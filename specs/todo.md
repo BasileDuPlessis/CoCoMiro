@@ -5,7 +5,7 @@ This todo list is based on the specifications in:
 - [infinite-canvas-spec.md](infinite-canvas-spec.md) - Infinite canvas feature requirements
 
 ## Hello World Application Implementation
-- [x] Following workspace-specs.md exactly, implement the Hello World application
+- [x] Following workspace-specs.md exactly, implement the workspace
 
 ## Infinite Canvas Implementation Tasks
 - [ ] Task 1: Project Setup and Dependencies
