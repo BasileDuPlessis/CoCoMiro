@@ -1,1 +1,1 @@
-// Shared types and models will go here
+// Common types and models shared between frontend and backend

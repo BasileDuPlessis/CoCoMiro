@@ -1,92 +1,113 @@
-# Infinite Canvas Feature Specification
+# Infinite Canvas Implementation Tasks
 
-## Overview
-The infinite canvas feature allows users to navigate a boundless 2D space with smooth zooming and panning capabilities. This provides an intuitive way to explore and organize content without spatial constraints.
+This document breaks down the infinite canvas feature specification into manageable implementation tasks.
 
-## Features
+## Task 1: Project Setup and Dependencies
+- Set up Yew framework with WebAssembly support
+- Configure Trunk build tool for compilation and serving
+- Add web-sys crate for DOM and Canvas API interaction
+- Ensure modern browser compatibility (WebAssembly, Canvas 2D)
+- Verify hardware acceleration support
 
-### Zoom Functionality
-- **Button Controls**: Dedicated zoom in (+) and zoom out (-) buttons for precise control
-- **Mouse Wheel Support**: Standard mouse wheel scrolling for natural zoom interaction with zoom centered on mouse position
-- **Keyboard Shortcuts**: Ctrl+Plus/Ctrl+Equals to zoom in, Ctrl+Minus to zoom out
-- **Zoom Limits**: Minimum zoom level of 0.1 prevents content from becoming too small to interact with
-- **Zoom Center**: Zoom operations center on the current mouse position for wheel zoom
+## Task 2: Basic Canvas Component Structure
+- Create Yew component for the infinite canvas
+- Implement HTML5 Canvas element with 2D context
+- Set canvas size dynamically to window inner dimensions (capped at 3000x2000 pixels)
+- Add solid white background fill to prevent flickering
+- Set cursor style to "grab" for pan indication
 
-### Pan Functionality
-- **Click and Drag**: Click anywhere on the canvas and drag to move the view
-- **Directional Movement**: Smooth panning in all directions (left, right, up, down)
-- **Boundary Handling**: No boundaries - infinite movement in all directions
+## Task 3: View State Management
+- Implement state management using Yew's use_state hook
+- Define zoom level as f64 (1.0 = 100% magnification, minimum 0.1)
+- Define pan position as (pan_x, pan_y) f64 values in screen coordinates
+- Add drag state boolean flag and last mouse position tracking
+- Ensure state persists only in memory (no session persistence)
 
-### Grid System
-- **Horizontal and Vertical Lines**: The canvas displays a grid of horizontal and vertical lines to provide visual reference points
-- **Adaptive Grid**: Grid line width adjusts based on zoom level for optimal readability (thinner lines at higher zoom)
-- **Fixed Grid Spacing**: Grid lines are spaced 50 world units apart
+## Task 4: Zoom Functionality Implementation
+- Add zoom in (+) and zoom out (-) button controls
+- Position zoom buttons in top-left corner (10px from top-left edge)
+- Implement mouse wheel scrolling for zoom (centered on mouse position)
+- Add keyboard shortcuts: Ctrl+Plus/Ctrl+Equals to zoom in, Ctrl+Minus to zoom out
+- Enforce zoom limits (minimum 0.1)
+- Calculate zoom factors: +20% for zoom in, ~16.7% for zoom out
+- Update canvas rendering on zoom changes
 
-## User Interactions
+## Task 5: Pan Functionality Implementation
+- Implement click and drag panning on canvas
+- Track mouse down, move, and up events
+- Update pan_x and pan_y based on mouse delta movement
+- Ensure natural pan behavior (canvas moves opposite to drag direction)
+- Support infinite movement in all directions (no boundaries)
+- Maintain smooth 60fps performance during drag operations
 
-### Zoom Controls
-1. Click zoom in button to increase magnification by 20%
-2. Click zoom out button to decrease magnification by ~16.7%
-3. Scroll mouse wheel up to zoom in (centered on mouse position)
-4. Scroll mouse wheel down to zoom out (centered on mouse position)
-5. Use Ctrl+Plus/Ctrl+Equals keyboard shortcut to zoom in
-6. Use Ctrl+Minus keyboard shortcut to zoom out
+## Task 6: Grid System Implementation
+- Draw horizontal and vertical grid lines as visual reference points
+- Space grid lines 50 world units apart
+- Implement adaptive grid line width based on zoom level (thinner at higher zoom)
+- Use screen-space coordinate calculations for precise rendering
+- Draw lines directly to canvas without external libraries
+- Ensure grid translates correctly with pan operations
 
-### Pan Controls
-1. Click and hold left mouse button on canvas
-2. Drag mouse in desired direction
-3. Release to stop movement
-4. Canvas moves opposite to drag direction (natural pan behavior)
+## Task 7: Event Handling Integration
+- Attach direct event listeners to canvas element for mouse and keyboard events
+- Handle mouse wheel events for zoom
+- Handle mouse down/move/up for panning
+- Handle keyboard events for shortcuts
+- Prevent default browser behaviors where necessary (e.g., page scroll on wheel)
+- Ensure events update view state correctly
+- **CRITICAL**: Implement canvas redrawing effects that trigger on state changes (zoom, pan)
+- Use Yew's use_effect_with_deps to redraw canvas when view state updates
+- Ensure canvas redraws immediately after state changes for responsive interaction
+- **CRITICAL**: Use proper dependency cloning in use_effect_with_deps - clone state values instead of dereferencing to avoid compilation errors
 
-## Technical Requirements
+## Task 8: Debug Overlay Implementation
+- Create semi-transparent overlay in top-left corner
+- Display real-time zoom level, pan coordinates (pan_x, pan_y), and drag state
+- Update overlay on every render cycle
+- Position overlay to not interfere with canvas interaction
+- Moved debug overlay from top-left to top-right corner to avoid overlapping zoom buttons
+- Use simple text rendering for debug information
 
-### Performance
-- Smooth 60fps animation during zoom and pan operations
-- Efficient rendering using screen-space grid drawing
-- Memory management for infinite space
-- Canvas size limited to 3000x2000 pixels for performance
+## Task 9: Performance and Rendering Optimization
+- Implement imperative canvas drawing with screen-space coordinates
+- Avoid transform matrices for precision
+- Ensure 60fps animation during zoom and pan operations
+- Optimize grid drawing for large canvas areas
+- Limit canvas size to 3000x2000 pixels for performance
+- Manage memory efficiently for infinite space concept
+- **CRITICAL**: Ensure reactive rendering - canvas must redraw immediately when view state changes
+- Implement proper dependency tracking for canvas redraw effects
+- Test that all state changes (pan, zoom) trigger immediate visual updates
 
-### Accessibility
-- Keyboard shortcuts for zoom (Ctrl+Plus, Ctrl+Minus)
-- Tab navigation support for zoom buttons
+## Task 10: Accessibility Features
+- Ensure keyboard shortcuts work (Ctrl+Plus, Ctrl+Minus)
+- Implement tab navigation support for zoom buttons
+- Add proper ARIA labels and roles where applicable
+- Test keyboard-only navigation
+- Verify screen reader compatibility
 
-### Browser Compatibility
-- Modern browsers with WebAssembly and Canvas 2D API support
-- Hardware acceleration when available
+## Task 11: Testing and Validation
+- Implement unit tests for zoom calculations and limits
+- Test pan functionality with mouse simulation
+- Validate grid drawing at different zoom levels
+- Performance test for 60fps during operations
+- Test boundary handling for infinite movement
+- Cross-browser compatibility testing
+- **CRITICAL**: Test reactive canvas updates - verify canvas redraws immediately on state changes
+- Test that pan operations update visual grid position in real-time
+- Test that zoom operations update visual grid scale immediately
+- Validate that no state changes are "silent" (don't trigger visual updates)
+- **CRITICAL**: Validate compilation succeeds - ensure no "cannot move out of dereference" errors in use_effect_with_deps
 
-## Implementation Details
-
-### Technology Stack
-- **Framework**: Yew (React-like framework for Rust/WebAssembly)
-- **Rendering**: HTML5 Canvas with 2D context
-- **Build Tool**: Trunk for WebAssembly compilation and serving
-- **Browser APIs**: web-sys crate for DOM and Canvas interaction
-
-### Architecture
-- **State Management**: Yew's use_state hook for view state (zoom, pan position, drag state)
-- **Event Handling**: Direct event listeners on canvas element for mouse and keyboard events
-- **Rendering**: Imperative canvas drawing with screen-space coordinate calculations
-- **Grid Drawing**: Lines calculated in world coordinates but drawn directly to screen pixels
-
-### View State
-- **Zoom**: f64 value representing magnification level (1.0 = 100%)
-- **Pan**: (pan_x, pan_y) f64 values for translation in screen coordinates
-- **Drag State**: Boolean flag and last mouse position for panning
-
-### Canvas Management
-- **Size**: Dynamically set to window inner dimensions (capped at 3000x2000)
-- **Background**: Solid white fill to prevent flickering
-- **Cursor**: "grab" cursor style for pan indication
-
-### Debug Features
-- **Overlay**: Real-time display of zoom level, pan coordinates, and drag state
-- **Position**: Top-left corner with semi-transparent background
-
-## Implementation Notes
-- Use HTML5 Canvas for rendering with screen-space coordinate system
-- No transform matrix used - all calculations done in screen coordinates for precision
-- Grid lines drawn directly to canvas without libraries
-- View state stored in memory only (not persisted across sessions)
-- No external canvas libraries (Fabric.js, Konva.js) - built with web-sys only
-
-<!-- How to implement with a GEN AI Agent: "Following infinite-canvas-spec.md exactly, implement the infinite canvas application" -->
+## Task 12: Integration and Final Polish
+- Integrate all features into cohesive application
+- Test complete user workflows (zoom + pan + grid)
+- Optimize UI layout: Position zoom buttons in top-left, debug overlay in top-right to prevent overlap
+- Add any missing error handling
+- Optimize build and serve process with Trunk
+- Document usage and deployment instructions
+- Final validation against specification requirements
+- **CRITICAL**: Perform manual testing of reactive canvas updates - drag to pan and verify grid moves immediately
+- **CRITICAL**: Test zoom operations and verify immediate visual feedback
+- **CRITICAL**: Ensure no "static canvas" bugs where state changes don't trigger redraws
+- **CRITICAL**: Validate compilation - ensure use_effect_with_deps dependencies are properly cloned (not dereferenced) to avoid "cannot move out of dereference" errors

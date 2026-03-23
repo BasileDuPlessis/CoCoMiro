@@ -9,20 +9,20 @@ Setup specifications for a simple Hello World application: WASM frontend with Tr
 Create a comprehensive `.gitignore` file for Rust/WASM development:
 
 ```
-/target/
-/Cargo.lock
+target/
+Cargo.lock
 **/*.rs.bk
 *.pdb
 
 # Trunk specific
-/dist/
-/.wasm-target/
+dist/
+.wasm-target/
 
 # WASM specific
-/pkg/
-/static/pkg/
-/node_modules/
-/build/
+pkg/
+static/pkg/
+node_modules/
+build/
 
 # IDE and editor files
 .vscode/
@@ -51,10 +51,9 @@ yarn-error.log*
 # Temporary files
 *.tmp
 *.temp
-```
 
-### 2. .copilot-instructions.md Setup
-Create `.copilot-instructions.md` with development guidelines:
+### 2. .github/copilot-instructions.md Setup
+Create `.github/copilot-instructions.md` with development guidelines:
 
 ```markdown
 # Hello World - Rust/WASM Development Guidelines
@@ -95,7 +94,6 @@ Create `.copilot-instructions.md` with development guidelines:
 For full-stack applications with backend communication:
 
 ```
-hello-world/
 ├── Cargo.toml                    # Workspace configuration
 ├── Cargo.lock
 ├── frontend/
@@ -138,6 +136,7 @@ wasm-bindgen-test = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
 thiserror = "1.0"
+wasm-bindgen-futures = "0.4"
 hello-world-shared = { path = "../shared" }  # Shared types
 
 [package.metadata.wasm-pack.profile.release]
@@ -388,9 +387,31 @@ Before implementing the hello world example, establish the full workspace struct
    ```rust
    use yew::prelude::*;
 
+   mod api;
+
    #[function_component(App)]
    pub fn app() -> Html {
-       html! { <h1>{ "HELLO WORLD" }</h1> }
+       let health_status = use_state(|| "Checking...".to_string());
+
+       {
+           let health_status = health_status.clone();
+           use_effect(move || {
+               wasm_bindgen_futures::spawn_local(async move {
+                   match api::health_check().await {
+                       Ok(status) => health_status.set(format!("Backend: {}", status)),
+                       Err(_) => health_status.set("Backend: Unavailable".to_string()),
+                   }
+               });
+               || ()
+           });
+       }
+
+       html! {
+           <div>
+               <h1>{ "HELLO WORLD" }</h1>
+               <p>{ (*health_status).clone() }</p>
+           </div>
+       }
    }
 
    #[cfg(not(test))]
@@ -408,6 +429,7 @@ Before implementing the hello world example, establish the full workspace struct
        async fn test_hello_world_display() {
            let rendered = yew::ServerRenderer::<App>::new().render().await;
            assert!(rendered.contains("HELLO WORLD"));
+           assert!(rendered.contains("Backend:")); // Check that health status is displayed
        }
    }
    ```
@@ -453,9 +475,9 @@ Before implementing the hello world example, establish the full workspace struct
 ### Verification Steps
 - Page loads without errors
 - "HELLO WORLD" text displays
+- Backend health status displays (shows "Backend: OK" when server is running, "Backend: Unavailable" when not)
 - Browser console shows no WASM errors
 - Hot reload works when code changes
-- Workspace structure is properly established for future development
 
 ## 8. Health Check Implementation
 
@@ -529,6 +551,8 @@ pub fn app() -> Html {
 ```rust
 // frontend/src/api.rs
 use wasm_bindgen::JsValue;
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
 pub async fn health_check() -> Result<String, JsValue> {
@@ -538,13 +562,14 @@ pub async fn health_check() -> Result<String, JsValue> {
 
     let request = Request::new_with_str_and_init("http://localhost:3000/health", &opts)?;
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("No window object"))?;
-    let resp_value = wasm_bindgen_futures::JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
     let resp: Response = resp_value.dyn_into().map_err(|_| JsValue::from_str("Failed to cast response"))?;
 
     match resp.status() {
         200 => {
-            let text = wasm_bindgen_futures::JsFuture::from(resp.text()?).await?;
-            Ok(text.as_string().unwrap_or_default())
+            let text_promise = resp.text()?;
+            let text_value: JsValue = JsFuture::from(text_promise).await?;
+            Ok(text_value.as_string().unwrap_or_default())
         },
         _ => Err(JsValue::from_str("Health check failed")),
     }

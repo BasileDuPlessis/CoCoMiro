@@ -1,17 +1,17 @@
-/target/
-/Cargo.lock
+target/
+Cargo.lock
 **/*.rs.bk
 *.pdb
 
 # Trunk specific
-/dist/
-/.wasm-target/
+dist/
+.wasm-target/
 
 # WASM specific
-/pkg/
-/static/pkg/
-/node_modules/
-/build/
+pkg/
+static/pkg/
+node_modules/
+build/
 
 # IDE and editor files
 .vscode/

@@ -1,13 +1,3 @@
 [build]
 target = "index.html"
 dist = "dist"
-
-[[hooks]]
-stage = "pre_build"
-command = "echo"
-command_arguments = ["Building Hello World..."]
-
-[[hooks]]
-stage = "post_build"
-command = "cp"
-command_arguments = ["-r", "static/.", "dist/"]
