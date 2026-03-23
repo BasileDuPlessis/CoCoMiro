@@ -1,0 +1,25 @@
+[package]
+name = "hello-world-frontend"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+yew = { version = "0.20", features = ["csr", "ssr"] }
+web-sys = { version = "0.3", features = [
+  "console", "Window", "Document", "Element", "HtmlElement", "Node", "Text",
+  "Request", "RequestInit", "RequestMode", "Response", "Headers"
+] }
+js-sys = "0.3"
+wasm-bindgen-test = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"
+hello-world-shared = { path = "../shared" }  # Shared types
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O", "--enable-reference-types", "shrink-level=1"]

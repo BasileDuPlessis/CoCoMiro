@@ -1,2 +1,42 @@
-target/
-dist/
+/target/
+/Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Trunk specific
+/dist/
+/.wasm-target/
+
+# WASM specific
+/pkg/
+/static/pkg/
+/node_modules/
+/build/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+*.tmp
+*.temp
