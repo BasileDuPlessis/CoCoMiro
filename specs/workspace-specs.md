@@ -1,7 +1,7 @@
-# Hello World - Workspace Setup Specifications
+# App - Workspace Setup Specifications
 
 ## Overview
-Setup specifications for a simple Hello World application: WASM frontend with Trunk + Rust backend communication. Follows TDD principles.
+Setup specifications for a simple app: WASM frontend with Trunk + Rust backend communication. Follows TDD principles.
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ yarn-error.log*
 Create `.github/copilot-instructions.md` with development guidelines:
 
 ```markdown
-# Hello World - Rust/WASM Development Guidelines
+# App - Rust/WASM Development Guidelines
 
 ## Code Style
 - Use `rustfmt` and `clippy`
@@ -192,7 +192,7 @@ dist = "dist"
 [[hooks]]
 stage = "pre_build"
 command = "echo"
-command_arguments = ["Building Hello World..."]
+command_arguments = ["Building app..."]
 
 [[hooks]]
 stage = "post_build"
@@ -313,7 +313,7 @@ mod wasm_tests {
 3. **REFACTOR**: Improve code while keeping tests passing
 4. **VERIFY**: Use `trunk serve` to test in browser
 
-### Example TDD for "HELLO WORLD"
+### Example TDD for App
 1. Write test in `frontend/src/lib.rs`:
    ```rust
    #[cfg(test)]
@@ -371,10 +371,10 @@ trunk build --release
 - Reference assets using relative paths from HTML root
 - Trunk handles cache busting automatically
 
-## 7. "HELLO WORLD" Implementation Goal
+## 7. App Implementation Goal
 
 ### Workspace Structure Setup (REQUIRED)
-Before implementing the hello world example, establish the full workspace structure as defined in section 3. This ensures scalability and proper separation of concerns from the start.
+Before implementing the app example, establish the full workspace structure as defined in section 3. This ensures scalability and proper separation of concerns from the start.
 
 1. Create the workspace directories: `frontend/`, `backend/`, `shared/`
 2. Set up root `Cargo.toml` as workspace with members
@@ -440,7 +440,7 @@ Before implementing the hello world example, establish the full workspace struct
    <html>
      <head>
        <meta charset="utf-8" />
-       <title>Hello World</title>
+       <title>App</title>
        <style>
          body {
            margin: 0;
@@ -474,7 +474,7 @@ Before implementing the hello world example, establish the full workspace struct
 
 ### Verification Steps
 - Page loads without errors
-- "HELLO WORLD" text displays
+- App text displays
 - Backend health status displays (shows "Backend: OK" when server is running, "Backend: Unavailable" when not)
 - Browser console shows no WASM errors
 - Hot reload works when code changes
@@ -593,4 +593,4 @@ trunk serve --port 8080
 - CORS allows cross-origin requests from frontend to backend
 - Health check runs automatically on page load
 
-<!-- How to implement with a GEN AI Agent: "Following workspace-specs.md exactly, implement the Hello World application" -->
+<!-- How to implement with a GEN AI Agent: "Following workspace-specs.md exactly, implement the app" -->
