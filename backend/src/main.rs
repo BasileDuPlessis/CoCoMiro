@@ -1,8 +1,10 @@
 use axum::{routing::get, Router};
-use tower_http::cors::{CorsLayer, Any};
+use hello_world_shared::HealthResponse;
+use std::net::TcpListener;
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -12,11 +14,15 @@ async fn main() {
         .route("/health", get(health_check))
         .layer(cors);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3000")?;
     println!("Server running on http://localhost:3000");
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(tokio::net::TcpListener::from_std(listener)?, app).await?;
+    Ok(())
 }
 
-async fn health_check() -> &'static str {
-    "OK"
+async fn health_check() -> axum::Json<HealthResponse> {
+    axum::Json(HealthResponse {
+        status: "OK".to_string(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    })
 }

@@ -1,6 +1,8 @@
-use yew::prelude::*;
-use web_sys::{window, HtmlCanvasElement, CanvasRenderingContext2d, MouseEvent, WheelEvent, KeyboardEvent};
 use wasm_bindgen::JsCast;
+use web_sys::{
+    window, CanvasRenderingContext2d, HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent,
+};
+use yew::prelude::*;
 
 mod api;
 
@@ -42,6 +44,7 @@ fn infinite_canvas() -> Html {
     let draw_canvas = {
         let view_state = view_state.clone();
         let get_context = get_context.clone();
+        #[allow(deprecated)]
         move || {
             if let Some(ctx) = get_context() {
                 let canvas = canvas_ref_clone.cast::<HtmlCanvasElement>().unwrap();
@@ -49,7 +52,7 @@ fn infinite_canvas() -> Html {
                 let height = canvas.height() as f64;
 
                 // Clear canvas with white background
-                ctx.set_fill_style(&wasm_bindgen::JsValue::from("#FFFFFF"));
+                ctx.set_fill_style(&"#FFFFFF".into());
                 ctx.fill_rect(0.0, 0.0, width, height);
 
                 // Draw grid
@@ -62,11 +65,12 @@ fn infinite_canvas() -> Html {
     };
 
     // Draw grid function
+    #[allow(deprecated)]
     fn draw_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, view_state: &ViewState) {
         let grid_spacing = 50.0 * view_state.zoom;
-        let line_width = (1.0 / view_state.zoom).max(0.5).min(2.0);
+        let line_width = (1.0 / view_state.zoom).clamp(0.5, 2.0);
 
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from("#E0E0E0"));
+        ctx.set_stroke_style(&"#E0E0E0".into());
         ctx.set_line_width(line_width);
 
         // Calculate grid offset based on pan
@@ -95,19 +99,26 @@ fn infinite_canvas() -> Html {
     }
 
     // Draw debug overlay
-    fn draw_debug_overlay(ctx: &CanvasRenderingContext2d, width: f64, _height: f64, view_state: &ViewState) {
+    #[allow(deprecated)]
+    fn draw_debug_overlay(
+        ctx: &CanvasRenderingContext2d,
+        width: f64,
+        _height: f64,
+        view_state: &ViewState,
+    ) {
         let debug_text = format!(
             "Zoom: {:.2}\nPan: ({:.1}, {:.1})\nDragging: {}",
             view_state.zoom, view_state.pan_x, view_state.pan_y, view_state.is_dragging
         );
 
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from("rgba(0, 0, 0, 0.7)"));
+        ctx.set_fill_style(&"rgba(0, 0, 0, 0.7)".into());
         ctx.set_font("14px monospace");
         ctx.fill_rect(width - 200.0, 10.0, 190.0, 60.0);
 
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from("#FFFFFF"));
+        ctx.set_fill_style(&"#FFFFFF".into());
         for (i, line) in debug_text.lines().enumerate() {
-            ctx.fill_text(line, width - 190.0, 30.0 + (i as f64 * 16.0)).unwrap();
+            ctx.fill_text(line, width - 190.0, 30.0 + (i as f64 * 16.0))
+                .unwrap();
         }
     }
 
@@ -119,7 +130,12 @@ fn infinite_canvas() -> Html {
             move |_| {
                 draw_canvas();
             },
-            (view_state.zoom, view_state.pan_x, view_state.pan_y, view_state.is_dragging),
+            (
+                view_state.zoom,
+                view_state.pan_x,
+                view_state.pan_y,
+                view_state.is_dragging,
+            ),
         );
     }
 
@@ -198,7 +214,7 @@ fn infinite_canvas() -> Html {
             let zoom_factor = if delta > 0.0 { 0.8333 } else { 1.2 }; // ~16.7% out, +20% in
 
             let mut new_state = (*view_state).clone();
-            new_state.zoom = (new_state.zoom * zoom_factor).max(0.1).min(10.0);
+            new_state.zoom = (new_state.zoom * zoom_factor).clamp(0.1, 10.0);
             view_state.set(new_state);
         })
     };
@@ -235,7 +251,8 @@ fn infinite_canvas() -> Html {
             if let Some(canvas) = canvas_ref.cast::<HtmlCanvasElement>() {
                 if let Some(window) = window() {
                     let width = (window.inner_width().unwrap().as_f64().unwrap() as u32).min(3000);
-                    let height = (window.inner_height().unwrap().as_f64().unwrap() as u32).min(2000);
+                    let height =
+                        (window.inner_height().unwrap().as_f64().unwrap() as u32).min(2000);
                     canvas.set_width(width);
                     canvas.set_height(height);
                     draw_canvas();
@@ -274,35 +291,4 @@ pub fn app() -> Html {
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 pub fn main() {
     yew::Renderer::<App>::new().render();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use wasm_bindgen_test::*;
-
-    #[wasm_bindgen_test]
-    fn test_zoom_limits() {
-        let view_state = ViewState {
-            zoom: 1.0,
-            pan_x: 0.0,
-            pan_y: 0.0,
-            is_dragging: false,
-            last_mouse_pos: None,
-        };
-
-        // Test zoom in
-        let zoomed_in = ViewState {
-            zoom: (view_state.zoom * 1.2).min(10.0),
-            ..view_state
-        };
-        assert!(zoomed_in.zoom >= 1.0);
-
-        // Test zoom out
-        let zoomed_out = ViewState {
-            zoom: (view_state.zoom / 1.2).max(0.1),
-            ..view_state
-        };
-        assert!(zoomed_out.zoom >= 0.1);
-    }
 }
