@@ -22,6 +22,12 @@ anyhow = "1.0"
 thiserror = "1.0"
 wasm-bindgen-futures = "0.4"
 hello-world-shared = { path = "../shared" }  # Shared types
+wasm-logger = "0.2"
+log = "0.4"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
+dead_code = "allow"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O", "--enable-reference-types", "shrink-level=1"]

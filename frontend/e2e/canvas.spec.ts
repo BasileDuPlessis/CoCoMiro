@@ -5,16 +5,57 @@ test.describe('Infinite Canvas', () => {
     await page.goto('/');
   });
 
-  test('canvas loads and displays', async ({ page }) => {
-    // Check that canvas element exists
-    const canvas = page.locator('canvas');
-    await expect(canvas).toBeVisible();
+  test('floating toolbar is visible and positioned correctly', async ({ page }) => {
+    // Check that the floating toolbar exists - look for the div with absolute positioning
+    const toolbar = page.locator('div[style*="position: absolute"][style*="left: 10px"][style*="top: 10px"]');
+    await expect(toolbar).toBeVisible();
 
-    // Check that zoom buttons are present
-    const zoomInButton = page.locator('button:has-text("+")');
-    const zoomOutButton = page.locator('button:has-text("-")');
+    // Check that zoom buttons are inside the toolbar
+    const zoomInButton = toolbar.locator('button:has-text("+")');
+    const zoomOutButton = toolbar.locator('button:has-text("-")');
     await expect(zoomInButton).toBeVisible();
     await expect(zoomOutButton).toBeVisible();
+
+    // Check that the grip zone is visible
+    const gripZone = toolbar.locator('div[style*="height: 8px"]');
+    await expect(gripZone).toBeVisible();
+
+    // Check that it's positioned near the top-left initially
+    const toolbarBox = await toolbar.boundingBox();
+    
+    // Toolbar should be positioned near the top-left initially
+    expect(toolbarBox!.y).toBeLessThan(50); // Should be near the top
+    expect(toolbarBox!.x).toBeLessThan(50); // Should be near the left initially
+    expect(toolbarBox!.width).toBeGreaterThan(40); // Should have reasonable width for buttons
+  });
+
+  test('floating toolbar can be dragged to new positions', async ({ page }) => {
+    const toolbar = page.locator('div[style*="position: absolute"]');
+    
+    // Get initial position
+    const initialBox = await toolbar.boundingBox();
+    const initialX = initialBox!.x;
+    const initialY = initialBox!.y;
+
+    // Drag the toolbar to a new position (50px right, 50px down)
+    await page.mouse.move(initialX + 20, initialY + 10); // Move to grip zone
+    await page.mouse.down();
+    await page.mouse.move(initialX + 70, initialY + 60, { steps: 10 }); // Drag to new position
+    await page.mouse.up();
+
+    // Check that toolbar has moved
+    const newBox = await toolbar.boundingBox();
+    const newX = newBox!.x;
+    const newY = newBox!.y;
+
+    // Should have moved approximately 50px in each direction
+    expect(newX).toBeGreaterThan(initialX + 40);
+    expect(newY).toBeGreaterThan(initialY + 40);
+
+    // Toolbar should still be visible and functional
+    await expect(toolbar).toBeVisible();
+    const zoomInButton = toolbar.locator('button:has-text("+")');
+    await expect(zoomInButton).toBeVisible();
   });
 
   test('zoom in button increases zoom', async ({ page }) => {

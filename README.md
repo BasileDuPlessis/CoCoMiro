@@ -62,7 +62,11 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
    # Terminal 1: Start backend API
    cd backend && cargo run
 
-   # Terminal 2: Start frontend dev server
+   # Terminal 2: Build and start frontend (recommended)
+   ./run-frontend.sh
+
+   # Or manually:
+   cargo build --package hello-world-frontend
    cd frontend && trunk serve --open
    ```
 
@@ -73,6 +77,13 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
 ### Development Commands
 
 ```bash
+# Quick start (builds frontend automatically)
+./run-frontend.sh
+
+# Manual frontend development
+cargo build --package hello-world-frontend
+cd frontend && trunk serve --open
+
 # Build entire workspace
 cargo build
 
@@ -91,6 +102,38 @@ cd frontend && npm run test:ui
 # Build for production
 cd frontend && trunk build --release
 cd backend && cargo build --release
+```
+
+## 🔧 Troubleshooting
+
+### Frontend Won't Start
+If `trunk serve` fails with "could not find the root package":
+```bash
+# Build the frontend package first (required for workspace dependencies)
+cargo build --package hello-world-frontend
+cd frontend && trunk serve --open
+```
+
+### Port Conflicts
+If you get "Address already in use":
+```bash
+# Kill processes using ports 3000 (backend) or 8080 (frontend)
+lsof -ti:3000 | xargs kill -9  # Backend
+lsof -ti:8080 | xargs kill -9  # Frontend
+
+# Or use different ports
+cd backend && cargo run -- --port 3001
+cd frontend && trunk serve --port 8081
+```
+
+### WASM Build Issues
+```bash
+# Ensure WASM target is installed
+rustup target add wasm32-unknown-unknown
+
+# Clear build cache if needed
+rm -rf target/
+cargo clean
 ```
 
 ## 🤖 CI/CD & Quality Assurance

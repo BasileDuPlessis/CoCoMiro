@@ -200,6 +200,281 @@ command = "cp"
 command_arguments = ["-r", "static/.", "dist/"]
 ```
 
+## E2E Test Framework Implementation
+
+### 1. Playwright Setup
+Install Playwright as the primary E2E testing framework:
+
+```bash
+# Install Playwright and test runner
+npm install --save-dev @playwright/test playwright
+
+# Install browser binaries
+npx playwright install
+
+# Install system dependencies for CI
+npx playwright install-deps
+```
+
+### 2. Test Configuration Structure
+Create the following test directory structure:
+
+```
+frontend/
+├── e2e/                          # E2E test specifications
+│   ├── canvas.spec.ts           # Canvas interaction tests
+│   ├── sticky-notes.spec.ts     # Sticky notes tests (future)
+│   └── shared/                  # Shared test utilities
+│       ├── fixtures.ts          # Test fixtures and setup
+│       └── helpers.ts           # Test helper functions
+├── playwright.config.ts         # Playwright configuration
+├── package.json                 # Test scripts and dependencies
+└── test-results/                # Test output and screenshots
+```
+
+### 3. Playwright Configuration
+Configure `playwright.config.ts` with the following settings:
+
+```typescript
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+
+  use: {
+    baseURL: 'http://localhost:8080',  // Frontend port
+    trace: 'on-first-retry',
+  },
+
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+
+  webServer: {
+    command: 'trunk serve --port 8080',
+    port: 8080,
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+
+### 4. Test Script Configuration
+Add the following scripts to `package.json`:
+
+```json
+{
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report"
+  }
+}
+```
+
+### 5. TypeScript Type Definitions
+Install Node.js type definitions for proper TypeScript support:
+
+```bash
+npm install --save-dev @types/node
+```
+
+### 6. Test File Structure Template
+Create test files following this structure:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Feature Name', () => {
+  test('should perform specific user interaction', async ({ page }) => {
+    // Arrange: Set up initial state
+    await page.goto('/');
+
+    // Act: Perform user action
+    await page.click('selector');
+
+    // Assert: Verify expected behavior
+    await expect(page.locator('result')).toBeVisible();
+  });
+});
+```
+
+### 7. CI/CD Integration
+Add GitHub Actions workflow for automated testing:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: cargo build --workspace
+      - run: cd frontend && npm ci
+      - run: cd frontend && npx playwright install --with-deps
+      - run: cd frontend && npm test
+```
+
+### 8. Test Automation Scripts
+Create automated test runner script (`test-all.sh`):
+
+```bash
+#!/bin/bash
+# Comprehensive test suite runner
+
+echo "🚀 Running Mori Test Suite"
+echo "=========================="
+
+# Code formatting check
+cargo fmt --all -- --check
+echo "✅ Code formatting OK"
+
+# Linting
+cargo clippy --all-targets --all-features -- -D warnings
+echo "✅ Clippy checks passed"
+
+# Build
+cargo build --workspace
+echo "✅ Build successful"
+
+# E2E tests
+cd frontend
+npm test
+cd ..
+echo "✅ E2E tests passed"
+
+echo "🎉 All tests passed!"
+```
+
+### 9. Pre-commit Hooks
+Implement pre-commit quality gates:
+
+```bash
+# Install pre-commit hook
+chmod +x .git/hooks/pre-commit
+
+# Hook content (.git/hooks/pre-commit):
+#!/bin/bash
+echo "🔍 Running pre-commit checks..."
+./test-all.sh || (echo "❌ Tests failed!" && exit 1)
+```
+
+### 10. Test Documentation Standards
+Follow these documentation standards for all tests:
+
+- **Test Names**: Describe user behavior, not implementation
+  - ✅ `"should zoom in when + button is clicked"`
+  - ❌ `"should call zoomIn function"`
+
+- **Test Structure**: Arrange-Act-Assert pattern
+- **Selectors**: Use semantic selectors over CSS classes
+- **Assertions**: Verify user-visible changes, not internal state
+
+### 11. Browser Compatibility Testing
+Configure multi-browser testing for comprehensive coverage:
+
+```typescript
+// playwright.config.ts
+projects: [
+  {
+    name: 'chromium',
+    use: { ...devices['Desktop Chrome'] },
+  },
+  {
+    name: 'firefox',
+    use: { ...devices['Desktop Firefox'] },
+  },
+  {
+    name: 'webkit',
+    use: { ...devices['Desktop Safari'] },
+  },
+],
+```
+
+### 12. Visual Regression Testing (Optional)
+Add visual regression testing for UI consistency:
+
+```bash
+# Install visual testing
+npm install --save-dev @playwright/test-visual-regression
+
+# Add to tests
+await expect(page).toHaveScreenshot('canvas-initial-state.png');
+```
+
+### 13. Performance Testing
+Include performance benchmarks in E2E tests:
+
+```typescript
+test('should render canvas smoothly at 60fps', async ({ page }) => {
+  // Measure frame rate during interactions
+  const startTime = Date.now();
+  // Perform canvas operations
+  const endTime = Date.now();
+  const duration = endTime - startTime;
+
+  expect(duration).toBeLessThan(1000); // Should complete within 1 second
+});
+```
+
+### 14. Accessibility Testing
+Integrate accessibility checks:
+
+```typescript
+test('should be keyboard accessible', async ({ page }) => {
+  // Test keyboard navigation
+  await page.keyboard.press('Tab');
+  await expect(page.locator('button:focus')).toBeVisible();
+
+  // Test screen reader compatibility
+  await expect(page.locator('[aria-label]')).toBeTruthy();
+});
+```
+
+### 15. Test Data Management
+Implement test data isolation:
+
+- Use unique test data for each test run
+- Clean up test data after test completion
+- Avoid dependencies between tests
+- Use fixtures for common test setup
+
+### 16. Error Handling and Debugging
+Configure comprehensive error reporting:
+
+```typescript
+// playwright.config.ts
+use: {
+  screenshot: 'only-on-failure',
+  video: 'retain-on-failure',
+  trace: 'on-first-retry',
+},
+```
+
+### 17. Test Organization Best Practices
+- Group related tests in `describe` blocks
+- Use `beforeEach`/`afterEach` for setup/cleanup
+- Keep tests focused on single user interactions
+- Use page objects for complex interactions
+- Document test prerequisites and assumptions
+```
+
 ### Development Tools Setup
 1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 2. Install WASM target: `rustup target add wasm32-unknown-unknown`
