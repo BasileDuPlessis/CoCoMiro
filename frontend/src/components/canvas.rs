@@ -2,7 +2,7 @@ use crate::components::{FloatingToolbar, StickyNoteComponent};
 use crate::constants::*;
 use crate::events::*;
 use crate::rendering::{draw_debug_overlay, draw_grid};
-use crate::state::{AppState, StickyNotesState, ToolbarState, ViewState};
+use crate::state::{AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState};
 use wasm_bindgen::JsCast;
 use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
 use yew::prelude::*;
@@ -27,6 +27,7 @@ pub fn infinite_canvas() -> Html {
             notes: Vec::new(),
             editing_note_id: None,
             editing_content: None,
+            selected_note_id: None,
         },
     });
 
@@ -95,6 +96,7 @@ pub fn infinite_canvas() -> Html {
     let save_edit_note = create_save_edit_handler(&app_state);
     let cancel_edit_note = create_cancel_edit_handler(&app_state);
     let update_editing_content = create_update_content_handler(&app_state);
+    let select_note = create_select_note_handler(&app_state);
     let on_mouse_down = create_mouse_down_handler(&app_state);
     let on_mouse_move = create_mouse_move_handler(&app_state);
     let on_mouse_up = create_mouse_up_handler(&app_state);
@@ -135,6 +137,7 @@ pub fn infinite_canvas() -> Html {
         });
     }
 
+
     html! {
         <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
             <FloatingToolbar app_state={app_state.clone()} on_zoom_in={zoom_in} on_zoom_out={zoom_out} on_create_sticky_note={create_sticky_note} />
@@ -146,27 +149,36 @@ pub fn infinite_canvas() -> Html {
                 onmouseup={on_mouse_up}
                 onwheel={on_wheel}
                 onkeydown={on_key_down}
+                onclick={
+                    let app_state = app_state.clone();
+                    Callback::from(move |_| {
+                        app_state.dispatch(AppAction::StickyNotes(StickyNotesAction::DeselectNote));
+                    })
+                }
                 tabindex="0"
             />
             { for app_state.sticky_notes.notes.iter().map(|note| {
                 let is_editing = app_state.sticky_notes.editing_note_id.as_ref() == Some(&note.id);
+                let is_selected = app_state.sticky_notes.selected_note_id.as_ref() == Some(&note.id);
                 html! {
                     <StickyNoteComponent
                         note={note.clone()}
                         app_state={app_state.clone()}
                         is_editing={is_editing}
                         editing_content={app_state.sticky_notes.editing_content.clone()}
+                        is_selected={is_selected}
                         on_start_edit={start_edit_note.clone()}
                         on_save_edit={save_edit_note.clone()}
                         on_cancel_edit={cancel_edit_note.clone()}
                         on_update_content={update_editing_content.clone()}
+                        on_select={select_note.clone()}
                     />
                 }
             })}
             { if app_state.sticky_notes.editing_note_id.is_some() {
                 html! {
                     <div
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 4; cursor: default;"
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: default;"
                         onclick={save_edit_note.clone()}
                     />
                 }

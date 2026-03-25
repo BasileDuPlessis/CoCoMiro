@@ -11,10 +11,12 @@ pub struct StickyNoteProps {
     pub app_state: UseReducerHandle<AppState>,
     pub is_editing: bool,
     pub editing_content: Option<String>,
+    pub is_selected: bool,
     pub on_start_edit: Callback<String>,
     pub on_save_edit: Callback<MouseEvent>,
     pub on_cancel_edit: Callback<MouseEvent>,
     pub on_update_content: Callback<String>,
+    pub on_select: Callback<String>,
 }
 
 #[function_component(StickyNoteComponent)]
@@ -60,11 +62,13 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
         screen_width,
         screen_height,
         STICKY_NOTE_BG,
-        STICKY_NOTE_BORDER,
+        if props.is_selected { STICKY_NOTE_SELECTED_BORDER } else { STICKY_NOTE_BORDER },
         FONT_SIZE_BASE * view_state.zoom.max(0.5),
         if *is_dragging { "grabbing" } else if *is_hovered { "grab" } else { "pointer" },
         if *is_dragging {
             format!(" box-shadow: {}; opacity: {};", STICKY_NOTE_DRAG_SHADOW, STICKY_NOTE_DRAG_OPACITY)
+        } else if props.is_selected {
+            " box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);".to_string()
         } else {
             "".to_string()
         }
@@ -115,10 +119,14 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
         let on_click = {
             let note_id = note.id.clone();
             let on_start_edit = props.on_start_edit.clone();
-            let is_dragging = is_dragging.clone();
-            Callback::from(move |_| {
-                if !*is_dragging {
+            let on_select = props.on_select.clone();
+            let is_selected = props.is_selected;
+            Callback::from(move |e: MouseEvent| {
+                e.stop_propagation();
+                if is_selected {
                     on_start_edit.emit(note_id.clone());
+                } else {
+                    on_select.emit(note_id.clone());
                 }
             })
         };

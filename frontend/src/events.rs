@@ -79,6 +79,15 @@ pub fn create_update_content_handler(app_state: &UseReducerHandle<AppState>) -> 
     })
 }
 
+pub fn create_select_note_handler(app_state: &UseReducerHandle<AppState>) -> Callback<String> {
+    let app_state = app_state.clone();
+    Callback::from(move |note_id: String| {
+        app_state.dispatch(AppAction::StickyNotes(StickyNotesAction::SelectNote(
+            note_id,
+        )));
+    })
+}
+
 pub fn create_mouse_down_handler(app_state: &UseReducerHandle<AppState>) -> Callback<MouseEvent> {
     let app_state = app_state.clone();
     Callback::from(move |e: MouseEvent| {

@@ -24,6 +24,7 @@ pub struct StickyNotesState {
     pub notes: Vec<StickyNote>,
     pub editing_note_id: Option<String>,
     pub editing_content: Option<String>,
+    pub selected_note_id: Option<String>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -142,6 +143,8 @@ pub enum StickyNotesAction {
     SaveEdit,
     CancelEdit,
     UpdatePosition(String, Position),
+    SelectNote(String),
+    DeselectNote,
 }
 
 impl Reducible for StickyNotesState {
@@ -164,6 +167,7 @@ impl Reducible for StickyNotesState {
                     },
                     editing_note_id: self.editing_note_id.clone(),
                     editing_content: self.editing_content.clone(),
+                    selected_note_id: self.selected_note_id.clone(),
                 })
             }
             StickyNotesAction::StartEdit(note_id) => {
@@ -176,12 +180,14 @@ impl Reducible for StickyNotesState {
                     editing_note_id: Some(note_id),
                     editing_content,
                     notes: self.notes.clone(),
+                    selected_note_id: self.selected_note_id.clone(),
                 })
             }
             StickyNotesAction::UpdateContent(content) => Rc::new(StickyNotesState {
                 editing_content: Some(content),
                 notes: self.notes.clone(),
                 editing_note_id: self.editing_note_id.clone(),
+                selected_note_id: self.selected_note_id.clone(),
             }),
             StickyNotesAction::SaveEdit => {
                 if let Some(note_id) = self.editing_note_id.clone() {
@@ -201,6 +207,7 @@ impl Reducible for StickyNotesState {
                             notes,
                             editing_note_id: None,
                             editing_content: None,
+                            selected_note_id: self.selected_note_id.clone(),
                         })
                     } else {
                         self
@@ -213,6 +220,7 @@ impl Reducible for StickyNotesState {
                 editing_note_id: None,
                 editing_content: None,
                 notes: self.notes.clone(),
+                selected_note_id: self.selected_note_id.clone(),
             }),
             StickyNotesAction::UpdatePosition(note_id, new_position) => {
                 let notes = self
@@ -230,8 +238,21 @@ impl Reducible for StickyNotesState {
                     notes,
                     editing_note_id: self.editing_note_id.clone(),
                     editing_content: self.editing_content.clone(),
+                    selected_note_id: self.selected_note_id.clone(),
                 })
             }
+            StickyNotesAction::SelectNote(note_id) => Rc::new(StickyNotesState {
+                selected_note_id: Some(note_id),
+                notes: self.notes.clone(),
+                editing_note_id: self.editing_note_id.clone(),
+                editing_content: self.editing_content.clone(),
+            }),
+            StickyNotesAction::DeselectNote => Rc::new(StickyNotesState {
+                selected_note_id: None,
+                notes: self.notes.clone(),
+                editing_note_id: self.editing_note_id.clone(),
+                editing_content: self.editing_content.clone(),
+            }),
         }
     }
 }
