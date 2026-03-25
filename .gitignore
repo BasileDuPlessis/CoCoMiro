@@ -20,6 +20,9 @@ build/
 *.swo
 *~
 
+# Specs directory
+.specs/
+
 # OS specific
 .DS_Store
 Thumbs.db

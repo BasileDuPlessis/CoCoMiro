@@ -254,7 +254,7 @@ cd backend && cargo build --release
 
 1. **Code Style**: Use `rustfmt` and `clippy` for Rust code
 2. **Testing**: All changes must pass E2E tests
-3. **Documentation**: Update README and specs for new features
+3. **Documentation**: Update README and .specs for new features
 4. **Commits**: Use conventional commit format
 
 ### Development Workflow
@@ -300,7 +300,7 @@ mori/
 │   ├── Cargo.toml
 │   └── src/
 │       └── lib.rs
-├── specs/                         # Feature specifications
+├── .specs/                        # Feature specifications
 │   ├── infinite-canvas-spec.md
 │   ├── sticky-notes-spec.md
 │   └── workspace-specs.md

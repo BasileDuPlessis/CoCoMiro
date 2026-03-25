@@ -148,7 +148,7 @@ cd backend && cargo build --release
 When making changes:
 1. Update this instruction file if development practices change
 2. Update README.md for user-facing changes
-3. Update specs/ for new features or requirements
+3. Update .specs/ for new features or requirements
 4. Ensure tests cover new functionality
 5. Run full test suite before committing
 
