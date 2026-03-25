@@ -1,5 +1,6 @@
 use crate::constants::*;
 use crate::state::AppState;
+use crate::styles::StickyNoteStyle;
 use hello_world_shared::{Position, StickyNote};
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlTextAreaElement, InputEvent, KeyboardEvent, MouseEvent};
@@ -21,6 +22,7 @@ pub struct StickyNoteProps {
 
 #[function_component(StickyNoteComponent)]
 pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
+    let styles = StickyNoteStyle::new();
     let note = &props.note;
     let view_state = &props.app_state.view;
 
@@ -55,24 +57,28 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     let screen_width = note.size.width * view_state.zoom;
     let screen_height = note.size.height * view_state.zoom;
 
-    let style = format!(
-        "position: absolute; left: {}px; top: {}px; width: {}px; height: {}px; background: {}; border: 2px solid {}; padding: 8px; box-sizing: border-box; font-family: Arial, sans-serif; font-size: {}px; cursor: {}; user-select: none; z-index: 5;{}",
+    let transform_style = StickyNoteStyle::calculate_transform(
         screen_x,
         screen_y,
         screen_width,
         screen_height,
-        STICKY_NOTE_BG,
-        if props.is_selected { STICKY_NOTE_SELECTED_BORDER } else { STICKY_NOTE_BORDER },
-        FONT_SIZE_BASE * view_state.zoom.max(0.5),
-        if *is_dragging { "grabbing" } else if *is_hovered { "grab" } else { "pointer" },
-        if *is_dragging {
-            format!(" box-shadow: {}; opacity: {};", STICKY_NOTE_DRAG_SHADOW, STICKY_NOTE_DRAG_OPACITY)
-        } else if props.is_selected {
-            " box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);".to_string()
-        } else {
-            "".to_string()
-        }
+        view_state.zoom,
     );
+
+    // Determine CSS classes
+    let combined_classes = if props.is_selected && *is_dragging {
+        classes![
+            styles.base.clone(),
+            styles.selected.clone(),
+            styles.dragging.clone()
+        ]
+    } else if props.is_selected {
+        classes![styles.base.clone(), styles.selected.clone()]
+    } else if *is_dragging {
+        classes![styles.base.clone(), styles.dragging.clone()]
+    } else {
+        styles.base.clone()
+    };
 
     if props.is_editing {
         // Edit mode - show textarea
@@ -107,11 +113,13 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
         html! {
             <textarea
                 ref={textarea_ref}
-                style={format!("{} resize: none; border: none; outline: none; background: {};", style, STICKY_NOTE_BG)}
+                class={classes![styles.base, styles.editing]}
+                style={transform_style}
                 value={props.editing_content.clone().unwrap_or_default()}
                 oninput={on_input}
                 onkeydown={on_keydown}
                 autofocus={true}
+                data-testid="sticky-note-textarea"
             />
         }
     } else {
@@ -191,8 +199,18 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
             })
         };
 
+        let cursor_style = if *is_dragging {
+            "cursor: grabbing;"
+        } else if *is_hovered {
+            "cursor: grab;"
+        } else {
+            "cursor: pointer;"
+        };
+
+        let final_style = format!("{}{}", transform_style, cursor_style);
+
         html! {
-            <div {style} onclick={on_click} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup} onmouseenter={on_mouseenter} onmouseleave={on_mouseleave}>
+            <div class={combined_classes} style={final_style} onclick={on_click} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup} onmouseenter={on_mouseenter} onmouseleave={on_mouseleave} data-testid="sticky-note">
                 { for note.content.split('\n').map(|line| {
                     html! {
                         <div style={format!("margin-bottom: {}px;", LINE_MARGIN * view_state.zoom.max(0.5))}>

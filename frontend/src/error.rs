@@ -9,6 +9,9 @@ pub enum CanvasError {
     ElementCastFailed(String),
     WindowAccessFailed,
     SyntheticEventFailed(String),
+    StyleApplicationFailed(String),
+    ComponentRenderFailed(String),
+    CanvasOperationFailed(String),
 }
 
 impl fmt::Display for CanvasError {
@@ -22,6 +25,15 @@ impl fmt::Display for CanvasError {
             CanvasError::WindowAccessFailed => write!(f, "Failed to access window object"),
             CanvasError::SyntheticEventFailed(event_type) => {
                 write!(f, "Failed to create synthetic {} event", event_type)
+            }
+            CanvasError::StyleApplicationFailed(style) => {
+                write!(f, "Failed to apply style: {}", style)
+            }
+            CanvasError::ComponentRenderFailed(component) => {
+                write!(f, "Failed to render component: {}", component)
+            }
+            CanvasError::CanvasOperationFailed(operation) => {
+                write!(f, "Canvas operation failed: {}", operation)
             }
         }
     }

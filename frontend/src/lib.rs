@@ -3,8 +3,10 @@ mod components;
 mod constants;
 mod error;
 mod events;
+mod performance;
 mod rendering;
 mod state;
+mod styles;
 
 #[allow(unused_imports)]
 use crate::components::App;

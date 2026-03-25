@@ -1,5 +1,5 @@
-use crate::constants::*;
 use crate::state::{AppAction, AppState, ToolbarAction};
+use crate::styles::ToolbarStyle;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlElement, MouseEvent, PointerEvent};
 use yew::prelude::*;
@@ -14,6 +14,7 @@ pub struct FloatingToolbarProps {
 
 #[function_component(FloatingToolbar)]
 pub fn floating_toolbar(props: &FloatingToolbarProps) -> Html {
+    let styles = ToolbarStyle::new();
     let app_state = &props.app_state;
 
     let on_pointer_down = {
@@ -59,84 +60,39 @@ pub fn floating_toolbar(props: &FloatingToolbarProps) -> Html {
         })
     };
 
-    let style = format!(
-        "position: absolute; left: {}px; top: {}px; z-index: 10; display: flex; flex-direction: column; gap: {}; background: rgba(255, 255, 255, 0.9); border-radius: 8px; padding: {}; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); backdrop-filter: blur(10px); cursor: {}; user-select: none; touch-action: none;",
+    let position_style = ToolbarStyle::calculate_position(
         app_state.toolbar.x,
         app_state.toolbar.y,
-        TOOLBAR_GAP,
-        TOOLBAR_PADDING,
-        if app_state.toolbar.is_dragging { "grabbing" } else { "grab" }
+        app_state.toolbar.is_dragging,
     );
 
     html! {
         <div
-            {style}
+            class={styles.container}
+            style={position_style}
             onpointerdown={on_pointer_down}
             onpointermove={on_pointer_move}
             onpointerup={on_pointer_up}
+            data-testid="floating-toolbar"
         >
-            <div style={format!("
-                width: 100%;
-                height: {};
-                background: linear-gradient(90deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%);
-                background-size: 4px 4px;
-                border-radius: 4px 4px 0 0;
-                margin: {} {};
-                cursor: grab;
-            ", TOOLBAR_HANDLE_HEIGHT, TOOLBAR_HANDLE_MARGIN, TOOLBAR_GAP)} title="Drag to move toolbar"></div>
+            <div class={styles.handle} title="Drag to move toolbar"></div>
             <button
+                class={styles.button.clone()}
                 onclick={&props.on_zoom_in}
-                style={format!("
-                    width: {};
-                    height: {};
-                    border: {};
-                    border-radius: 4px;
-                    background: {};
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 16px;
-                    font-weight: bold;
-                ", BUTTON_SIZE, BUTTON_SIZE, BUTTON_BORDER, BUTTON_BG)}
                 title="Zoom In"
             >
                 {"+"}
             </button>
             <button
+                class={styles.button.clone()}
                 onclick={&props.on_zoom_out}
-                style={format!("
-                    width: {};
-                    height: {};
-                    border: {};
-                    border-radius: 4px;
-                    background: {};
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 16px;
-                    font-weight: bold;
-                ", BUTTON_SIZE, BUTTON_SIZE, BUTTON_BORDER, BUTTON_BG)}
                 title="Zoom Out"
             >
                 {"-"}
             </button>
             <button
+                class={classes![styles.button, styles.create_button]}
                 onclick={&props.on_create_sticky_note}
-                style={format!("
-                    width: {};
-                    height: {};
-                    border: {};
-                    border-radius: 4px;
-                    background: {};
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 16px;
-                    font-weight: bold;
-                ", BUTTON_SIZE, BUTTON_SIZE, BUTTON_BORDER, STICKY_BUTTON_BG)}
                 title="Create Sticky Note"
             >
                 {"📝"}

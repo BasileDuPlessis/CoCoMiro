@@ -6,8 +6,8 @@ test.describe('Infinite Canvas', () => {
   });
 
   test('floating toolbar is visible and positioned correctly', async ({ page }) => {
-    // Check that the floating toolbar exists - look for the div with absolute positioning
-    const toolbar = page.locator('div[style*="position: absolute"][style*="left: 10px"][style*="top: 10px"]');
+    // Check that the floating toolbar exists - look for the div with data-testid
+    const toolbar = page.locator('[data-testid="floating-toolbar"]');
     await expect(toolbar).toBeVisible();
 
     // Check that zoom buttons are inside the toolbar
@@ -17,7 +17,7 @@ test.describe('Infinite Canvas', () => {
     await expect(zoomOutButton).toBeVisible();
 
     // Check that the grip zone is visible
-    const gripZone = toolbar.locator('div[style*="height: 8px"]');
+    const gripZone = toolbar.locator('div').first(); // The first div is the handle
     await expect(gripZone).toBeVisible();
 
     // Check that it's positioned near the top-left initially
@@ -30,7 +30,7 @@ test.describe('Infinite Canvas', () => {
   });
 
   test('floating toolbar can be dragged to new positions', async ({ page }) => {
-    const toolbar = page.locator('div[style*="position: absolute"]');
+    const toolbar = page.locator('[data-testid="floating-toolbar"]');
     
     // Get initial position
     const initialBox = await toolbar.boundingBox();

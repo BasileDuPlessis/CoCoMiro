@@ -1,16 +1,20 @@
 use crate::components::{FloatingToolbar, StickyNoteComponent};
-use crate::constants::*;
-use crate::events::*;
-use crate::rendering::{draw_debug_overlay, draw_grid};
-use crate::state::{
-    AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState,
+use crate::constants::{
+    CANVAS_BG, CANVAS_MAX_HEIGHT, CANVAS_MAX_WIDTH, TOOLBAR_INITIAL_X, TOOLBAR_INITIAL_Y,
 };
-use wasm_bindgen::JsCast;
+use crate::error::{CanvasError, CanvasResult};
+use crate::events::*;
+use crate::performance::PerformanceLogger;
+use crate::rendering::{draw_debug_overlay, draw_grid};
+use crate::state::{AppState, StickyNotesState, ToolbarState, ViewState};
+use crate::styles::CanvasStyle;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
 use yew::prelude::*;
 
 #[function_component(InfiniteCanvas)]
 pub fn infinite_canvas() -> Html {
+    let styles = CanvasStyle::new();
     let app_state = use_reducer(|| AppState {
         view: ViewState {
             zoom: 1.0,
@@ -36,38 +40,62 @@ pub fn infinite_canvas() -> Html {
     let canvas_ref = use_node_ref();
 
     // Function to get canvas context
-    let get_context = {
-        let canvas_ref = canvas_ref.clone();
-        move || -> Option<CanvasRenderingContext2d> {
-            canvas_ref
-                .cast::<HtmlCanvasElement>()
-                .and_then(|canvas| canvas.get_context("2d").ok())
-                .flatten()
-                .and_then(|ctx| ctx.dyn_into::<CanvasRenderingContext2d>().ok())
-        }
-    };
+    let get_context =
+        {
+            let canvas_ref = canvas_ref.clone();
+            move || -> CanvasResult<CanvasRenderingContext2d> {
+                let canvas = canvas_ref.cast::<HtmlCanvasElement>().ok_or(
+                    CanvasError::ElementCastFailed("HtmlCanvasElement".to_string()),
+                )?;
+
+                let context = canvas
+                    .get_context("2d")
+                    .map_err(|_| CanvasError::ContextNotAvailable)?
+                    .ok_or(CanvasError::ContextNotAvailable)?;
+
+                context.dyn_into::<CanvasRenderingContext2d>().map_err(|_| {
+                    CanvasError::ElementCastFailed("CanvasRenderingContext2d".to_string())
+                })
+            }
+        };
 
     let canvas_ref_clone = canvas_ref.clone();
     // Function to draw the canvas
     let draw_canvas = {
         let app_state = app_state.clone();
         let get_context = get_context.clone();
-        #[allow(deprecated)]
         move || {
-            if let Some(ctx) = get_context() {
-                if let Some(canvas) = canvas_ref_clone.cast::<HtmlCanvasElement>() {
-                    let width = canvas.width() as f64;
-                    let height = canvas.height() as f64;
+            let start_time = js_sys::Date::now();
+            match get_context() {
+                Ok(ctx) => {
+                    if let Some(canvas) = canvas_ref_clone.cast::<HtmlCanvasElement>() {
+                        let width = canvas.width() as f64;
+                        let height = canvas.height() as f64;
 
-                    // Clear canvas with white background
-                    ctx.set_fill_style(&CANVAS_BG.into());
-                    ctx.fill_rect(0.0, 0.0, width, height);
+                        // Clear canvas with white background
+                        #[allow(deprecated)]
+                        ctx.set_fill_style(&JsValue::from_str(CANVAS_BG));
+                        ctx.fill_rect(0.0, 0.0, width, height);
 
-                    // Draw grid
-                    draw_grid(&ctx, width, height, &app_state.view);
+                        // Draw grid
+                        draw_grid(&ctx, width, height, &app_state.view);
 
-                    // Draw debug overlay
-                    draw_debug_overlay(&ctx, width, height, &app_state.view);
+                        // Draw debug overlay
+                        draw_debug_overlay(&ctx, width, height, &app_state.view);
+
+                        PerformanceLogger::log_canvas_operation("canvas_render", start_time);
+                    } else {
+                        PerformanceLogger::log_error(
+                            "canvas_render",
+                            "Canvas element not found for drawing",
+                        );
+                    }
+                }
+                Err(e) => {
+                    PerformanceLogger::log_error(
+                        "canvas_context",
+                        &format!("Failed to get canvas context: {}", e),
+                    );
                 }
             }
         }
@@ -140,22 +168,16 @@ pub fn infinite_canvas() -> Html {
     }
 
     html! {
-        <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
+        <div class={styles.container}>
             <FloatingToolbar app_state={app_state.clone()} on_zoom_in={zoom_in} on_zoom_out={zoom_out} on_create_sticky_note={create_sticky_note} />
             <canvas
                 ref={canvas_ref}
-                style="cursor: grab; display: block;"
+                class={styles.canvas}
                 onmousedown={on_mouse_down}
                 onmousemove={on_mouse_move}
                 onmouseup={on_mouse_up}
                 onwheel={on_wheel}
                 onkeydown={on_key_down}
-                onclick={
-                    let app_state = app_state.clone();
-                    Callback::from(move |_| {
-                        app_state.dispatch(AppAction::StickyNotes(StickyNotesAction::DeselectNote));
-                    })
-                }
                 tabindex="0"
             />
             { for app_state.sticky_notes.notes.iter().map(|note| {
@@ -178,9 +200,9 @@ pub fn infinite_canvas() -> Html {
             })}
             { if app_state.sticky_notes.editing_note_id.is_some() {
                 html! {
-                    <div
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: default;"
+                    <div class={styles.overlay}
                         onclick={save_edit_note.clone()}
+                        data-testid="canvas-overlay"
                     />
                 }
             } else {

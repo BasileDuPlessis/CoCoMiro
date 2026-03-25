@@ -24,6 +24,7 @@ wasm-bindgen-futures = "0.4"
 hello-world-shared = { path = "../shared" }  # Shared types
 wasm-logger = "0.2"
 log = "0.4"
+stylist = { version = "0.12", features = ["yew_integration"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }
