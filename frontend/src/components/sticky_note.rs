@@ -1,6 +1,6 @@
 use crate::constants::*;
 use crate::state::AppState;
-use hello_world_shared::StickyNote;
+use hello_world_shared::{Position, StickyNote};
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlTextAreaElement, InputEvent, KeyboardEvent, MouseEvent};
 use yew::prelude::*;
@@ -21,6 +21,11 @@ pub struct StickyNoteProps {
 pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     let note = &props.note;
     let view_state = &props.app_state.view;
+
+    // Drag state
+    let is_dragging = use_state(|| false);
+    let drag_start_pos = use_state(|| (0.0, 0.0));
+    let note_start_pos = use_state(|| (0.0, 0.0));
 
     // Ref for the textarea
     let textarea_ref = use_node_ref();
@@ -103,13 +108,62 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
         let on_click = {
             let note_id = note.id.clone();
             let on_start_edit = props.on_start_edit.clone();
+            let is_dragging = is_dragging.clone();
             Callback::from(move |_| {
-                on_start_edit.emit(note_id.clone());
+                if !*is_dragging {
+                    on_start_edit.emit(note_id.clone());
+                }
+            })
+        };
+
+        let on_mousedown = {
+            let is_dragging = is_dragging.clone();
+            let drag_start_pos = drag_start_pos.clone();
+            let note_start_pos = note_start_pos.clone();
+            let note_pos = (note.position.x, note.position.y);
+            Callback::from(move |e: MouseEvent| {
+                e.prevent_default();
+                is_dragging.set(true);
+                drag_start_pos.set((e.client_x() as f64, e.client_y() as f64));
+                note_start_pos.set(note_pos);
+            })
+        };
+
+        let on_mousemove = {
+            let is_dragging = is_dragging.clone();
+            let drag_start_pos = drag_start_pos.clone();
+            let note_start_pos = note_start_pos.clone();
+            let app_state = props.app_state.clone();
+            let note_id = note.id.clone();
+            let zoom = view_state.zoom;
+            Callback::from(move |e: MouseEvent| {
+                if *is_dragging {
+                    e.prevent_default();
+                    let current_pos = (e.client_x() as f64, e.client_y() as f64);
+                    let delta_x = current_pos.0 - drag_start_pos.0;
+                    let delta_y = current_pos.1 - drag_start_pos.1;
+                    let world_delta_x = delta_x / zoom;
+                    let world_delta_y = delta_y / zoom;
+                    let new_pos = Position {
+                        x: note_start_pos.0 + world_delta_x,
+                        y: note_start_pos.1 + world_delta_y,
+                    };
+                    app_state.dispatch(crate::state::AppAction::StickyNotes(
+                        crate::state::StickyNotesAction::UpdatePosition(note_id.clone(), new_pos),
+                    ));
+                }
+            })
+        };
+
+        let on_mouseup = {
+            let is_dragging = is_dragging.clone();
+            Callback::from(move |_| {
+                is_dragging.set(false);
             })
         };
 
         html! {
-            <div {style} onclick={on_click}>
+            <div {style} onclick={on_click} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup}>
                 { for note.content.split('\n').map(|line| {
                     html! {
                         <div style={format!("margin-bottom: {}px;", LINE_MARGIN * view_state.zoom.max(0.5))}>

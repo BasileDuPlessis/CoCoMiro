@@ -141,6 +141,7 @@ pub enum StickyNotesAction {
     UpdateContent(String),
     SaveEdit,
     CancelEdit,
+    UpdatePosition(String, Position),
 }
 
 impl Reducible for StickyNotesState {
@@ -213,6 +214,24 @@ impl Reducible for StickyNotesState {
                 editing_content: None,
                 notes: self.notes.clone(),
             }),
+            StickyNotesAction::UpdatePosition(note_id, new_position) => {
+                let notes = self
+                    .notes
+                    .iter()
+                    .cloned()
+                    .map(|mut note| {
+                        if note.id == note_id {
+                            note.position = new_position.clone();
+                        }
+                        note
+                    })
+                    .collect();
+                Rc::new(StickyNotesState {
+                    notes,
+                    editing_note_id: self.editing_note_id.clone(),
+                    editing_content: self.editing_content.clone(),
+                })
+            }
         }
     }
 }
