@@ -26,6 +26,7 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     let is_dragging = use_state(|| false);
     let drag_start_pos = use_state(|| (0.0, 0.0));
     let note_start_pos = use_state(|| (0.0, 0.0));
+    let is_hovered = use_state(|| false);
 
     // Ref for the textarea
     let textarea_ref = use_node_ref();
@@ -53,14 +54,20 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     let screen_height = note.size.height * view_state.zoom;
 
     let style = format!(
-        "position: absolute; left: {}px; top: {}px; width: {}px; height: {}px; background: {}; border: 2px solid {}; padding: 8px; box-sizing: border-box; font-family: Arial, sans-serif; font-size: {}px; cursor: pointer; user-select: none; z-index: 5;",
+        "position: absolute; left: {}px; top: {}px; width: {}px; height: {}px; background: {}; border: 2px solid {}; padding: 8px; box-sizing: border-box; font-family: Arial, sans-serif; font-size: {}px; cursor: {}; user-select: none; z-index: 5;{}",
         screen_x,
         screen_y,
         screen_width,
         screen_height,
         STICKY_NOTE_BG,
         STICKY_NOTE_BORDER,
-        FONT_SIZE_BASE * view_state.zoom.max(0.5)
+        FONT_SIZE_BASE * view_state.zoom.max(0.5),
+        if *is_dragging { "grabbing" } else if *is_hovered { "grab" } else { "pointer" },
+        if *is_dragging {
+            format!(" box-shadow: {}; opacity: {};", STICKY_NOTE_DRAG_SHADOW, STICKY_NOTE_DRAG_OPACITY)
+        } else {
+            "".to_string()
+        }
     );
 
     if props.is_editing {
@@ -162,8 +169,22 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
             })
         };
 
+        let on_mouseenter = {
+            let is_hovered = is_hovered.clone();
+            Callback::from(move |_| {
+                is_hovered.set(true);
+            })
+        };
+
+        let on_mouseleave = {
+            let is_hovered = is_hovered.clone();
+            Callback::from(move |_| {
+                is_hovered.set(false);
+            })
+        };
+
         html! {
-            <div {style} onclick={on_click} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup}>
+            <div {style} onclick={on_click} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup} onmouseenter={on_mouseenter} onmouseleave={on_mouseleave}>
                 { for note.content.split('\n').map(|line| {
                     html! {
                         <div style={format!("margin-bottom: {}px;", LINE_MARGIN * view_state.zoom.max(0.5))}>

@@ -37,6 +37,8 @@ pub const DEBUG_OVERLAY_TEXT: &str = "#FFFFFF";
 pub const GRID_COLOR: &str = "#E0E0E0";
 pub const STICKY_NOTE_BG: &str = "#FFFF88";
 pub const STICKY_NOTE_BORDER: &str = "#CCCC00";
+pub const STICKY_NOTE_DRAG_SHADOW: &str = "0 4px 8px rgba(0, 0, 0, 0.2)";
+pub const STICKY_NOTE_DRAG_OPACITY: &str = "0.8";
 
 // Button styles
 pub const BUTTON_SIZE: &str = "32px";
