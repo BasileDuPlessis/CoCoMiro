@@ -5,6 +5,9 @@ test.describe('Sticky Notes', () => {
     await page.goto('/');
     // Wait for WASM to load
     await page.waitForTimeout(1000);
+    // Reload page to ensure clean state
+    await page.reload();
+    await page.waitForTimeout(1000);
     // Ensure no leftover editing state by clicking outside if needed
     await page.mouse.click(10, 10);
     await page.waitForTimeout(100);

@@ -3,6 +3,14 @@ import { test, expect } from '@playwright/test';
 test.describe('Infinite Canvas', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    // Wait for WASM to load (same as sticky notes tests)
+    await page.waitForTimeout(1000);
+    // Reload page to ensure clean state
+    await page.reload();
+    await page.waitForTimeout(1000);
+    // Ensure clean state by clicking outside
+    await page.mouse.click(10, 10);
+    await page.waitForTimeout(100);
   });
 
   test('floating toolbar is visible and positioned correctly', async ({ page }) => {
