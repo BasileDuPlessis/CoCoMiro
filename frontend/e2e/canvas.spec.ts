@@ -42,6 +42,7 @@ test.describe('Infinite Canvas', () => {
     await page.mouse.down();
     await page.mouse.move(initialX + 70, initialY + 60, { steps: 10 }); // Drag to new position
     await page.mouse.up();
+    await page.waitForTimeout(100); // Wait for position update
 
     // Check that toolbar has moved
     const newBox = await toolbar.boundingBox();

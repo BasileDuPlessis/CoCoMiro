@@ -2,7 +2,9 @@ use crate::components::{FloatingToolbar, StickyNoteComponent};
 use crate::constants::*;
 use crate::events::*;
 use crate::rendering::{draw_debug_overlay, draw_grid};
-use crate::state::{AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState};
+use crate::state::{
+    AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState,
+};
 use wasm_bindgen::JsCast;
 use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
 use yew::prelude::*;
@@ -136,7 +138,6 @@ pub fn infinite_canvas() -> Html {
             || ()
         });
     }
-
 
     html! {
         <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
