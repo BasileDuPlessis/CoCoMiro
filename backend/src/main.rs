@@ -1,5 +1,5 @@
 use axum::{routing::get, Router};
-use hello_world_shared::HealthResponse;
+use cocomiro_shared::HealthResponse;
 use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]

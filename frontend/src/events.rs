@@ -1,6 +1,6 @@
 use crate::constants::*;
 use crate::state::{AppAction, AppState, StickyNotesAction, ViewAction};
-use hello_world_shared::{Position, Size};
+use cocomiro_shared::{Position, Size};
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 use yew::prelude::*;
 

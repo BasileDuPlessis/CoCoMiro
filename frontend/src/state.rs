@@ -1,4 +1,4 @@
-use hello_world_shared::{Position, Size, StickyNote};
+use cocomiro_shared::{Position, Size, StickyNote};
 use std::rc::Rc;
 use yew::prelude::*;
 

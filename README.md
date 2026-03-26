@@ -66,7 +66,7 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
    ./run-frontend.sh
 
    # Or manually:
-   cargo build --package hello-world-frontend
+   cargo build --package cocomiro-frontend
    cd frontend && trunk serve --open
    ```
 
@@ -81,7 +81,7 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
 ./run-frontend.sh
 
 # Manual frontend development
-cargo build --package hello-world-frontend
+cargo build --package cocomiro-frontend
 cd frontend && trunk serve --open
 
 # Build entire workspace
@@ -110,7 +110,7 @@ cd backend && cargo build --release
 If `trunk serve` fails with "could not find the root package":
 ```bash
 # Build the frontend package first (required for workspace dependencies)
-cargo build --package hello-world-frontend
+cargo build --package cocomiro-frontend
 cd frontend && trunk serve --open
 ```
 

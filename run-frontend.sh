@@ -22,7 +22,7 @@ if ! lsof -i:3000 > /dev/null 2>&1; then
 fi
 
 echo "🔨 Building frontend package (workspace dependencies)..."
-cargo build --package hello-world-frontend
+cargo build --package cocomiro-frontend
 echo "✅ Build successful"
 
 echo "🌐 Starting frontend dev server on http://localhost:8080"

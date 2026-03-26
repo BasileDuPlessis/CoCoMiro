@@ -1,7 +1,7 @@
 use crate::constants::*;
 use crate::state::AppState;
 use crate::styles::StickyNoteStyle;
-use hello_world_shared::{Position, StickyNote};
+use cocomiro_shared::{Position, StickyNote};
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlTextAreaElement, InputEvent, KeyboardEvent, MouseEvent};
 use yew::prelude::*;

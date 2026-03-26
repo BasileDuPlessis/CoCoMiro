@@ -87,7 +87,7 @@ cd backend && cargo run
 
 # Frontend dev server (port 8080)
 # IMPORTANT: Build frontend package first due to workspace dependencies
-cargo build --package hello-world-frontend
+cargo build --package cocomiro-frontend
 cd frontend && trunk serve --open
 ```
 
