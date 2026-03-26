@@ -69,7 +69,11 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     let combined_classes = if props.is_editing {
         // When editing, show editing style (red border) plus selected if it was selected
         if props.is_selected {
-            classes![styles.base.clone(), styles.selected.clone(), styles.editing.clone()]
+            classes![
+                styles.base.clone(),
+                styles.selected.clone(),
+                styles.editing.clone()
+            ]
         } else {
             classes![styles.base.clone(), styles.editing.clone()]
         }

@@ -6,7 +6,9 @@ use crate::error::{CanvasError, CanvasResult};
 use crate::events::*;
 use crate::performance::PerformanceLogger;
 use crate::rendering::{draw_debug_overlay, draw_grid};
-use crate::state::{AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState};
+use crate::state::{
+    AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState,
+};
 use crate::styles::CanvasStyle;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
