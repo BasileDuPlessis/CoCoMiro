@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Mori Frontend Runner
+# CoCoMiro Frontend Runner
 # Builds and serves the frontend with proper dependency resolution
 
 set -e  # Exit on any error
 
-echo "🚀 Starting Mori Frontend"
+echo "🚀 Starting CoCoMiro Frontend"
 echo "========================"
 
 # Check if we're in the project root

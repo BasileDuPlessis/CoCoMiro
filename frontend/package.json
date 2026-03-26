@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "description": "Frontend E2E tests for Mori infinite canvas",
+  "description": "Frontend E2E tests for CoCoMiro infinite canvas",
   "main": "index.js",
   "scripts": {
     "test": "playwright test",

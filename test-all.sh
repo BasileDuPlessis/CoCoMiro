@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Mori Test Runner
+# CoCoMiro Test Runner
 # Ensures all tests pass before commits
 
 set -e  # Exit on any error
 
-echo "🚀 Running Mori Test Suite"
+echo "🚀 Running CoCoMiro Test Suite"
 echo "=========================="
 
 # Check if we're in the right directory
