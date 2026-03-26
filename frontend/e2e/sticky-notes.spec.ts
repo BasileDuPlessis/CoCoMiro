@@ -60,8 +60,8 @@ test.describe('Sticky Notes', () => {
     await stickyNote.click();
     await page.waitForTimeout(50);
 
-    // Click again to enter edit mode
-    await stickyNote.click();
+    // Double-click to enter edit mode
+    await stickyNote.dblclick();
     await page.waitForTimeout(50);
 
     // Verify textarea appears and has focus
@@ -93,8 +93,8 @@ test.describe('Sticky Notes', () => {
     await stickyNote.click();
     await page.waitForTimeout(50);
 
-    // Click again to enter edit mode
-    await stickyNote.click();
+    // Double-click to enter edit mode
+    await stickyNote.dblclick();
     await page.waitForTimeout(50);
 
     const textarea = page.locator('[data-testid="sticky-note-textarea"]');
@@ -120,8 +120,8 @@ test.describe('Sticky Notes', () => {
     await stickyNote.click();
     await page.waitForTimeout(50);
 
-    // Click again to enter edit mode
-    await stickyNote.click();
+    // Double-click to enter edit mode
+    await stickyNote.dblclick();
     await page.waitForTimeout(50);
 
     const textarea = page.locator('[data-testid="sticky-note-textarea"]');
@@ -228,7 +228,7 @@ test.describe('Sticky Notes', () => {
     // Verify deselected (tested functionally elsewhere)
   });
 
-  test('clicking selected note enters edit mode', async ({ page }) => {
+  test('double-clicking selected note enters edit mode', async ({ page }) => {
     // Create sticky note
     const toolbar = page.locator('[data-testid="floating-toolbar"]');
     const createButton = toolbar.locator('button[title="Create Sticky Note"]');
@@ -242,8 +242,8 @@ test.describe('Sticky Notes', () => {
     await page.waitForTimeout(50);
     // Verify it's selected (border style is in CSS classes now)
 
-    // Click again to enter edit mode
-    await stickyNote.click();
+    // Double-click to enter edit mode
+    await stickyNote.dblclick();
     await page.waitForTimeout(50);
     const textarea = page.locator('[data-testid="sticky-note-textarea"]');
     await expect(textarea).toBeVisible();
@@ -253,5 +253,46 @@ test.describe('Sticky Notes', () => {
     await page.waitForTimeout(50);
 
     // Should still be selected (tested functionally elsewhere)
+  });
+
+  test('clicking on canvas deselects sticky note', async ({ page }) => {
+    // Create sticky note
+    const toolbar = page.locator('[data-testid="floating-toolbar"]');
+    const createButton = toolbar.locator('button[title="Create Sticky Note"]');
+    await createButton.click();
+    await page.waitForTimeout(100);
+
+    const stickyNote = page.locator('[data-testid="sticky-note"]').first();
+
+    // Click to select the sticky note
+    await stickyNote.click();
+    await page.waitForTimeout(50);
+
+    // Verify it's selected by checking that double-clicking enters edit mode
+    await stickyNote.dblclick();
+    await page.waitForTimeout(50);
+    const textarea = page.locator('[data-testid="sticky-note-textarea"]');
+    await expect(textarea).toBeVisible();
+
+    // Exit edit mode
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(50);
+    await expect(textarea).not.toBeVisible();
+
+    // Now click on the canvas (outside the sticky note) to deselect
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    await page.waitForTimeout(50);
+
+    // Verify the sticky note is deselected by checking that single-clicking selects it
+    await stickyNote.click();
+    await page.waitForTimeout(50);
+    // If deselected, single-clicking should select it, not enter edit mode
+    await expect(textarea).not.toBeVisible();
+
+    // Double-click to enter edit mode (confirming it's now selected again)
+    await stickyNote.dblclick();
+    await page.waitForTimeout(50);
+    await expect(textarea).toBeVisible();
   });
 });

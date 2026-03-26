@@ -66,7 +66,14 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     );
 
     // Determine CSS classes
-    let combined_classes = if props.is_selected && *is_dragging {
+    let combined_classes = if props.is_editing {
+        // When editing, show editing style (red border) plus selected if it was selected
+        if props.is_selected {
+            classes![styles.base.clone(), styles.selected.clone(), styles.editing.clone()]
+        } else {
+            classes![styles.base.clone(), styles.editing.clone()]
+        }
+    } else if props.is_selected && *is_dragging {
         classes![
             styles.base.clone(),
             styles.selected.clone(),
@@ -126,16 +133,19 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
         // Display mode - show text
         let on_click = {
             let note_id = note.id.clone();
-            let on_start_edit = props.on_start_edit.clone();
             let on_select = props.on_select.clone();
-            let is_selected = props.is_selected;
             Callback::from(move |e: MouseEvent| {
                 e.stop_propagation();
-                if is_selected {
-                    on_start_edit.emit(note_id.clone());
-                } else {
-                    on_select.emit(note_id.clone());
-                }
+                on_select.emit(note_id.clone());
+            })
+        };
+
+        let on_dblclick = {
+            let note_id = note.id.clone();
+            let on_start_edit = props.on_start_edit.clone();
+            Callback::from(move |e: MouseEvent| {
+                e.stop_propagation();
+                on_start_edit.emit(note_id.clone());
             })
         };
 
@@ -210,7 +220,7 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
         let final_style = format!("{}{}", transform_style, cursor_style);
 
         html! {
-            <div class={combined_classes} style={final_style} onclick={on_click} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup} onmouseenter={on_mouseenter} onmouseleave={on_mouseleave} data-testid="sticky-note">
+            <div class={combined_classes} style={final_style} onclick={on_click} ondblclick={on_dblclick} onmousedown={on_mousedown} onmousemove={on_mousemove} onmouseup={on_mouseup} onmouseenter={on_mouseenter} onmouseleave={on_mouseleave} data-testid="sticky-note">
                 { for note.content.split('\n').map(|line| {
                     html! {
                         <div style={format!("margin-bottom: {}px;", LINE_MARGIN * view_state.zoom.max(0.5))}>

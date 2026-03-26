@@ -6,7 +6,7 @@ use crate::error::{CanvasError, CanvasResult};
 use crate::events::*;
 use crate::performance::PerformanceLogger;
 use crate::rendering::{draw_debug_overlay, draw_grid};
-use crate::state::{AppState, StickyNotesState, ToolbarState, ViewState};
+use crate::state::{AppAction, AppState, StickyNotesAction, StickyNotesState, ToolbarState, ViewState};
 use crate::styles::CanvasStyle;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
@@ -133,6 +133,25 @@ pub fn infinite_canvas() -> Html {
     let on_wheel = create_wheel_handler(&app_state);
     let on_key_down = create_key_down_handler(&app_state);
 
+    // Click outside handler for saving edits and deselecting
+    let on_container_click = {
+        let app_state = app_state.clone();
+        Callback::from(move |e: MouseEvent| {
+            let has_editing = app_state.sticky_notes.editing_note_id.is_some();
+            let has_selection = app_state.sticky_notes.selected_note_id.is_some();
+
+            if has_editing {
+                e.prevent_default();
+                app_state.dispatch(AppAction::StickyNotes(StickyNotesAction::SaveEdit));
+                // Also deselect after saving
+                app_state.dispatch(AppAction::StickyNotes(StickyNotesAction::DeselectNote));
+            } else if has_selection {
+                e.prevent_default();
+                app_state.dispatch(AppAction::StickyNotes(StickyNotesAction::DeselectNote));
+            }
+        })
+    };
+
     // Effect to set up canvas size and initial draw
     {
         let canvas_ref = canvas_ref.clone();
@@ -168,7 +187,7 @@ pub fn infinite_canvas() -> Html {
     }
 
     html! {
-        <div class={styles.container}>
+        <div class={styles.container} onclick={on_container_click}>
             <FloatingToolbar app_state={app_state.clone()} on_zoom_in={zoom_in} on_zoom_out={zoom_out} on_create_sticky_note={create_sticky_note} />
             <canvas
                 ref={canvas_ref}

@@ -50,11 +50,13 @@ impl StickyNoteStyle {
             editing: css!(
                 r#"
                     resize: none;
-                    border: none;
+                    border: 2px solid ${editing_border};
                     outline: none;
                     background: ${bg};
+                    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
                 "#,
                 bg = STICKY_NOTE_BG,
+                editing_border = STICKY_NOTE_EDITING_BORDER,
             )
             .into(),
         }

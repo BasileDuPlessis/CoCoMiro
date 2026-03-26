@@ -171,17 +171,63 @@ impl Reducible for StickyNotesState {
                 })
             }
             StickyNotesAction::StartEdit(note_id) => {
-                let editing_content = self
-                    .notes
-                    .iter()
-                    .find(|n| n.id == note_id)
-                    .map(|n| n.content.clone());
-                Rc::new(StickyNotesState {
-                    editing_note_id: Some(note_id),
-                    editing_content,
-                    notes: self.notes.clone(),
-                    selected_note_id: self.selected_note_id.clone(),
-                })
+                // If we're already editing a different note, save it first
+                if let Some(current_editing_id) = &self.editing_note_id {
+                    if current_editing_id != &note_id {
+                        // Save the current edit first
+                        if let Some(content) = self.editing_content.clone() {
+                            let notes = self
+                                .notes
+                                .iter()
+                                .cloned()
+                                .map(|mut note| {
+                                    if note.id == *current_editing_id {
+                                        note.content = content.clone();
+                                    }
+                                    note
+                                })
+                                .collect();
+                            Rc::new(StickyNotesState {
+                                notes,
+                                editing_note_id: Some(note_id.clone()),
+                                editing_content: self
+                                    .notes
+                                    .iter()
+                                    .find(|n| n.id == note_id)
+                                    .map(|n| n.content.clone()),
+                                selected_note_id: Some(note_id),
+                            })
+                        } else {
+                            // No content to save, just switch editing
+                            Rc::new(StickyNotesState {
+                                editing_note_id: Some(note_id.clone()),
+                                editing_content: self
+                                    .notes
+                                    .iter()
+                                    .find(|n| n.id == note_id)
+                                    .map(|n| n.content.clone()),
+                                notes: self.notes.clone(),
+                                selected_note_id: Some(note_id),
+                            })
+                        }
+                    } else {
+                        // Already editing this note, do nothing
+                        self
+                    }
+                } else {
+                    // Not editing anything, start editing this note
+                    let editing_content = self
+                        .notes
+                        .iter()
+                        .find(|n| n.id == note_id)
+                        .map(|n| n.content.clone());
+                    Rc::new(StickyNotesState {
+                        editing_note_id: Some(note_id.clone()),
+                        editing_content,
+                        notes: self.notes.clone(),
+                        selected_note_id: Some(note_id),
+                    })
+                }
             }
             StickyNotesAction::UpdateContent(content) => Rc::new(StickyNotesState {
                 editing_content: Some(content),
@@ -207,7 +253,7 @@ impl Reducible for StickyNotesState {
                             notes,
                             editing_note_id: None,
                             editing_content: None,
-                            selected_note_id: self.selected_note_id.clone(),
+                            selected_note_id: None, // Deselect after saving
                         })
                     } else {
                         self
