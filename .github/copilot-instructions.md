@@ -1,7 +1,7 @@
-# CoCoMiro - Infinite Canvas Application Development Guidelines
+# Mori - Infinite Canvas Application Development Guidelines
 
 ## Project Overview
-CoCoMiro is a modern infinite canvas application built with Rust, featuring:
+Mori is a modern infinite canvas application built with Rust, featuring:
 - **Frontend**: Yew WebAssembly application with HTML5 Canvas 2D rendering
 - **Backend**: Axum REST API server with CORS support
 - **Shared**: Type-safe Rust models for frontend-backend communication

@@ -1,4 +1,4 @@
-# CoCoMiro - Infinite Canvas Application
+# Mori - Infinite Canvas Application
 
 A modern infinite canvas application built with Rust, featuring WebAssembly frontend and REST API backend. Provides smooth zoom, pan, and grid functionality for creative work and note-taking.
 
@@ -47,7 +47,7 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
 1. **Clone and setup**:
    ```bash
    git clone <repository-url>
-   cd cocomiro
+   cd mori
    ```
 
 2. **Install dependencies**:
@@ -276,7 +276,7 @@ git commit -m "feat: add new canvas interaction"
 ## 📄 Project Structure
 
 ```
-cocomiro/
+mori/
 ├── .github/
 │   ├── copilot-instructions.md    # AI assistant guidelines
 │   └── workflows/

@@ -1,4 +1,4 @@
-// Constants for the CoCoMiro infinite canvas application
+// Constants for the Mori infinite canvas application
 
 // Toolbar
 pub const TOOLBAR_INITIAL_X: f64 = 10.0;
