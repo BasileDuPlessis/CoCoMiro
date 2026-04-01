@@ -40,6 +40,6 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Temporary files
-*.tmp
-*.temp
+# Database files
+backend/cocomiro.db
+backend/test-dbs/
