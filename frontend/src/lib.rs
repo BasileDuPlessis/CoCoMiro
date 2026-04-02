@@ -1,5 +1,7 @@
 mod api;
 mod components;
+#[cfg(test)]
+mod components_test;
 mod constants;
 mod error;
 mod events;

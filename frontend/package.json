@@ -1,27 +1,31 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "description": "Frontend E2E tests for Mori infinite canvas",
+  "description": "Frontend Rust testing for Mori infinite canvas",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test",
-    "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui",
-    "test:debug": "playwright test --debug",
-    "test:report": "playwright test --reporter=html",
-    "report": "playwright show-report"
+    "test": "wasm-pack test --headless --chrome",
+    "test:headed": "wasm-pack test --chrome",
+    "test:firefox": "wasm-pack test --headless --firefox",
+    "test:safari": "wasm-pack test --headless --safari",
+    "test:all": "wasm-pack test --headless --chrome && wasm-pack test --headless --firefox",
+    "cargo:test": "cargo test",
+    "cargo:test:watch": "cargo watch -x test",
+    "build": "trunk build",
+    "build:release": "trunk build --release",
+    "serve": "trunk serve",
+    "serve:open": "trunk serve --open"
   },
   "keywords": [
-    "e2e",
+    "rust",
+    "wasm",
     "testing",
     "canvas",
-    "playwright"
+    "yew"
   ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@types/node": "^25.5.0",
-    "playwright": "^1.58.2"
+    "wasm-pack": "^0.12.1"
   }
 }

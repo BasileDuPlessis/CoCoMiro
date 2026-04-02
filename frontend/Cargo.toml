@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-yew = { version = "0.20", features = ["csr", "ssr"] }
+yew = { version = "0.21", features = ["csr", "ssr"] }
 web-sys = { version = "0.3", features = [
   "console", "Window", "Document", "Element", "HtmlElement", "Node", "Text",
   "Request", "RequestInit", "RequestMode", "Response", "Headers",
@@ -17,6 +17,7 @@ web-sys = { version = "0.3", features = [
 ] }
 js-sys = "0.3"
 wasm-bindgen-test = "0.3"
+yewlish-testing-tools = "1.3"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
 thiserror = "1.0"
@@ -24,7 +25,7 @@ wasm-bindgen-futures = "0.4"
 cocomiro-shared = { path = "../shared" }  # Shared types
 wasm-logger = "0.2"
 log = "0.4"
-stylist = { version = "0.12", features = ["yew_integration"] }
+stylist = { version = "0.13", features = ["yew_integration"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin)'] }

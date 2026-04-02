@@ -38,11 +38,54 @@ export class InfiniteCanvasPage {
   }
 
   async waitForCanvasReady() {
-    await this.canvas.waitFor({ state: 'visible' });
+    // First, wait for the page to load
+    await this.page.waitForLoadState('domcontentloaded');
+
+    // Check if the page has any content at all
+    const bodyText = await this.page.locator('body').textContent();
+    if (!bodyText || bodyText.trim() === '') {
+      throw new Error('Page body is empty - application may not have loaded');
+    }
+
+    // Check if WASM loaded by looking for script tags or other indicators
+    const scripts = await this.page.locator('script').count();
+    if (scripts === 0) {
+      throw new Error('No scripts found - WASM may not have loaded');
+    }
+
+    // Now check for canvas
+    const canvasCount = await this.page.locator('canvas').count();
+    if (canvasCount === 0) {
+      // Wait a bit more for Yew to mount
+      await this.page.waitForTimeout(3000);
+      const canvasCount2 = await this.page.locator('canvas').count();
+      if (canvasCount2 === 0) {
+        // Get page content for debugging
+        const html = await this.page.content();
+        throw new Error(`Canvas element not found in DOM after waiting. Page HTML length: ${html.length}. Check if Yew app mounted properly.`);
+      }
+    }
+
+    // Wait for canvas to be visible
+    await this.canvas.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Wait for canvas to have proper dimensions
     const boundingBox = await this.canvas.boundingBox();
     if (!boundingBox || boundingBox.width <= 0 || boundingBox.height <= 0) {
       throw new Error('Canvas does not have valid dimensions');
     }
+
+    // Wait for application initialization
+    await this.page.waitForFunction(`() => {
+      const canvas = document.querySelector('canvas');
+      if (!canvas) return false;
+
+      const loading = canvas.getAttribute('data-loading');
+      if (loading === 'true') return false;
+
+      const zoom = canvas.getAttribute('data-zoom');
+      return zoom !== null && !isNaN(parseFloat(zoom));
+    }`, { timeout: 8000 });
   }
 
   // Actions
@@ -52,6 +95,21 @@ export class InfiniteCanvasPage {
 
   async zoomOut() {
     await this.zoomOutButton.click();
+  }
+
+  async zoomInKeyboard() {
+    await this.canvas.focus();
+    await this.page.keyboard.press('Control++');
+  }
+
+  async zoomInKeyboardEquals() {
+    await this.canvas.focus();
+    await this.page.keyboard.press('Control+=');
+  }
+
+  async zoomOutKeyboard() {
+    await this.canvas.focus();
+    await this.page.keyboard.press('Control+-');
   }
 
   async createStickyNote() {

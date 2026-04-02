@@ -39,8 +39,8 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
 ### Prerequisites
 - **Rust**: 1.70+ with WASM target (`rustup target add wasm32-unknown-unknown`)
 - **Trunk**: WASM build tool (`cargo install trunk`)
-- **Node.js**: 18+ for E2E testing
-- **Playwright**: Browser automation for testing
+- **wasm-pack**: WASM test runner (`cargo install wasm-pack`)
+- **Chrome/Firefox**: For browser testing (headless mode supported)
 
 ### Quick Start
 
@@ -52,9 +52,8 @@ A modern infinite canvas application built with Rust, featuring WebAssembly fron
 
 2. **Install dependencies**:
    ```bash
-   # Frontend testing dependencies
-   cd frontend && npm install
-   cd ..
+   # Install wasm-pack for testing
+   cargo install wasm-pack
    ```
 
 3. **Run the application**:
@@ -90,14 +89,18 @@ cargo build
 # Run all tests (comprehensive test suite)
 ./test-all.sh
 
-# Run E2E tests only
-cd frontend && npm test
+# Run Rust unit tests only
+cargo test --workspace
 
-# View test reports
-cd frontend && npx playwright show-report
+# Run WASM browser tests only
+cd frontend && wasm-pack test --headless --chrome
 
-# Debug tests interactively
-cd frontend && npm run test:ui
+# Run tests with browser visible
+cd frontend && wasm-pack test --chrome
+
+# Run tests in watch mode
+cd frontend && cargo watch -x test
+```
 
 # Build for production
 cd frontend && trunk build --release
@@ -150,7 +153,8 @@ GitHub Actions runs on every push and pull request:
 - Code formatting checks (`rustfmt`)
 - Linting (`clippy`)
 - Full workspace build
-- E2E test execution
+- Rust unit test execution
+- WASM browser test execution (Chrome & Firefox)
 - Production builds verification
 
 ### Pre-commit Quality Gates
@@ -158,29 +162,30 @@ Before any commit, the following checks run automatically:
 1. Code formatting validation
 2. Clippy linting (warnings as errors)
 3. Full workspace compilation
-4. Complete E2E test suite
+4. Complete Rust unit test suite
+5. WASM browser tests (Chrome & Firefox)
 
 To bypass checks (not recommended): `git commit --no-verify`
 
 ## 🧪 Testing Strategy
 
-### E2E Testing with Playwright
-We use comprehensive E2E tests instead of unit tests because they verify actual user behavior:
+### Pure Rust Testing with WASM
+We use comprehensive Rust-based testing instead of JavaScript E2E tests because they provide better type safety, performance, and maintainability:
 
 ```bash
 cd frontend
 
 # Run all tests
-npm test
+wasm-pack test --headless --chrome
 
 # Run with browser visible
-npm run test:headed
+wasm-pack test --chrome
 
-# Interactive debugging
-npm run test:ui
+# Run tests in multiple browsers
+wasm-pack test --headless --chrome && wasm-pack test --headless --firefox
 
-# Step-by-step debugging
-npm run test:debug
+# Run unit tests only
+cargo test
 ```
 
 **Test Coverage**:
@@ -191,8 +196,31 @@ npm run test:debug
 - ✅ Mouse wheel zoom functionality
 - ✅ Canvas maintains functionality after multiple interactions
 
-### Why E2E Over Unit Tests?
-Unit tests only verify mathematical calculations, but E2E tests verify real user interactions like "click + drag = canvas moves". This provides much more valuable coverage for UI applications.
+### Why Rust Testing Over JavaScript E2E?
+Rust tests provide several advantages over traditional E2E testing:
+
+- **Type Safety**: Full Rust type checking prevents runtime errors
+- **Performance**: Faster test execution with native WASM performance
+- **Maintainability**: Single language stack (Rust everywhere)
+- **Reliability**: No external WebDriver dependencies or timing issues
+- **Integration**: Tests run as part of the normal Rust toolchain
+
+### Testing Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Unit Tests     │    │ ServerRenderer  │    │ Browser Tests   │
+│  (cargo test)   │    │ Tests (HTML)    │    │ (wasm-pack)     │
+│                 │    │                 │    │                 │
+│ • Component     │    │ • HTML output   │    │ • Real DOM      │
+│   compilation   │    │ • State changes │    │ • Event handling│
+│ • State logic   │    │ • Rendering     │    │ • User workflows│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+- **Unit Tests**: Component compilation and basic functionality
+- **ServerRenderer Tests**: HTML output validation and state changes
+- **Browser Tests**: Real DOM interaction and user workflow testing
 
 ## 📚 API Documentation
 

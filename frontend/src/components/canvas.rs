@@ -107,16 +107,16 @@ pub fn infinite_canvas() -> Html {
     {
         let draw_canvas = draw_canvas.clone();
         let app_state = app_state.clone();
-        use_effect_with_deps(
-            move |_| {
-                draw_canvas();
-            },
+        use_effect_with(
             (
                 app_state.view.zoom,
                 app_state.view.pan_x,
                 app_state.view.pan_y,
                 app_state.view.is_dragging,
             ),
+            move |_| {
+                draw_canvas();
+            },
         );
     }
 
@@ -154,10 +154,13 @@ pub fn infinite_canvas() -> Html {
         })
     };
 
+    let loading_state = use_state(|| true);
+
     // Effect to set up canvas size and initial draw
     {
         let canvas_ref = canvas_ref.clone();
         let draw_canvas = draw_canvas.clone();
+        let loading_state = loading_state.clone();
         use_effect(move || {
             if let Some(canvas) = canvas_ref.cast::<HtmlCanvasElement>() {
                 if let Some(window) = window() {
@@ -178,6 +181,9 @@ pub fn infinite_canvas() -> Html {
                     canvas.set_width(width);
                     canvas.set_height(height);
                     draw_canvas();
+
+                    // Mark as loaded after successful setup
+                    loading_state.set(false);
                 } else {
                     log::error!("Window object not available for canvas setup");
                 }
@@ -203,6 +209,7 @@ pub fn infinite_canvas() -> Html {
                 data-zoom={app_state.view.zoom.to_string()}
                 data-pan-x={app_state.view.pan_x.to_string()}
                 data-pan-y={app_state.view.pan_y.to_string()}
+                data-loading={(*loading_state).to_string()}
             />
             { for app_state.sticky_notes.notes.iter().map(|note| {
                 let is_editing = app_state.sticky_notes.editing_note_id.as_ref() == Some(&note.id);

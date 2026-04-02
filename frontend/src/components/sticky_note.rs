@@ -39,16 +39,13 @@ pub fn sticky_note_component(props: &StickyNoteProps) -> Html {
     {
         let textarea_ref = textarea_ref.clone();
         let is_editing = props.is_editing;
-        use_effect_with_deps(
-            move |_| {
-                if is_editing {
-                    if let Some(textarea) = textarea_ref.cast::<HtmlTextAreaElement>() {
-                        let _ = textarea.focus();
-                    }
+        use_effect_with(is_editing, move |_| {
+            if is_editing {
+                if let Some(textarea) = textarea_ref.cast::<HtmlTextAreaElement>() {
+                    let _ = textarea.focus();
                 }
-            },
-            is_editing,
-        );
+            }
+        });
     }
 
     // Transform note position based on view state
