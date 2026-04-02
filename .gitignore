@@ -13,6 +13,10 @@ static/pkg/
 node_modules/
 build/
 
+# Playwright test artifacts
+playwright-report/
+test-results/
+
 # IDE and editor files
 .vscode/
 .idea/
