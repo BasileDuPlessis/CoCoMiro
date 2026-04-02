@@ -1,16 +1,9 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "description": "Frontend Rust testing for Mori infinite canvas",
+  "description": "Frontend Rust application for Mori infinite canvas",
   "main": "index.js",
   "scripts": {
-    "test": "wasm-pack test --headless --chrome",
-    "test:headed": "wasm-pack test --chrome",
-    "test:firefox": "wasm-pack test --headless --firefox",
-    "test:safari": "wasm-pack test --headless --safari",
-    "test:all": "wasm-pack test --headless --chrome && wasm-pack test --headless --firefox",
-    "cargo:test": "cargo test",
-    "cargo:test:watch": "cargo watch -x test",
     "build": "trunk build",
     "build:release": "trunk build --release",
     "serve": "trunk serve",
@@ -19,13 +12,9 @@
   "keywords": [
     "rust",
     "wasm",
-    "testing",
     "canvas",
     "yew"
   ],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "wasm-pack": "^0.12.1"
-  }
+  "license": "ISC"
 }
