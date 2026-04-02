@@ -1,2 +1,2 @@
 [alias]
-e2e = "test --test e2e_home -- --nocapture"
+e2e = "test --test e2e_home -- --ignored --nocapture"

@@ -7,20 +7,84 @@
     <link data-trunk rel="rust" />
     <style>
       :root {
-        font-family: Arial, sans-serif;
-        color: #1f2937;
-        background: #f9fafb;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        color: #0f172a;
+        background:
+          radial-gradient(circle at top left, #dbeafe 0%, transparent 42%),
+          linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
         min-height: 100vh;
         margin: 0;
+        padding: clamp(16px, 3vw, 32px);
+      }
+
+      .app-shell {
+        max-width: 1200px;
+        margin: 0 auto;
         display: grid;
-        place-items: center;
+        gap: 16px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 8px;
+      }
+
+      .badge {
+        width: fit-content;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 0.85rem;
+        font-weight: 700;
       }
 
       h1 {
-        font-size: 3rem;
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3rem);
+      }
+
+      .subtitle {
+        margin: 0;
+        color: #334155;
+        font-size: 1rem;
+      }
+
+      .canvas-panel {
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+        backdrop-filter: blur(8px);
+      }
+
+      .canvas-status {
+        margin: 0 0 10px;
+        color: #475569;
+        font-size: 0.95rem;
+      }
+
+      #infinite-canvas {
+        display: block;
+        width: 100%;
+        height: min(72vh, 720px);
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        background: #f8fafc;
+        cursor: grab;
+        outline: none;
+      }
+
+      #infinite-canvas:focus {
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
       }
     </style>
   </head>

@@ -18,16 +18,27 @@ A minimal Rust + WebAssembly example that displays **Hello world from CoCoMiro!*
    ```
 4. Then open <http://127.0.0.1:8080> if it does not open automatically.
 
-## Run the Rust E2E test
+## Run tests
 
-This project includes a **headless browser E2E test written in Rust** that checks the homepage `<h1>`.
+### Fast default tests
+
+Run the regular unit suite with:
+
+```bash
+cargo test
+```
+
+### Opt-in browser E2E
+
+The headless browser regression test is **opt-in** so normal development stays fast.
+Run it explicitly with:
 
 ```bash
 cargo e2e
 ```
 
-You can also run the whole test suite with:
+Equivalent command:
 
 ```bash
-cargo test
+cargo test --test e2e_home -- --ignored
 ```

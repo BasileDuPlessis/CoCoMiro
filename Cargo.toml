@@ -8,7 +8,19 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "Node"] }
+web-sys = { version = "0.3", features = [
+    "CanvasRenderingContext2d",
+    "CssStyleDeclaration",
+    "Document",
+    "Element",
+    "EventTarget",
+    "HtmlCanvasElement",
+    "HtmlElement",
+    "MouseEvent",
+    "Node",
+    "WheelEvent",
+    "Window",
+] }
 
 [dev-dependencies]
 headless_chrome = "1.0"
