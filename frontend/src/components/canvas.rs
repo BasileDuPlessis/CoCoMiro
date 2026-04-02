@@ -200,6 +200,9 @@ pub fn infinite_canvas() -> Html {
                 onwheel={on_wheel}
                 onkeydown={on_key_down}
                 tabindex="0"
+                data-zoom={app_state.view.zoom.to_string()}
+                data-pan-x={app_state.view.pan_x.to_string()}
+                data-pan-y={app_state.view.pan_y.to_string()}
             />
             { for app_state.sticky_notes.notes.iter().map(|note| {
                 let is_editing = app_state.sticky_notes.editing_note_id.as_ref() == Some(&note.id);
