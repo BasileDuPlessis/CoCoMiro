@@ -1,6 +1,16 @@
 # CoCoMiro
 
-A minimal Rust + WebAssembly example that displays **Hello world from CoCoMiro!** in the browser.
+A small **Rust + WebAssembly infinite canvas** prototype with drag-to-pan, wheel zoom, and an opt-in headless browser regression test.
+
+> Requires a current Rust toolchain with **edition 2024** support.
+
+## Features
+
+- **Infinite-feeling canvas** with a movable grid and note card
+- **Cursor-anchored zoom** for smoother navigation
+- **Keyboard-accessible pan/zoom** with arrow keys, `+/-`, and `0` to reset
+- **HiDPI-aware rendering** for sharper output on Retina displays
+- **Rust E2E coverage** using `headless_chrome`
 
 ## Run it locally with Trunk
 
@@ -12,26 +22,21 @@ A minimal Rust + WebAssembly example that displays **Hello world from CoCoMiro!*
    ```bash
    cargo install trunk
    ```
-3. Start the Rust web server from the project root:
+3. Start the local app from the project root:
    ```bash
    trunk serve --open
    ```
-4. Then open <http://127.0.0.1:8080> if it does not open automatically.
+4. Visit <http://127.0.0.1:8080> if the browser does not open automatically.
 
 ## Run tests
 
-### Fast default tests
-
-Run the regular unit suite with:
+### Unit tests
 
 ```bash
-cargo test
+cargo test --lib
 ```
 
 ### Opt-in browser E2E
-
-The headless browser regression test is **opt-in** so normal development stays fast.
-Run it explicitly with:
 
 ```bash
 cargo e2e

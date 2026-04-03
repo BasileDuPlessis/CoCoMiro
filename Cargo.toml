@@ -16,10 +16,12 @@ web-sys = { version = "0.3", features = [
     "EventTarget",
     "HtmlCanvasElement",
     "HtmlElement",
+    "KeyboardEvent",
     "MouseEvent",
     "Node",
     "WheelEvent",
     "Window",
+    "console",
 ] }
 
 [dev-dependencies]
