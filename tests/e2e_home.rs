@@ -13,7 +13,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-const EXPECTED_TITLE: &str = "Hello world from CoCoMiro!";
 const HOST: &str = "127.0.0.1";
 
 struct ChildGuard(Child);
@@ -73,7 +72,7 @@ fn open_home_page() -> Result<(ChildGuard, Browser, Arc<Tab>), Box<dyn Error>> {
     let browser = Browser::new(launch_options)?;
     let tab = browser.new_tab()?;
     tab.navigate_to(&url)?;
-    tab.wait_for_element("h1")?;
+    tab.wait_for_element("#infinite-canvas")?;
 
     Ok((trunk_guard, browser, tab))
 }
@@ -177,12 +176,12 @@ fn assert_dragging_canvas_updates_pan_coordinates(tab: &Tab) -> Result<(), Box<d
 
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
-fn home_page_contains_expected_h1_and_supports_dragging() -> Result<(), Box<dyn Error>> {
+fn home_page_supports_dragging_without_header_copy() -> Result<(), Box<dyn Error>> {
     let (_trunk_guard, _browser, tab) = open_home_page()?;
-    let title = tab.wait_for_element("h1")?;
     let canvas = tab.wait_for_element("#infinite-canvas")?;
 
-    assert_eq!(title.get_inner_text()?.trim(), EXPECTED_TITLE);
+    assert!(tab.find_element("h1").is_err());
+    assert!(tab.find_element(".subtitle").is_err());
     assert!(attribute_as_f64(&canvas, "data-pan-x")?.abs() < 0.01);
     assert!(attribute_as_f64(&canvas, "data-pan-y")?.abs() < 0.01);
     assert!((attribute_as_f64(&canvas, "data-zoom")? - 1.0).abs() < 0.01);

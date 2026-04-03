@@ -21,49 +21,26 @@
       body {
         min-height: 100vh;
         margin: 0;
-        padding: clamp(16px, 3vw, 32px);
+        padding: clamp(12px, 2vw, 20px);
       }
 
       .app-shell {
-        max-width: 1200px;
+        width: min(1600px, 100%);
+        min-height: calc(100vh - (2 * clamp(12px, 2vw, 20px)));
         margin: 0 auto;
         display: grid;
-        gap: 16px;
-      }
-
-      .hero {
-        display: grid;
-        gap: 8px;
-      }
-
-      .badge {
-        width: fit-content;
-        padding: 0.35rem 0.7rem;
-        border-radius: 999px;
-        background: #dbeafe;
-        color: #1d4ed8;
-        font-size: 0.85rem;
-        font-weight: 700;
-      }
-
-      h1 {
-        margin: 0;
-        font-size: clamp(2rem, 4vw, 3rem);
-      }
-
-      .subtitle {
-        margin: 0;
-        color: #334155;
-        font-size: 1rem;
       }
 
       .canvas-panel {
-        padding: 12px;
+        padding: 10px;
         border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 20px;
         background: rgba(255, 255, 255, 0.8);
         box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
         backdrop-filter: blur(8px);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
       }
 
       .canvas-status {
@@ -75,7 +52,8 @@
       #infinite-canvas {
         display: block;
         width: 100%;
-        height: min(72vh, 720px);
+        height: 100%;
+        min-height: 65vh;
         border: 1px solid #cbd5e1;
         border-radius: 16px;
         background: #f8fafc;

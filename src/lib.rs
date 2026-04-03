@@ -64,55 +64,36 @@ impl ViewportState {
     }
 }
 
-#[cfg_attr(not(any(test, target_arch = "wasm32")), allow(dead_code))]
-fn hello_message() -> &'static str {
-    "Hello world from CoCoMiro!"
-}
-
-#[cfg_attr(not(any(test, target_arch = "wasm32")), allow(dead_code))]
-fn canvas_subtitle() -> &'static str {
-    "Infinite canvas restored — drag with the mouse and zoom with the wheel."
-}
-
 #[cfg(target_arch = "wasm32")]
 fn app_markup() -> String {
-    format!(
-        r#"
+    r#"
         <main class="app-shell">
-            <section class="hero">
-                <span class="badge">Recovered feature</span>
-                <h1>{}</h1>
-                <p class="subtitle">{}</p>
-            </section>
             <section class="canvas-panel">
                 <p id="canvas-status" class="canvas-status">Pan (0, 0) · Zoom 1.00× · Hold the mouse button and drag.</p>
                 <canvas id="infinite-canvas" tabindex="0" data-pan-x="0" data-pan-y="0" data-zoom="1"></canvas>
             </section>
         </main>
-        "#,
-        hello_message(),
-        canvas_subtitle()
-    )
+        "#
+    .to_string()
 }
 
 #[cfg(target_arch = "wasm32")]
 fn resize_canvas(canvas: &HtmlCanvasElement) -> Result<(), JsValue> {
     let browser_window = window().ok_or_else(|| JsValue::from_str("window is unavailable"))?;
-    let width = (browser_window
-        .inner_width()?
-        .as_f64()
-        .unwrap_or(1280.0)
-        - 80.0)
-        .max(640.0) as u32;
-    let height = (browser_window
-        .inner_height()?
-        .as_f64()
-        .unwrap_or(840.0)
-        - 240.0)
-        .clamp(360.0, 720.0) as u32;
+    let viewport_width = browser_window.inner_width()?.as_f64().unwrap_or(1280.0);
+    let viewport_height = browser_window.inner_height()?.as_f64().unwrap_or(840.0);
 
-    canvas.set_width(width);
-    canvas.set_height(height);
+    let width = match canvas.client_width() {
+        0 => (viewport_width - 32.0).max(320.0),
+        value => f64::from(value),
+    };
+    let height = match canvas.client_height() {
+        0 => (viewport_height - 96.0).max(320.0),
+        value => f64::from(value),
+    };
+
+    canvas.set_width(width.round() as u32);
+    canvas.set_height(height.round() as u32);
     Ok(())
 }
 
@@ -177,7 +158,11 @@ fn render_canvas(
 
     ctx.set_fill_style(&JsValue::from_str("#111827"));
     ctx.set_font(&format!("{}px sans-serif", (18.0 * zoom).clamp(12.0, 28.0)));
-    ctx.fill_text("Infinite canvas", note_x + (16.0 * zoom), note_y + (32.0 * zoom))?;
+    ctx.fill_text(
+        "Infinite canvas",
+        note_x + (16.0 * zoom),
+        note_y + (32.0 * zoom),
+    )?;
     ctx.set_font(&format!("{}px sans-serif", (13.0 * zoom).clamp(10.0, 20.0)));
     ctx.fill_text(
         "Drag anywhere to keep exploring.",
@@ -193,9 +178,14 @@ fn render_canvas(
     canvas.set_attribute("data-pan-x", &format!("{:.2}", state.pan_x))?;
     canvas.set_attribute("data-pan-y", &format!("{:.2}", state.pan_y))?;
     canvas.set_attribute("data-zoom", &format!("{:.2}", state.zoom))?;
-    canvas
-        .style()
-        .set_property("cursor", if state.is_dragging { "grabbing" } else { "grab" })?;
+    canvas.style().set_property(
+        "cursor",
+        if state.is_dragging {
+            "grabbing"
+        } else {
+            "grab"
+        },
+    )?;
 
     status.set_text_content(Some(&format!(
         "Pan ({:.0}, {:.0}) · Zoom {:.2}× · Hold the mouse button and drag.",
@@ -303,7 +293,8 @@ pub fn start() -> Result<(), JsValue> {
             }
         }
     }));
-    browser_window.add_event_listener_with_callback("mouseup", on_mouse_up.as_ref().unchecked_ref())?;
+    browser_window
+        .add_event_listener_with_callback("mouseup", on_mouse_up.as_ref().unchecked_ref())?;
     on_mouse_up.forget();
 
     let on_wheel = Closure::<dyn FnMut(WheelEvent)>::wrap(Box::new({
@@ -311,7 +302,11 @@ pub fn start() -> Result<(), JsValue> {
         let render = render.clone();
         move |event: WheelEvent| {
             event.prevent_default();
-            let factor = if event.delta_y() < 0.0 { 1.1 } else { 1.0 / 1.1 };
+            let factor = if event.delta_y() < 0.0 {
+                1.1
+            } else {
+                1.0 / 1.1
+            };
             state.borrow_mut().zoom_by(factor);
             render();
         }
@@ -327,7 +322,8 @@ pub fn start() -> Result<(), JsValue> {
             render();
         }
     }));
-    browser_window.add_event_listener_with_callback("resize", on_resize.as_ref().unchecked_ref())?;
+    browser_window
+        .add_event_listener_with_callback("resize", on_resize.as_ref().unchecked_ref())?;
     on_resize.forget();
 
     Ok(())
@@ -335,12 +331,17 @@ pub fn start() -> Result<(), JsValue> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ViewportState, canvas_subtitle, hello_message};
+    use super::ViewportState;
 
     #[test]
-    fn hello_message_is_correct() {
-        assert_eq!(hello_message(), "Hello world from CoCoMiro!");
-        assert!(canvas_subtitle().contains("Infinite canvas restored"));
+    fn default_viewport_state_is_centered() {
+        let state = ViewportState::default();
+
+        assert_eq!(state.pan_x, 0.0);
+        assert_eq!(state.pan_y, 0.0);
+        assert_eq!(state.zoom, 1.0);
+        assert!(!state.is_dragging);
+        assert_eq!(state.last_mouse_pos, None);
     }
 
     #[test]
