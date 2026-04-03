@@ -113,6 +113,7 @@ fn chrome_binary() -> Option<PathBuf> {
 }
 
 fn wait_for_canvas_ready(tab: &Tab, timeout: Duration) -> Result<(), Box<dyn Error>> {
+    // Wait for the app's own ready marker instead of relying on a fixed sleep.
     let deadline = Instant::now() + timeout;
 
     while Instant::now() < deadline {
@@ -221,6 +222,7 @@ fn wait_for_pan_update(
     initial_pan_y: f64,
     timeout: Duration,
 ) -> Result<(f64, f64), Box<dyn Error>> {
+    // Poll the exported pan attributes so slower CI machines do not race the render loop.
     let deadline = Instant::now() + timeout;
 
     while Instant::now() < deadline {

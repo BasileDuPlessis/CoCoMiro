@@ -129,6 +129,7 @@ impl ViewportState {
         viewport_width: f64,
         viewport_height: f64,
     ) {
+        // Preserve the world-space point under the cursor so wheel zoom feels anchored.
         let world_point = self.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
         self.zoom_by(factor);
 
@@ -188,6 +189,7 @@ fn resize_canvas(
 ) -> Result<(), JsValue> {
     let browser_window = window().ok_or_else(|| JsValue::from_str("window is unavailable"))?;
     let (width, height) = canvas_css_size(canvas)?;
+    // Keep CSS size stable while allocating a denser backing store for Retina/HiDPI displays.
     let device_pixel_ratio = browser_window.device_pixel_ratio().max(1.0);
 
     canvas
@@ -394,6 +396,7 @@ fn start_impl() -> Result<(), JsValue> {
         }
     }));
     canvas.add_event_listener_with_callback("mousedown", on_mouse_down.as_ref().unchecked_ref())?;
+    // `forget()` intentionally transfers listener ownership to JS for the app lifetime.
     on_mouse_down.forget();
 
     let on_mouse_move = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
