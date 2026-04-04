@@ -14,6 +14,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
 const HOST: &str = "127.0.0.1";
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(20);
 const SERVER_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -25,8 +27,16 @@ const DRAG_DISTANCE_X: f64 = 140.0;
 const DRAG_DISTANCE_Y: f64 = 90.0;
 const MIN_EXPECTED_PAN_X_DELTA: f64 = 80.0;
 const MIN_EXPECTED_PAN_Y_DELTA: f64 = 50.0;
+const CANVAS_SELECTOR: &str = "#infinite-canvas[data-ready=\"true\"]";
+const DEFAULT_VIEW_TOLERANCE: f64 = 0.01;
 
 struct ChildGuard(Child);
+
+struct HomePageSession {
+    _trunk_guard: ChildGuard,
+    _browser: Browser,
+    tab: Arc<Tab>,
+}
 
 impl Drop for ChildGuard {
     fn drop(&mut self) {
@@ -35,16 +45,12 @@ impl Drop for ChildGuard {
     }
 }
 
-fn reserve_port() -> Result<u16, Box<dyn Error>> {
+fn reserve_port() -> TestResult<u16> {
     let listener = TcpListener::bind((HOST, 0))?;
     Ok(listener.local_addr()?.port())
 }
 
-fn wait_for_server(
-    address: &str,
-    child: &mut Child,
-    timeout: Duration,
-) -> Result<(), Box<dyn Error>> {
+fn wait_for_server(address: &str, child: &mut Child, timeout: Duration) -> TestResult {
     let deadline = Instant::now() + timeout;
 
     while Instant::now() < deadline {
@@ -112,12 +118,12 @@ fn chrome_binary() -> Option<PathBuf> {
         })
 }
 
-fn wait_for_canvas_ready(tab: &Tab, timeout: Duration) -> Result<(), Box<dyn Error>> {
+fn wait_for_canvas_ready(tab: &Tab, timeout: Duration) -> TestResult {
     // Wait for the app's own ready marker instead of relying on a fixed sleep.
     let deadline = Instant::now() + timeout;
 
     while Instant::now() < deadline {
-        if tab.find_element("#infinite-canvas[data-ready=\"true\"]").is_ok() {
+        if tab.find_element(CANVAS_SELECTOR).is_ok() {
             return Ok(());
         }
 
@@ -127,7 +133,7 @@ fn wait_for_canvas_ready(tab: &Tab, timeout: Duration) -> Result<(), Box<dyn Err
     Err("timed out waiting for the canvas app to become interactive".into())
 }
 
-fn spawn_trunk() -> Result<(ChildGuard, String), Box<dyn Error>> {
+fn spawn_trunk() -> TestResult<(ChildGuard, String)> {
     let mut last_error: Option<Box<dyn Error>> = None;
 
     for attempt in 1..=TRUNK_START_ATTEMPTS {
@@ -150,8 +156,10 @@ fn spawn_trunk() -> Result<(ChildGuard, String), Box<dyn Error>> {
             Ok(()) => return Ok((ChildGuard(trunk), format!("http://{address}/"))),
             Err(error) => {
                 last_error = Some(
-                    format!("attempt {attempt} failed to start the Trunk server on {address}: {error}")
-                        .into(),
+                    format!(
+                        "attempt {attempt} failed to start the Trunk server on {address}: {error}"
+                    )
+                    .into(),
                 );
                 let _ = trunk.kill();
                 let _ = trunk.wait();
@@ -162,29 +170,103 @@ fn spawn_trunk() -> Result<(ChildGuard, String), Box<dyn Error>> {
     Err(last_error.unwrap_or_else(|| "failed to start Trunk after multiple attempts".into()))
 }
 
-fn open_home_page() -> Result<(ChildGuard, Browser, Arc<Tab>), Box<dyn Error>> {
-    let (trunk_guard, url) = spawn_trunk()?;
+impl HomePageSession {
+    fn launch() -> TestResult<Self> {
+        let (trunk_guard, url) = spawn_trunk()?;
 
-    let launch_options = LaunchOptionsBuilder::default()
-        .path(chrome_binary())
-        .headless(true)
-        .build()
-        .map_err(|message| format!("failed to build Chrome launch options: {message}"))?;
+        let launch_options = LaunchOptionsBuilder::default()
+            .path(chrome_binary())
+            .headless(true)
+            .build()
+            .map_err(|message| format!("failed to build Chrome launch options: {message}"))?;
 
-    let browser = Browser::new(launch_options)?;
-    let tab = browser.new_tab()?;
-    tab.navigate_to(&url)?;
-    wait_for_canvas_ready(tab.as_ref(), STARTUP_TIMEOUT)?;
+        let browser = Browser::new(launch_options)?;
+        let tab = browser.new_tab()?;
+        tab.navigate_to(&url)?;
+        wait_for_canvas_ready(tab.as_ref(), STARTUP_TIMEOUT)?;
 
-    Ok((trunk_guard, browser, tab))
+        Ok(Self {
+            _trunk_guard: trunk_guard,
+            _browser: browser,
+            tab,
+        })
+    }
+
+    fn tab(&self) -> &Tab {
+        self.tab.as_ref()
+    }
+
+    fn assert_starts_clean(&self) -> TestResult {
+        assert_home_page_starts_clean(self.tab())
+    }
+
+    fn assert_drag_pans_canvas(&self) -> TestResult {
+        assert_dragging_canvas_updates_pan_coordinates(self.tab())
+    }
 }
 
-fn attribute_as_f64(element: &Element<'_>, name: &str) -> Result<f64, Box<dyn Error>> {
+fn attribute_as_f64(element: &Element<'_>, name: &str) -> TestResult<f64> {
     let value = element
         .get_attribute_value(name)?
         .ok_or_else(|| format!("missing attribute {name}"))?;
 
     Ok(value.parse::<f64>()?)
+}
+
+fn ready_canvas(tab: &Tab) -> TestResult<Element<'_>> {
+    Ok(tab.wait_for_element(CANVAS_SELECTOR)?)
+}
+
+fn pan_coordinates(canvas: &Element<'_>) -> TestResult<(f64, f64)> {
+    Ok((
+        attribute_as_f64(canvas, "data-pan-x")?,
+        attribute_as_f64(canvas, "data-pan-y")?,
+    ))
+}
+
+fn assert_within_tolerance(label: &str, actual: f64, expected: f64, tolerance: f64) {
+    assert!(
+        (actual - expected).abs() < tolerance,
+        "{label} expected {expected} ± {tolerance}, got {actual}"
+    );
+}
+
+fn assert_home_page_starts_clean(tab: &Tab) -> TestResult {
+    let canvas = ready_canvas(tab)?;
+    let (pan_x, pan_y) = pan_coordinates(&canvas)?;
+
+    assert!(
+        tab.find_element("h1").is_err(),
+        "unexpected header copy found"
+    );
+    assert!(
+        tab.find_element(".subtitle").is_err(),
+        "unexpected subtitle copy found"
+    );
+    assert_within_tolerance("data-pan-x", pan_x, 0.0, DEFAULT_VIEW_TOLERANCE);
+    assert_within_tolerance("data-pan-y", pan_y, 0.0, DEFAULT_VIEW_TOLERANCE);
+    assert_within_tolerance(
+        "data-zoom",
+        attribute_as_f64(&canvas, "data-zoom")?,
+        1.0,
+        DEFAULT_VIEW_TOLERANCE,
+    );
+
+    Ok(())
+}
+
+fn drag_start_and_end_points(canvas: &Element<'_>) -> TestResult<(Point, Point)> {
+    let bounds = canvas.get_box_model()?.margin_viewport();
+    let start = Point {
+        x: bounds.x + (bounds.width / 2.0),
+        y: bounds.y + (bounds.height / 2.0),
+    };
+    let end = Point {
+        x: start.x + DRAG_DISTANCE_X,
+        y: start.y + DRAG_DISTANCE_Y,
+    };
+
+    Ok((start, end))
 }
 
 fn dispatch_mouse_event(
@@ -193,7 +275,7 @@ fn dispatch_mouse_event(
     point: Point,
     button: Option<Input::MouseButton>,
     buttons: Option<u32>,
-) -> Result<(), Box<dyn Error>> {
+) -> TestResult {
     tab.call_method(Input::DispatchMouseEvent {
         Type: event_type,
         x: point.x,
@@ -221,14 +303,13 @@ fn wait_for_pan_update(
     initial_pan_x: f64,
     initial_pan_y: f64,
     timeout: Duration,
-) -> Result<(f64, f64), Box<dyn Error>> {
+) -> TestResult<(f64, f64)> {
     // Poll the exported pan attributes so slower CI machines do not race the render loop.
     let deadline = Instant::now() + timeout;
 
     while Instant::now() < deadline {
-        let canvas = tab.wait_for_element("#infinite-canvas[data-ready=\"true\"]")?;
-        let final_pan_x = attribute_as_f64(&canvas, "data-pan-x")?;
-        let final_pan_y = attribute_as_f64(&canvas, "data-pan-y")?;
+        let canvas = ready_canvas(tab)?;
+        let (final_pan_x, final_pan_y) = pan_coordinates(&canvas)?;
 
         if (final_pan_x - initial_pan_x).abs() > 1.0 || (final_pan_y - initial_pan_y).abs() > 1.0 {
             return Ok((final_pan_x, final_pan_y));
@@ -240,21 +321,7 @@ fn wait_for_pan_update(
     Err("timed out waiting for drag pan coordinates to update".into())
 }
 
-fn assert_dragging_canvas_updates_pan_coordinates(tab: &Tab) -> Result<(), Box<dyn Error>> {
-    let canvas = tab.wait_for_element("#infinite-canvas[data-ready=\"true\"]")?;
-    let initial_pan_x = attribute_as_f64(&canvas, "data-pan-x")?;
-    let initial_pan_y = attribute_as_f64(&canvas, "data-pan-y")?;
-
-    let bounds = canvas.get_box_model()?.margin_viewport();
-    let start = Point {
-        x: bounds.x + (bounds.width / 2.0),
-        y: bounds.y + (bounds.height / 2.0),
-    };
-    let end = Point {
-        x: start.x + DRAG_DISTANCE_X,
-        y: start.y + DRAG_DISTANCE_Y,
-    };
-
+fn drag_canvas(tab: &Tab, start: Point, end: Point) -> TestResult {
     tab.move_mouse_to_point(start)?;
     dispatch_mouse_event(
         tab,
@@ -288,28 +355,40 @@ fn assert_dragging_canvas_updates_pan_coordinates(tab: &Tab) -> Result<(), Box<d
         Some(1),
     )?;
 
+    Ok(())
+}
+
+fn assert_dragging_canvas_updates_pan_coordinates(tab: &Tab) -> TestResult {
+    let canvas = ready_canvas(tab)?;
+    let (initial_pan_x, initial_pan_y) = pan_coordinates(&canvas)?;
+    let (start, end) = drag_start_and_end_points(&canvas)?;
+
+    drag_canvas(tab, start, end)?;
+
     let (final_pan_x, final_pan_y) =
         wait_for_pan_update(tab, initial_pan_x, initial_pan_y, PAN_UPDATE_TIMEOUT)?;
 
-    assert!(final_pan_x - initial_pan_x > MIN_EXPECTED_PAN_X_DELTA);
-    assert!(final_pan_y - initial_pan_y > MIN_EXPECTED_PAN_Y_DELTA);
+    assert!(
+        final_pan_x - initial_pan_x > MIN_EXPECTED_PAN_X_DELTA,
+        "expected horizontal pan change to exceed {MIN_EXPECTED_PAN_X_DELTA}, got {}",
+        final_pan_x - initial_pan_x
+    );
+    assert!(
+        final_pan_y - initial_pan_y > MIN_EXPECTED_PAN_Y_DELTA,
+        "expected vertical pan change to exceed {MIN_EXPECTED_PAN_Y_DELTA}, got {}",
+        final_pan_y - initial_pan_y
+    );
 
     Ok(())
 }
 
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
-fn home_page_supports_dragging_without_header_copy() -> Result<(), Box<dyn Error>> {
-    let (_trunk_guard, _browser, tab) = open_home_page()?;
-    let canvas = tab.wait_for_element("#infinite-canvas[data-ready=\"true\"]")?;
+fn home_page_supports_dragging_without_header_copy() -> TestResult {
+    let session = HomePageSession::launch()?;
 
-    assert!(tab.find_element("h1").is_err());
-    assert!(tab.find_element(".subtitle").is_err());
-    assert!(attribute_as_f64(&canvas, "data-pan-x")?.abs() < 0.01);
-    assert!(attribute_as_f64(&canvas, "data-pan-y")?.abs() < 0.01);
-    assert!((attribute_as_f64(&canvas, "data-zoom")? - 1.0).abs() < 0.01);
-
-    assert_dragging_canvas_updates_pan_coordinates(tab.as_ref())?;
+    session.assert_starts_clean()?;
+    session.assert_drag_pans_canvas()?;
 
     Ok(())
 }

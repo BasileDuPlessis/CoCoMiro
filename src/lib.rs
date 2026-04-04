@@ -8,8 +8,8 @@ use std::{
 use wasm_bindgen::{JsCast, closure::Closure, prelude::*};
 #[cfg(target_arch = "wasm32")]
 use web_sys::{
-    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent,
-    MouseEvent, WheelEvent, window,
+    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent,
+    WheelEvent, window,
 };
 
 #[cfg(any(test, target_arch = "wasm32"))]
@@ -208,9 +208,7 @@ fn resize_canvas(
 
 #[cfg(target_arch = "wasm32")]
 fn log_js_error(prefix: &str, error: &JsValue) {
-    let message = error
-        .as_string()
-        .unwrap_or_else(|| format!("{error:?}"));
+    let message = error.as_string().unwrap_or_else(|| format!("{error:?}"));
     web_sys::console::error_1(&JsValue::from_str(&format!("{prefix}: {message}")));
 }
 
@@ -640,7 +638,8 @@ mod tests {
         let cursor_x = 620.0;
         let cursor_y = 420.0;
 
-        let world_before = state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
+        let world_before =
+            state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
         state.zoom_at(1.25, cursor_x, cursor_y, viewport_width, viewport_height);
         let world_after = state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
 
