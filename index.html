@@ -49,6 +49,11 @@
         font-size: 0.95rem;
       }
 
+      .canvas-workspace {
+        position: relative;
+        min-height: 65vh;
+      }
+
       #infinite-canvas {
         display: block;
         width: 100%;
@@ -63,6 +68,39 @@
 
       #infinite-canvas:focus {
         box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+      }
+
+      .floating-toolbar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        width: 58px;
+        min-height: 220px;
+        padding: 10px 0 14px;
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+        backdrop-filter: blur(10px);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 10px;
+        user-select: none;
+        touch-action: none;
+        cursor: default;
+      }
+
+      .floating-toolbar__handle {
+        width: 28px;
+        height: 18px;
+        border-radius: 999px;
+        background:
+          radial-gradient(circle, rgba(148, 163, 184, 0.95) 30%, transparent 31%) center / 14px 8px repeat-x;
+        opacity: 0.9;
+        cursor: grab;
       }
     </style>
   </head>

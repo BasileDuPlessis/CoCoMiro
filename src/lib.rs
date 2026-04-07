@@ -41,6 +41,12 @@ const GRID_MIN_SPACING: f64 = 24.0;
 const GRID_MAX_SPACING: f64 = 120.0;
 #[cfg(target_arch = "wasm32")]
 const STATUS_HELP_TEXT: &str = "Drag to pan, scroll to zoom, or use the arrow keys and +/-.";
+#[cfg(any(test, target_arch = "wasm32"))]
+const TOOLBAR_DEFAULT_X: f64 = 18.0;
+#[cfg(any(test, target_arch = "wasm32"))]
+const TOOLBAR_DEFAULT_Y: f64 = 18.0;
+#[cfg(any(test, target_arch = "wasm32"))]
+const TOOLBAR_EDGE_PADDING: f64 = 12.0;
 
 #[cfg(any(test, target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq)]
@@ -140,13 +146,77 @@ impl ViewportState {
     }
 }
 
+#[cfg(any(test, target_arch = "wasm32"))]
+#[derive(Debug, Clone, PartialEq)]
+struct FloatingToolbarState {
+    x: f64,
+    y: f64,
+    is_dragging: bool,
+    last_mouse_pos: Option<(f64, f64)>,
+}
+
+#[cfg(any(test, target_arch = "wasm32"))]
+impl Default for FloatingToolbarState {
+    fn default() -> Self {
+        Self {
+            x: TOOLBAR_DEFAULT_X,
+            y: TOOLBAR_DEFAULT_Y,
+            is_dragging: false,
+            last_mouse_pos: None,
+        }
+    }
+}
+
+#[cfg(any(test, target_arch = "wasm32"))]
+impl FloatingToolbarState {
+    fn start_drag(&mut self, x: f64, y: f64) {
+        self.is_dragging = true;
+        self.last_mouse_pos = Some((x, y));
+    }
+
+    fn drag_to(&mut self, x: f64, y: f64) -> bool {
+        if !self.is_dragging {
+            return false;
+        }
+
+        if let Some((last_x, last_y)) = self.last_mouse_pos {
+            self.x += x - last_x;
+            self.y += y - last_y;
+            self.last_mouse_pos = Some((x, y));
+            return true;
+        }
+
+        self.last_mouse_pos = Some((x, y));
+        false
+    }
+
+    fn clamp_within(&mut self, max_x: f64, max_y: f64) {
+        self.x = self
+            .x
+            .clamp(TOOLBAR_EDGE_PADDING, max_x.max(TOOLBAR_EDGE_PADDING));
+        self.y = self
+            .y
+            .clamp(TOOLBAR_EDGE_PADDING, max_y.max(TOOLBAR_EDGE_PADDING));
+    }
+
+    fn end_drag(&mut self) {
+        self.is_dragging = false;
+        self.last_mouse_pos = None;
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 fn app_markup() -> String {
     r#"
         <main class="app-shell">
-            <section id="canvas-panel" class="canvas-panel">
+            <section class="canvas-panel">
                 <p id="canvas-status" class="canvas-status" role="status" aria-live="polite">Pan (0, 0) · Zoom 1.00× · Drag to pan, scroll to zoom, or use the arrow keys and +/-.</p>
-                <canvas id="infinite-canvas" tabindex="0" aria-label="Infinite canvas workspace" aria-describedby="canvas-status" title="Use arrow keys to pan, plus/minus to zoom, and 0 to reset the view." data-ready="false" data-pan-x="0" data-pan-y="0" data-zoom="1"></canvas>
+                <div id="canvas-workspace" class="canvas-workspace">
+                    <canvas id="infinite-canvas" tabindex="0" aria-label="Infinite canvas workspace" aria-describedby="canvas-status" title="Use arrow keys to pan, plus/minus to zoom, and 0 to reset the view." data-ready="false" data-pan-x="0" data-pan-y="0" data-zoom="1"></canvas>
+                    <div id="floating-toolbar" class="floating-toolbar" role="toolbar" aria-orientation="vertical" aria-label="Floating canvas toolbar" title="Drag the handle to reposition the toolbar." data-x="18" data-y="18">
+                        <div id="floating-toolbar-handle" class="floating-toolbar__handle" aria-label="Drag handle" title="Drag handle"></div>
+                    </div>
+                </div>
             </section>
         </main>
         "#
@@ -310,12 +380,50 @@ fn render_canvas(
 }
 
 #[cfg(target_arch = "wasm32")]
-fn install_app(document: &Document) -> Result<(HtmlCanvasElement, HtmlElement, HtmlElement), JsValue> {
+fn sync_toolbar_position(
+    toolbar: &HtmlElement,
+    workspace: &HtmlElement,
+    state: &mut FloatingToolbarState,
+) -> Result<(), JsValue> {
+    let max_x = (f64::from(workspace.client_width() - toolbar.offset_width())
+        - TOOLBAR_EDGE_PADDING)
+        .max(TOOLBAR_EDGE_PADDING);
+    let max_y = (f64::from(workspace.client_height() - toolbar.offset_height())
+        - TOOLBAR_EDGE_PADDING)
+        .max(TOOLBAR_EDGE_PADDING);
+
+    state.clamp_within(max_x, max_y);
+    toolbar.set_attribute("data-x", &format!("{:.2}", state.x))?;
+    toolbar.set_attribute("data-y", &format!("{:.2}", state.y))?;
+    toolbar.style().set_property(
+        "transform",
+        &format!("translate({:.2}px, {:.2}px)", state.x, state.y),
+    )?;
+    toolbar.style().set_property(
+        "cursor",
+        if state.is_dragging {
+            "grabbing"
+        } else {
+            "grab"
+        },
+    )?;
+
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn install_app(
+    document: &Document,
+) -> Result<(HtmlElement, HtmlCanvasElement, HtmlElement, HtmlElement), JsValue> {
     let body = document
         .body()
         .ok_or_else(|| JsValue::from_str("document has no body element"))?;
     body.set_inner_html(&app_markup());
 
+    let workspace = document
+        .get_element_by_id("canvas-workspace")
+        .ok_or_else(|| JsValue::from_str("canvas workspace element not found"))?
+        .dyn_into::<HtmlElement>()?;
     let canvas = document
         .get_element_by_id("infinite-canvas")
         .ok_or_else(|| JsValue::from_str("canvas element not found"))?
@@ -324,12 +432,17 @@ fn install_app(document: &Document) -> Result<(HtmlCanvasElement, HtmlElement, H
         .get_element_by_id("canvas-status")
         .ok_or_else(|| JsValue::from_str("status element not found"))?
         .dyn_into::<HtmlElement>()?;
-    let canvas_panel = document
-        .get_element_by_id("canvas-panel")
-        .ok_or_else(|| JsValue::from_str("canvas-panel element not found"))?
+    let toolbar = document
+        .get_element_by_id("floating-toolbar")
+        .ok_or_else(|| JsValue::from_str("floating toolbar element not found"))?
         .dyn_into::<HtmlElement>()?;
+    let toolbar_handle = document
+        .get_element_by_id("floating-toolbar-handle")
+        .ok_or_else(|| JsValue::from_str("floating toolbar handle element not found"))?
+        .dyn_into::<HtmlElement>()?;
+    toolbar.set_attribute("data-handle-id", &toolbar_handle.id())?;
 
-    Ok((canvas, status, canvas_panel))
+    Ok((workspace, canvas, status, toolbar))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -341,13 +454,24 @@ fn end_drag_if_needed(state: &Rc<RefCell<ViewportState>>, render: &Rc<dyn Fn()>)
 }
 
 #[cfg(target_arch = "wasm32")]
+fn end_toolbar_drag_if_needed(
+    state: &Rc<RefCell<FloatingToolbarState>>,
+    position_toolbar: &Rc<dyn Fn()>,
+) {
+    if state.borrow().is_dragging {
+        state.borrow_mut().end_drag();
+        position_toolbar();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 fn start_impl() -> Result<(), JsValue> {
     let browser_window = window().ok_or_else(|| JsValue::from_str("window is unavailable"))?;
     let document = browser_window
         .document()
         .ok_or_else(|| JsValue::from_str("could not access the browser document"))?;
 
-    let (canvas, status, canvas_panel) = install_app(&document)?;
+    let (workspace, canvas, status, toolbar) = install_app(&document)?;
 
     let context = canvas
         .get_context("2d")?
@@ -356,9 +480,8 @@ fn start_impl() -> Result<(), JsValue> {
     resize_canvas(&canvas, &context)?;
 
     let state = Rc::new(RefCell::new(ViewportState::default()));
+    let toolbar_state = Rc::new(RefCell::new(FloatingToolbarState::default()));
     let is_rendering = Rc::new(Cell::new(false));
-    let toolbar_dragging = Rc::new(RefCell::new(false));
-    let toolbar_start_pos = Rc::new(RefCell::new((0.0, 0.0)));
     let render: Rc<dyn Fn()> = Rc::new({
         let context = context.clone();
         let canvas = canvas.clone();
@@ -378,50 +501,20 @@ fn start_impl() -> Result<(), JsValue> {
             is_rendering.set(false);
         }
     });
-
-    // Create floating toolbar
-    let toolbar = document.create_element("div")?.dyn_into::<HtmlElement>()?;
-    toolbar.set_id("floating-toolbar");
-    toolbar.set_attribute("style", "position: absolute; top: 20px; left: 20px; background: white; border: 1px solid #ccc; padding: 10px; cursor: move; z-index: 1000; display: flex; flex-direction: column; gap: 5px;")?;
-    canvas_panel.append_child(&toolbar)?;
-
-    // Add buttons
-    let button_types = ["Sticky Note", "Text", "Rectangle", "Circle"];
-    for button_text in button_types.iter() {
-        let button = document.create_element("button")?;
-        button.set_text_content(Some(button_text));
-        button.set_attribute("style", "padding: 5px;")?;
-
-        let closure = Closure::<dyn FnMut()>::wrap(Box::new({
-            let document = document.clone();
-            let canvas_panel = canvas_panel.clone();
-            let button_text = button_text.to_string();
-            move || {
-                let element = document.create_element("div").unwrap();
-                element.set_attribute("style", "position: absolute; top: 100px; left: 100px; background: yellow; border: 1px solid black; padding: 10px;").unwrap();
-                element.set_text_content(Some(&button_text));
-                canvas_panel.append_child(&element).unwrap();
+    let position_toolbar: Rc<dyn Fn()> = Rc::new({
+        let workspace = workspace.clone();
+        let toolbar = toolbar.clone();
+        let toolbar_state = toolbar_state.clone();
+        move || {
+            if let Err(error) =
+                sync_toolbar_position(&toolbar, &workspace, &mut toolbar_state.borrow_mut())
+            {
+                log_js_error("sync_toolbar_position failed", &error);
             }
-        }));
-        button.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
-        closure.forget();
-        toolbar.append_child(&button)?;
-    }
-
-    // Toolbar drag logic
-    let on_toolbar_mousedown = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
-        let toolbar_dragging = toolbar_dragging.clone();
-        let toolbar_start_pos = toolbar_start_pos.clone();
-        move |event: MouseEvent| {
-            event.prevent_default();
-            *toolbar_dragging.borrow_mut() = true;
-            *toolbar_start_pos.borrow_mut() = (event.client_x() as f64, event.client_y() as f64);
         }
-    }));
-    toolbar.add_event_listener_with_callback("mousedown", on_toolbar_mousedown.as_ref().unchecked_ref())?;
-    on_toolbar_mousedown.forget();
-
+    });
     render();
+    position_toolbar();
 
     let on_mouse_down = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
@@ -446,13 +539,56 @@ fn start_impl() -> Result<(), JsValue> {
     // `forget()` intentionally transfers listener ownership to JS for the app lifetime.
     on_mouse_down.forget();
 
+    let on_toolbar_mouse_down = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
+        let canvas = canvas.clone();
+        let toolbar_state = toolbar_state.clone();
+        let position_toolbar = position_toolbar.clone();
+        move |event: MouseEvent| {
+            if event.button() != 0 {
+                return;
+            }
+
+            let Some(target) = event.target() else {
+                return;
+            };
+            let Ok(target_element) = target.dyn_into::<HtmlElement>() else {
+                return;
+            };
+            if target_element.id() != "floating-toolbar-handle" {
+                return;
+            }
+
+            event.prevent_default();
+            event.stop_propagation();
+            if let Err(error) = canvas.focus() {
+                log_js_error("canvas focus failed", &error);
+            }
+            toolbar_state
+                .borrow_mut()
+                .start_drag(event.client_x() as f64, event.client_y() as f64);
+            position_toolbar();
+        }
+    }));
+    toolbar.add_event_listener_with_callback(
+        "mousedown",
+        on_toolbar_mouse_down.as_ref().unchecked_ref(),
+    )?;
+    on_toolbar_mouse_down.forget();
+
     let on_mouse_move = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
-        let toolbar_dragging = toolbar_dragging.clone();
-        let toolbar_start_pos = toolbar_start_pos.clone();
-        let toolbar = toolbar.clone();
+        let toolbar_state = toolbar_state.clone();
+        let position_toolbar = position_toolbar.clone();
         move |event: MouseEvent| {
+            let did_toolbar_move = toolbar_state
+                .borrow_mut()
+                .drag_to(event.client_x() as f64, event.client_y() as f64);
+            if did_toolbar_move {
+                position_toolbar();
+                return;
+            }
+
             let did_move = {
                 state
                     .borrow_mut()
@@ -461,19 +597,6 @@ fn start_impl() -> Result<(), JsValue> {
 
             if did_move {
                 render();
-            }
-
-            if *toolbar_dragging.borrow() {
-                let (start_x, start_y) = *toolbar_start_pos.borrow();
-                let delta_x = event.client_x() as f64 - start_x;
-                let delta_y = event.client_y() as f64 - start_y;
-                let current_top_str = toolbar.style().get_property_value("top").unwrap_or("20px".to_string());
-                let current_left_str = toolbar.style().get_property_value("left").unwrap_or("20px".to_string());
-                let current_top = current_top_str.trim_end_matches("px").parse::<f64>().unwrap_or(20.0);
-                let current_left = current_left_str.trim_end_matches("px").parse::<f64>().unwrap_or(20.0);
-                toolbar.style().set_property("top", &format!("{}px", current_top + delta_y)).unwrap();
-                toolbar.style().set_property("left", &format!("{}px", current_left + delta_x)).unwrap();
-                *toolbar_start_pos.borrow_mut() = (event.client_x() as f64, event.client_y() as f64);
             }
         }
     }));
@@ -484,10 +607,11 @@ fn start_impl() -> Result<(), JsValue> {
     let on_mouse_up = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
-        let toolbar_dragging = toolbar_dragging.clone();
+        let toolbar_state = toolbar_state.clone();
+        let position_toolbar = position_toolbar.clone();
         move |_event: MouseEvent| {
             end_drag_if_needed(&state, &render);
-            *toolbar_dragging.borrow_mut() = false;
+            end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
         }
     }));
     browser_window
@@ -497,7 +621,12 @@ fn start_impl() -> Result<(), JsValue> {
     let on_mouse_leave = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
-        move |_event: MouseEvent| end_drag_if_needed(&state, &render)
+        let toolbar_state = toolbar_state.clone();
+        let position_toolbar = position_toolbar.clone();
+        move |_event: MouseEvent| {
+            end_drag_if_needed(&state, &render);
+            end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
+        }
     }));
     document
         .add_event_listener_with_callback("mouseleave", on_mouse_leave.as_ref().unchecked_ref())?;
@@ -506,7 +635,12 @@ fn start_impl() -> Result<(), JsValue> {
     let on_blur = Closure::<dyn FnMut()>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
-        move || end_drag_if_needed(&state, &render)
+        let toolbar_state = toolbar_state.clone();
+        let position_toolbar = position_toolbar.clone();
+        move || {
+            end_drag_if_needed(&state, &render);
+            end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
+        }
     }));
     browser_window.add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())?;
     on_blur.forget();
@@ -605,11 +739,13 @@ fn start_impl() -> Result<(), JsValue> {
         let canvas = canvas.clone();
         let context = context.clone();
         let render = render.clone();
+        let position_toolbar = position_toolbar.clone();
         move || {
             if let Err(error) = resize_canvas(&canvas, &context) {
                 log_js_error("resize_canvas failed", &error);
             }
             render();
+            position_toolbar();
         }
     }));
     browser_window
@@ -636,7 +772,7 @@ pub fn start() -> Result<(), JsValue> {
 
 #[cfg(test)]
 mod tests {
-    use super::ViewportState;
+    use super::{FloatingToolbarState, TOOLBAR_DEFAULT_X, TOOLBAR_DEFAULT_Y, ViewportState};
 
     #[test]
     fn default_viewport_state_is_centered() {
@@ -715,5 +851,34 @@ mod tests {
         assert!((world_before.0 - world_after.0).abs() < 1e-9);
         assert!((world_before.1 - world_after.1).abs() < 1e-9);
         assert!(state.zoom > 1.0);
+    }
+
+    #[test]
+    fn floating_toolbar_dragging_updates_its_position() {
+        let mut toolbar = FloatingToolbarState::default();
+
+        assert_eq!(toolbar.x, TOOLBAR_DEFAULT_X);
+        assert_eq!(toolbar.y, TOOLBAR_DEFAULT_Y);
+        assert!(!toolbar.is_dragging);
+
+        toolbar.start_drag(40.0, 30.0);
+        assert!(toolbar.drag_to(70.0, 85.0));
+        assert_eq!(toolbar.x, TOOLBAR_DEFAULT_X + 30.0);
+        assert_eq!(toolbar.y, TOOLBAR_DEFAULT_Y + 55.0);
+
+        toolbar.end_drag();
+        assert!(!toolbar.drag_to(90.0, 100.0));
+    }
+
+    #[test]
+    fn floating_toolbar_stays_within_bounds_when_clamped() {
+        let mut toolbar = FloatingToolbarState::default();
+
+        toolbar.x = -100.0;
+        toolbar.y = 400.0;
+        toolbar.clamp_within(72.0, 64.0);
+
+        assert_eq!(toolbar.x, 12.0);
+        assert_eq!(toolbar.y, 64.0);
     }
 }

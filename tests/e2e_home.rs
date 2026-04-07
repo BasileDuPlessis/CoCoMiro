@@ -27,7 +27,11 @@ const DRAG_DISTANCE_X: f64 = 140.0;
 const DRAG_DISTANCE_Y: f64 = 90.0;
 const MIN_EXPECTED_PAN_X_DELTA: f64 = 80.0;
 const MIN_EXPECTED_PAN_Y_DELTA: f64 = 50.0;
+const MIN_EXPECTED_TOOLBAR_X_DELTA: f64 = 40.0;
+const MIN_EXPECTED_TOOLBAR_Y_DELTA: f64 = 30.0;
 const CANVAS_SELECTOR: &str = "#infinite-canvas[data-ready=\"true\"]";
+const TOOLBAR_SELECTOR: &str = "#floating-toolbar";
+const TOOLBAR_HANDLE_SELECTOR: &str = "#floating-toolbar-handle";
 const DEFAULT_VIEW_TOLERANCE: f64 = 0.01;
 
 struct ChildGuard(Child);
@@ -203,6 +207,14 @@ impl HomePageSession {
     fn assert_drag_pans_canvas(&self) -> TestResult {
         assert_dragging_canvas_updates_pan_coordinates(self.tab())
     }
+
+    fn assert_toolbar_is_visible(&self) -> TestResult {
+        assert_toolbar_is_visible(self.tab())
+    }
+
+    fn assert_toolbar_can_be_dragged(&self) -> TestResult {
+        assert_dragging_toolbar_repositions_it(self.tab())
+    }
 }
 
 fn attribute_as_f64(element: &Element<'_>, name: &str) -> TestResult<f64> {
@@ -215,6 +227,14 @@ fn attribute_as_f64(element: &Element<'_>, name: &str) -> TestResult<f64> {
 
 fn ready_canvas(tab: &Tab) -> TestResult<Element<'_>> {
     Ok(tab.wait_for_element(CANVAS_SELECTOR)?)
+}
+
+fn ready_toolbar(tab: &Tab) -> TestResult<Element<'_>> {
+    Ok(tab.wait_for_element(TOOLBAR_SELECTOR)?)
+}
+
+fn ready_toolbar_handle(tab: &Tab) -> TestResult<Element<'_>> {
+    Ok(tab.wait_for_element(TOOLBAR_HANDLE_SELECTOR)?)
 }
 
 fn pan_coordinates(canvas: &Element<'_>) -> TestResult<(f64, f64)> {
@@ -250,6 +270,23 @@ fn assert_home_page_starts_clean(tab: &Tab) -> TestResult {
         attribute_as_f64(&canvas, "data-zoom")?,
         1.0,
         DEFAULT_VIEW_TOLERANCE,
+    );
+
+    Ok(())
+}
+
+fn assert_toolbar_is_visible(tab: &Tab) -> TestResult {
+    let toolbar = ready_toolbar(tab)?;
+    let bounds = toolbar.get_box_model()?.margin_viewport();
+
+    assert!(bounds.height > bounds.width, "expected a vertical toolbar");
+    assert!(
+        attribute_as_f64(&toolbar, "data-x")? >= 0.0,
+        "toolbar x position should be exposed"
+    );
+    assert!(
+        attribute_as_f64(&toolbar, "data-y")? >= 0.0,
+        "toolbar y position should be exposed"
     );
 
     Ok(())
@@ -321,7 +358,7 @@ fn wait_for_pan_update(
     Err("timed out waiting for drag pan coordinates to update".into())
 }
 
-fn drag_canvas(tab: &Tab, start: Point, end: Point) -> TestResult {
+fn drag_pointer(tab: &Tab, start: Point, end: Point) -> TestResult {
     tab.move_mouse_to_point(start)?;
     dispatch_mouse_event(
         tab,
@@ -363,7 +400,7 @@ fn assert_dragging_canvas_updates_pan_coordinates(tab: &Tab) -> TestResult {
     let (initial_pan_x, initial_pan_y) = pan_coordinates(&canvas)?;
     let (start, end) = drag_start_and_end_points(&canvas)?;
 
-    drag_canvas(tab, start, end)?;
+    drag_pointer(tab, start, end)?;
 
     let (final_pan_x, final_pan_y) =
         wait_for_pan_update(tab, initial_pan_x, initial_pan_y, PAN_UPDATE_TIMEOUT)?;
@@ -382,13 +419,61 @@ fn assert_dragging_canvas_updates_pan_coordinates(tab: &Tab) -> TestResult {
     Ok(())
 }
 
+fn assert_dragging_toolbar_repositions_it(tab: &Tab) -> TestResult {
+    let toolbar = ready_toolbar(tab)?;
+    let handle = ready_toolbar_handle(tab)?;
+    let initial_x = attribute_as_f64(&toolbar, "data-x")?;
+    let initial_y = attribute_as_f64(&toolbar, "data-y")?;
+    let bounds = handle.get_box_model()?.margin_viewport();
+    let start = Point {
+        x: bounds.x + (bounds.width / 2.0),
+        y: bounds.y + (bounds.height / 2.0),
+    };
+    let end = Point {
+        x: start.x + 90.0,
+        y: start.y + 65.0,
+    };
+
+    drag_pointer(tab, start, end)?;
+
+    let toolbar = ready_toolbar(tab)?;
+    let final_x = attribute_as_f64(&toolbar, "data-x")?;
+    let final_y = attribute_as_f64(&toolbar, "data-y")?;
+
+    assert!(
+        final_x - initial_x > MIN_EXPECTED_TOOLBAR_X_DELTA,
+        "expected toolbar x to move by more than {MIN_EXPECTED_TOOLBAR_X_DELTA}, got {}",
+        final_x - initial_x
+    );
+    assert!(
+        final_y - initial_y > MIN_EXPECTED_TOOLBAR_Y_DELTA,
+        "expected toolbar y to move by more than {MIN_EXPECTED_TOOLBAR_Y_DELTA}, got {}",
+        final_y - initial_y
+    );
+
+    Ok(())
+}
+
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
 fn home_page_supports_dragging_without_header_copy() -> TestResult {
     let session = HomePageSession::launch()?;
 
     session.assert_starts_clean()?;
+    session.assert_toolbar_is_visible()?;
     session.assert_drag_pans_canvas()?;
+
+    Ok(())
+}
+
+#[test]
+#[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
+fn floating_toolbar_can_be_dragged_over_canvas() -> TestResult {
+    let session = HomePageSession::launch()?;
+
+    session.assert_starts_clean()?;
+    session.assert_toolbar_is_visible()?;
+    session.assert_toolbar_can_be_dragged()?;
 
     Ok(())
 }
