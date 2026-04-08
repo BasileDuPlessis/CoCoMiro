@@ -14,6 +14,8 @@ A small **Rust + WebAssembly infinite canvas** prototype with drag-to-pan, wheel
 
 ## Run it locally with Trunk
 
+From the project root:
+
 1. Install the wasm target:
    ```bash
    rustup target add wasm32-unknown-unknown
@@ -22,11 +24,19 @@ A small **Rust + WebAssembly infinite canvas** prototype with drag-to-pan, wheel
    ```bash
    cargo install trunk
    ```
-3. Start the local app from the project root:
+3. Start the local app:
    ```bash
-   trunk serve --open
+   trunk serve --address 127.0.0.1 --port 8080 --open
    ```
-4. Visit <http://127.0.0.1:8080> if the browser does not open automatically.
+4. If the browser does not open automatically, visit <http://127.0.0.1:8080/>.
+
+### Troubleshooting the browser build
+
+If `cargo test` passes but the app does not start in the browser, check the wasm build directly:
+
+```bash
+cargo check --target wasm32-unknown-unknown
+```
 
 ## Run tests
 

@@ -3,8 +3,9 @@
 ## Project context
 - `CoCoMiro` is a small **Rust + WebAssembly infinite canvas** project.
 - Main application logic lives in `src/lib.rs`.
-- The app is served locally with `trunk serve`.
+- The app is served locally with `trunk serve --address 127.0.0.1 --port 8080`.
 - Browser E2E coverage lives in `tests/e2e_home.rs` and uses `headless_chrome`.
+- When the app must run in the browser, verify the wasm build with `cargo check --target wasm32-unknown-unknown` if needed.
 
 ## Working style
 - Prefer **short, focused tasks** and small diffs.
