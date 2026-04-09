@@ -1,6 +1,5 @@
 #[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
-
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 #[cfg(target_arch = "wasm32")]
@@ -65,6 +64,7 @@ pub fn setup_event_listeners(
             state
                 .borrow_mut()
                 .start_drag(event.client_x() as f64, event.client_y() as f64);
+            crate::log_info(&format!("Canvas drag started at ({}, {})", event.client_x(), event.client_y()));
             render();
         }
     }));
@@ -145,8 +145,16 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |_event: MouseEvent| {
+            let was_dragging = state.borrow().is_dragging;
+            let toolbar_was_dragging = toolbar_state.borrow().is_dragging;
             end_drag_if_needed(&state, &render);
             end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
+            if was_dragging {
+                crate::log_info("Canvas drag ended");
+            }
+            if toolbar_was_dragging {
+                crate::log_info("Toolbar drag ended");
+            }
         }
     }));
     browser_window
@@ -197,6 +205,7 @@ pub fn setup_event_listeners(
             let viewport_width = f64::from(canvas.client_width().max(1));
             let viewport_height = f64::from(canvas.client_height().max(1));
 
+            let old_zoom = state.borrow().zoom;
             state.borrow_mut().zoom_at(
                 factor,
                 event.offset_x() as f64,
@@ -204,6 +213,8 @@ pub fn setup_event_listeners(
                 viewport_width,
                 viewport_height,
             );
+            let new_zoom = state.borrow().zoom;
+            crate::log_info(&format!("Zoom changed from {:.2} to {:.2} at ({}, {})", old_zoom, new_zoom, event.offset_x(), event.offset_y()));
             render();
         }
     }));
@@ -223,21 +234,26 @@ pub fn setup_event_listeners(
             let handled = match event.key().as_str() {
                 "ArrowLeft" => {
                     viewport.pan_by(-KEYBOARD_PAN_STEP, 0.0);
+                    crate::log_info(&format!("Panned left by {}", KEYBOARD_PAN_STEP));
                     true
                 }
                 "ArrowRight" => {
                     viewport.pan_by(KEYBOARD_PAN_STEP, 0.0);
+                    crate::log_info(&format!("Panned right by {}", KEYBOARD_PAN_STEP));
                     true
                 }
                 "ArrowUp" => {
                     viewport.pan_by(0.0, -KEYBOARD_PAN_STEP);
+                    crate::log_info(&format!("Panned up by {}", KEYBOARD_PAN_STEP));
                     true
                 }
                 "ArrowDown" => {
                     viewport.pan_by(0.0, KEYBOARD_PAN_STEP);
+                    crate::log_info(&format!("Panned down by {}", KEYBOARD_PAN_STEP));
                     true
                 }
                 "+" | "=" => {
+                    let old_zoom = viewport.zoom;
                     viewport.zoom_at(
                         ZOOM_STEP_FACTOR,
                         viewport_width / 2.0,
@@ -245,9 +261,11 @@ pub fn setup_event_listeners(
                         viewport_width,
                         viewport_height,
                     );
+                    crate::log_info(&format!("Zoomed in from {:.2} to {:.2}", old_zoom, viewport.zoom));
                     true
                 }
                 "-" | "_" => {
+                    let old_zoom = viewport.zoom;
                     viewport.zoom_at(
                         1.0 / ZOOM_STEP_FACTOR,
                         viewport_width / 2.0,
@@ -255,10 +273,12 @@ pub fn setup_event_listeners(
                         viewport_width,
                         viewport_height,
                     );
+                    crate::log_info(&format!("Zoomed out from {:.2} to {:.2}", old_zoom, viewport.zoom));
                     true
                 }
                 "0" | "Home" => {
                     viewport.reset();
+                    crate::log_info("Viewport reset to default");
                     true
                 }
                 _ => false,

@@ -5,6 +5,7 @@
 - Main application logic lives in `src/lib.rs`.
 - The app is served locally with `trunk serve --address 127.0.0.1 --port 8080`.
 - Browser E2E coverage lives in `tests/e2e_home.rs` and uses `headless_chrome`.
+- **CRITICAL**: Code must compile for both host and WebAssembly targets
 - When the app must run in the browser, verify the wasm build with `cargo check --target wasm32-unknown-unknown` if needed.
 
 ## Working style
@@ -13,23 +14,34 @@
 - Refactor continuously to improve **readability**, naming, and structure.
 - Split long functions into small helpers when it makes intent clearer.
 - Avoid unnecessary abstraction, duplication, and overly clever code.
+- **CRITICAL**: Always verify changes work for both host and WebAssembly targets
 
 ## Code quality expectations
 - Write idiomatic Rust.
 - Preserve existing behavior unless the task explicitly requires a change.
 - Favor clear names, predictable control flow, and maintainable logic.
 - Leave the codebase cleaner than you found it when possible.
+- **Ensure code compiles for both host and WebAssembly targets**
 
 ## Testing requirements
 - **Tests are required** for bug fixes and behavior changes.
 - Add or update tests when changing logic.
 - Do not consider work complete without verification.
+- **CRITICAL**: Always test both compilation targets before finishing:
+  - Host target: `cargo check && cargo test`
+  - WebAssembly target: `cargo check --target wasm32-unknown-unknown`
 - Before finishing a meaningful change, run the relevant checks such as:
   - `cargo fmt`
   - `cargo test`
   - `cargo test -- --include-ignored` for full coverage when relevant
+  - `cargo check --target wasm32-unknown-unknown` (WebAssembly compilation)
 
-## App-specific guidance
+## WebAssembly-Specific Considerations
+- Code must compile for both host and `wasm32-unknown-unknown` targets
+- Use `#[cfg(target_arch = "wasm32")]` for browser-specific code
+- Ensure all WASM imports are properly gated
+- Test with `trunk serve` to catch runtime issues
+- Host compilation success ≠ WebAssembly compilation success
 - Keep canvas interactions stable and deterministic.
 - Be careful with browser timing and E2E reliability.
 - Prefer robust readiness checks over fixed sleeps in browser tests.

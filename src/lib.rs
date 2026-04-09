@@ -27,6 +27,16 @@ pub fn log_js_error(prefix: &str, error: &JsValue) {
 }
 
 #[cfg(target_arch = "wasm32")]
+pub fn log_info(message: &str) {
+    web_sys::console::log_1(&JsValue::from_str(message));
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn log_warn(message: &str) {
+    web_sys::console::warn_1(&JsValue::from_str(message));
+}
+
+#[cfg(target_arch = "wasm32")]
 fn start_impl() -> Result<(), JsValue> {
     let browser_window = window().ok_or_else(|| JsValue::from_str("window is unavailable"))?;
     let document = browser_window
@@ -52,6 +62,7 @@ fn start_impl() -> Result<(), JsValue> {
         let is_rendering = is_rendering.clone();
         move || {
             if is_rendering.replace(true) {
+                log_info("Render skipped: already rendering");
                 return;
             }
 

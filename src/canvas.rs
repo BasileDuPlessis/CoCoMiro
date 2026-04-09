@@ -119,35 +119,6 @@ pub fn render_canvas(
     ctx.line_to(center_x, center_y + (20.0 * zoom));
     ctx.stroke();
 
-    let note_x = (width / 2.0) + state.pan_x + (110.0 * zoom);
-    let note_y = (height / 2.0) + state.pan_y + (80.0 * zoom);
-    let note_width = 230.0 * zoom;
-    let note_height = 112.0 * zoom;
-
-    ctx.set_fill_style_str("#fef3c7");
-    ctx.fill_rect(note_x, note_y, note_width, note_height);
-    ctx.set_stroke_style_str("#f59e0b");
-    ctx.stroke_rect(note_x, note_y, note_width, note_height);
-
-    ctx.set_fill_style_str("#111827");
-    ctx.set_font(&format!("{}px sans-serif", (18.0 * zoom).clamp(12.0, 28.0)));
-    ctx.fill_text(
-        "Infinite canvas",
-        note_x + (16.0 * zoom),
-        note_y + (32.0 * zoom),
-    )?;
-    ctx.set_font(&format!("{}px sans-serif", (13.0 * zoom).clamp(10.0, 20.0)));
-    ctx.fill_text(
-        "Drag anywhere to keep exploring.",
-        note_x + (16.0 * zoom),
-        note_y + (58.0 * zoom),
-    )?;
-    ctx.fill_text(
-        "The grid keeps moving forever.",
-        note_x + (16.0 * zoom),
-        note_y + (80.0 * zoom),
-    )?;
-
     canvas.set_attribute("data-ready", "true")?;
     canvas.set_attribute("data-pan-x", &format!("{:.2}", state.pan_x))?;
     canvas.set_attribute("data-pan-y", &format!("{:.2}", state.pan_y))?;

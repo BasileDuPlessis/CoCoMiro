@@ -16,19 +16,6 @@ pub struct ViewportState {
 }
 
 #[cfg(any(test, target_arch = "wasm32"))]
-impl Default for ViewportState {
-    fn default() -> Self {
-        Self {
-            pan_x: 0.0,
-            pan_y: 0.0,
-            zoom: DEFAULT_ZOOM,
-            is_dragging: false,
-            last_mouse_pos: None,
-        }
-    }
-}
-
-#[cfg(any(test, target_arch = "wasm32"))]
 impl ViewportState {
     pub fn start_drag(&mut self, x: f64, y: f64) {
         self.is_dragging = true;
@@ -50,14 +37,14 @@ impl ViewportState {
         false
     }
 
-    pub fn pan_by(&mut self, delta_x: f64, delta_y: f64) {
-        self.pan_x += delta_x;
-        self.pan_y += delta_y;
-    }
-
     pub fn end_drag(&mut self) {
         self.is_dragging = false;
         self.last_mouse_pos = None;
+    }
+
+    pub fn pan_by(&mut self, delta_x: f64, delta_y: f64) {
+        self.pan_x += delta_x;
+        self.pan_y += delta_y;
     }
 
     pub fn reset(&mut self) {
@@ -100,6 +87,19 @@ impl ViewportState {
         let center_y = viewport_height / 2.0;
         self.pan_x = cursor_x - center_x - (world_point.0 * self.zoom);
         self.pan_y = cursor_y - center_y - (world_point.1 * self.zoom);
+    }
+}
+
+#[cfg(any(test, target_arch = "wasm32"))]
+impl Default for ViewportState {
+    fn default() -> Self {
+        Self {
+            pan_x: 0.0,
+            pan_y: 0.0,
+            zoom: DEFAULT_ZOOM,
+            is_dragging: false,
+            last_mouse_pos: None,
+        }
     }
 }
 
