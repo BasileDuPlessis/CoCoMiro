@@ -111,8 +111,14 @@ impl StickyNotesState {
         let mut note_y = center_world_y + offset;
 
         // Calculate visible world bounds to ensure note stays on screen
-        let top_left_world = viewport_state.world_point_at(0.0, 0.0, viewport_width, viewport_height);
-        let bottom_right_world = viewport_state.world_point_at(viewport_width, viewport_height, viewport_width, viewport_height);
+        let top_left_world =
+            viewport_state.world_point_at(0.0, 0.0, viewport_width, viewport_height);
+        let bottom_right_world = viewport_state.world_point_at(
+            viewport_width,
+            viewport_height,
+            viewport_width,
+            viewport_height,
+        );
 
         // Adjust position to keep note within visible bounds with some margin
         let margin = 50.0; // pixels in screen space, converted to world space
@@ -129,7 +135,9 @@ impl StickyNotesState {
         let note_world_width = 200.0 / viewport_state.zoom;
         let note_world_height = 150.0 / viewport_state.zoom;
 
-        if visible_width > note_world_width + 2.0 * margin_world && visible_height > note_world_height + 2.0 * margin_world {
+        if visible_width > note_world_width + 2.0 * margin_world
+            && visible_height > note_world_height + 2.0 * margin_world
+        {
             // Bounds are reasonable, clamp the position
             note_x = note_x.clamp(min_x, max_x);
             note_y = note_y.clamp(min_y, max_y);
@@ -276,5 +284,81 @@ mod tests {
         assert_eq!(state.notes.len(), 1);
         assert_eq!(state.notes[0].id, note1_id);
         assert!(state.selected_note_id.is_none());
+    }
+
+    #[test]
+    fn add_note_at_viewport_center_bounds_checking() {
+        let mut state = StickyNotesState::default();
+        let mut viewport = ViewportState::default();
+        // Set zoom to make world coordinates smaller
+        viewport.zoom = 0.5;
+
+        // Add note when viewport is very small - should still place note
+        state.add_note_at_viewport_center(400.0, 300.0, &viewport);
+        assert_eq!(state.notes.len(), 1);
+        // Note should be placed at center despite bounds checking
+        let expected_x = 0.0; // center with no pan
+        let expected_y = 0.0;
+        assert_eq!(state.notes[0].x, expected_x);
+        assert_eq!(state.notes[0].y, expected_y);
+    }
+
+    #[test]
+    fn sticky_note_selection() {
+        let mut state = StickyNotesState::default();
+        let note1 = StickyNote::new(0.0, 0.0);
+        let note2 = StickyNote::new(300.0, 0.0);
+        let note1_id = note1.id;
+        let note2_id = note2.id;
+        state.add_note(note1);
+        state.add_note(note2);
+
+        // Click on note1
+        let found_id = state.find_note_at(50.0, 50.0);
+        assert_eq!(found_id, Some(note1_id));
+
+        // Start drag should select the note
+        state.start_drag(note1_id, 50.0, 50.0);
+        assert_eq!(state.selected_note_id, Some(note1_id));
+
+        // Click on note2 should select it
+        let found_id2 = state.find_note_at(350.0, 50.0);
+        assert_eq!(found_id2, Some(note2_id));
+        state.start_drag(note2_id, 350.0, 50.0);
+        assert_eq!(state.selected_note_id, Some(note2_id));
+    }
+
+    #[test]
+    fn sticky_note_drag_with_zoom() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0);
+        let note_id = note.id;
+        state.add_note(note);
+
+        // Simulate zoom by scaling coordinates (this is how screen coords work with zoom)
+        // Start drag at screen position (200, 200) which corresponds to world (100, 100) at zoom 1
+        state.start_drag(note_id, 200.0, 200.0);
+
+        // Drag to screen position (300, 250) - should move note by (100, 50) in world space
+        state.drag_to(300.0, 250.0);
+        assert_eq!(state.notes[0].x, 200.0); // 300 - (200 - 100) = 200
+        assert_eq!(state.notes[0].y, 150.0); // 250 - (200 - 100) = 150
+
+        state.end_drag();
+        assert!(!state.is_dragging);
+    }
+
+    #[test]
+    fn sticky_note_unique_ids() {
+        let note1 = StickyNote::new(0.0, 0.0);
+        let note2 = StickyNote::new(10.0, 10.0);
+        let note3 = StickyNote::new(20.0, 20.0);
+
+        assert_ne!(note1.id, note2.id);
+        assert_ne!(note2.id, note3.id);
+        assert_ne!(note1.id, note3.id);
+        assert!(note1.id > 0);
+        assert!(note2.id > 0);
+        assert!(note3.id > 0);
     }
 }

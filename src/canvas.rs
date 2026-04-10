@@ -171,10 +171,14 @@ pub fn render_canvas(
         "grabbing"
     } else {
         // Check if hovering over a sticky note
-        let world_pos = state.viewport.world_point_at(
-            state.mouse_x, state.mouse_y, width, height
-        );
-        if state.sticky_notes.find_note_at(world_pos.0, world_pos.1).is_some() {
+        let world_pos = state
+            .viewport
+            .world_point_at(state.mouse_x, state.mouse_y, width, height);
+        if state
+            .sticky_notes
+            .find_note_at(world_pos.0, world_pos.1)
+            .is_some()
+        {
             "grab"
         } else if state.viewport.is_dragging {
             "grabbing"

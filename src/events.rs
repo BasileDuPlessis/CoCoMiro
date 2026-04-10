@@ -78,9 +78,15 @@ pub fn setup_event_listeners(
                 let viewport_width = f64::from(canvas.client_width().max(1));
                 let viewport_height = f64::from(canvas.client_height().max(1));
                 let world_pos = state.borrow().viewport.world_point_at(
-                    mouse_x, mouse_y, viewport_width, viewport_height
+                    mouse_x,
+                    mouse_y,
+                    viewport_width,
+                    viewport_height,
                 );
-                state.borrow().sticky_notes.find_note_at(world_pos.0, world_pos.1)
+                state
+                    .borrow()
+                    .sticky_notes
+                    .find_note_at(world_pos.0, world_pos.1)
             };
 
             if let Some(note_id) = note_hit {
@@ -89,20 +95,23 @@ pub fn setup_event_listeners(
                     let viewport_width = f64::from(canvas.client_width().max(1));
                     let viewport_height = f64::from(canvas.client_height().max(1));
                     state.borrow().viewport.world_point_at(
-                        mouse_x, mouse_y, viewport_width, viewport_height
+                        mouse_x,
+                        mouse_y,
+                        viewport_width,
+                        viewport_height,
                     )
                 };
-                state.borrow_mut().sticky_notes.start_drag(note_id, world_pos.0, world_pos.1);
+                state
+                    .borrow_mut()
+                    .sticky_notes
+                    .start_drag(note_id, world_pos.0, world_pos.1);
                 crate::log_info(&format!("Sticky note {} drag started", note_id));
                 render();
                 return;
             }
 
             // If no sticky note hit, start canvas drag
-            state
-                .borrow_mut()
-                .viewport
-                .start_drag(mouse_x, mouse_y);
+            state.borrow_mut().viewport.start_drag(mouse_x, mouse_y);
             crate::log_info(&format!(
                 "Canvas drag started at ({}, {})",
                 mouse_x, mouse_y
@@ -194,9 +203,7 @@ pub fn setup_event_listeners(
             state.borrow_mut().mouse_y = mouse_y;
 
             // Handle toolbar dragging first
-            let did_toolbar_move = toolbar_state
-                .borrow_mut()
-                .drag_to(mouse_x, mouse_y);
+            let did_toolbar_move = toolbar_state.borrow_mut().drag_to(mouse_x, mouse_y);
             if did_toolbar_move {
                 position_toolbar();
                 return;
@@ -207,7 +214,10 @@ pub fn setup_event_listeners(
                 let viewport_width = f64::from(canvas.client_width().max(1));
                 let viewport_height = f64::from(canvas.client_height().max(1));
                 let world_pos = state.borrow().viewport.world_point_at(
-                    mouse_x, mouse_y, viewport_width, viewport_height
+                    mouse_x,
+                    mouse_y,
+                    viewport_width,
+                    viewport_height,
                 );
                 let sticky_notes = &mut state.borrow_mut().sticky_notes;
                 if sticky_notes.is_dragging {
@@ -224,12 +234,7 @@ pub fn setup_event_listeners(
             }
 
             // Handle canvas dragging
-            let did_move = {
-                state
-                    .borrow_mut()
-                    .viewport
-                    .drag_to(mouse_x, mouse_y)
-            };
+            let did_move = { state.borrow_mut().viewport.drag_to(mouse_x, mouse_y) };
 
             if did_move {
                 render();
