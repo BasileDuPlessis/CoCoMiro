@@ -266,7 +266,7 @@ pub fn setup_event_listeners(
         move |event: KeyboardEvent| {
             let viewport_width = f64::from(canvas.client_width().max(1));
             let viewport_height = f64::from(canvas.client_height().max(1));
-            let mut viewport = &mut state.borrow_mut().viewport;
+            let viewport = &mut state.borrow_mut().viewport;
 
             let handled = match event.key().as_str() {
                 "ArrowLeft" => {
