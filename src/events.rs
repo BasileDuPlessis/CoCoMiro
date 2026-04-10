@@ -110,6 +110,31 @@ pub fn setup_event_listeners(
     )?;
     on_toolbar_mouse_down.forget();
 
+    // Click on add note button
+    let on_add_note_click = Closure::<dyn FnMut()>::wrap(Box::new({
+        let canvas = canvas.clone();
+        let state = state.clone();
+        let render = render.clone();
+        move || {
+            let viewport_width = f64::from(canvas.client_width().max(1));
+            let viewport_height = f64::from(canvas.client_height().max(1));
+            state.borrow_mut().sticky_notes.add_note_at_viewport_center(
+                viewport_width,
+                viewport_height,
+                &state.borrow().viewport,
+            );
+            render();
+            crate::log_info("Added new sticky note");
+        }
+    }));
+    let add_note_button = document
+        .get_element_by_id("add-note-button")
+        .ok_or_else(|| JsValue::from_str("add note button element not found"))?
+        .dyn_into::<web_sys::HtmlElement>()?;
+    add_note_button
+        .add_event_listener_with_callback("click", on_add_note_click.as_ref().unchecked_ref())?;
+    on_add_note_click.forget();
+
     // Mouse move
     let on_mouse_move = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();

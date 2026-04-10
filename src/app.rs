@@ -13,6 +13,7 @@ pub fn app_markup() -> String {
                     <canvas id="infinite-canvas" tabindex="0" aria-label="Infinite canvas workspace" aria-describedby="canvas-status" title="Use arrow keys to pan, plus/minus to zoom, and 0 to reset the view." data-ready="false" data-pan-x="0" data-pan-y="0" data-zoom="1"></canvas>
                     <div id="floating-toolbar" class="floating-toolbar" role="toolbar" aria-orientation="vertical" aria-label="Floating canvas toolbar" title="Drag the handle to reposition the toolbar." data-x="18" data-y="18">
                         <div id="floating-toolbar-handle" class="floating-toolbar__handle" aria-label="Drag handle" title="Drag handle"></div>
+                        <button id="add-note-button" class="floating-toolbar__button" aria-label="Add sticky note" title="Add a new sticky note">+</button>
                     </div>
                 </div>
             </section>
