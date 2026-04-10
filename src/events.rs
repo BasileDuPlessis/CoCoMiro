@@ -175,7 +175,7 @@ pub fn setup_event_listeners(
 
             event.prevent_default();
             if let Err(error) = canvas.focus() {
-                crate::log_js_error("canvas focus failed", &error);
+                crate::log_jsvalue_error("canvas focus failed", &error);
             }
 
             let mouse_x = event.offset_x() as f64;
@@ -267,7 +267,7 @@ pub fn setup_event_listeners(
             event.prevent_default();
             event.stop_propagation();
             if let Err(error) = canvas.focus() {
-                crate::log_js_error("canvas focus failed", &error);
+                crate::log_jsvalue_error("canvas focus failed", &error);
             }
             toolbar_state
                 .borrow_mut()

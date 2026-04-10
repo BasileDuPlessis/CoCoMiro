@@ -77,6 +77,13 @@ impl std::fmt::Display for AppError {
 impl std::error::Error for AppError {}
 
 #[cfg(target_arch = "wasm32")]
+impl From<JsValue> for AppError {
+    fn from(js_error: JsValue) -> Self {
+        AppError::Generic(format!("JavaScript error: {:?}", js_error))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 impl From<AppError> for JsValue {
     fn from(error: AppError) -> Self {
         JsValue::from_str(&error.to_string())
@@ -140,6 +147,19 @@ thread_local! {
 /// * `error` - The error to log (can be AppError or JsValue)
 pub fn log_js_error(context: &str, error: &impl std::fmt::Display) {
     web_sys::console::error_1(&JsValue::from_str(&format!("CoCoMiro [{context}]: {error}")));
+}
+
+/// Logs raw JavaScript values as errors.
+///
+/// This function is specifically for logging JsValue errors that don't
+/// implement Display but can be debug-formatted.
+///
+/// # Arguments
+/// * `context` - Descriptive context for where the error occurred
+/// * `error` - The JsValue error to log
+#[cfg(target_arch = "wasm32")]
+pub fn log_jsvalue_error(context: &str, error: &JsValue) {
+    web_sys::console::error_1(&JsValue::from_str(&format!("CoCoMiro [{context}]: {:?}", error)));
 }
 
 #[cfg(target_arch = "wasm32")]
