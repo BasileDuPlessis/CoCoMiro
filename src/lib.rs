@@ -295,7 +295,7 @@ pub fn start() -> Result<(), JsValue> {
 
     if let Err(error) = start_impl() {
         APP_INITIALIZED.with(|flag| flag.set(false));
-        return Err(error);
+        return Err(JsValue::from(error));
     }
 
     Ok(())
