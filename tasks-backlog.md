@@ -5,47 +5,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 
 ## High Priority Tasks
 
-### 1. Fix Clippy Warnings ✅
-- Address all Clippy linting issues for better code quality
-- Fix derivable Default impl in `sticky_notes.rs`
-- Simplify collapsible if statements in `sticky_notes.rs`
-- Fix thread_local initializer in `lib.rs`
-
-**Implementation Details:**
-- Add `#[derive(Default)]` to `StickyNotesState` struct ✅
-- Refactor nested if-let chains in `drag_to` method ✅
-- Make thread_local initializer const: `const { Cell::new(false) }` ✅
-- Run `cargo clippy -- -D warnings` to verify all issues are resolved ✅
-- Ensure fixes work for both host and WebAssembly targets ✅
-
-### 2. Improve E2E Tests ✅
-- Enhance end-to-end tests to actually verify sticky note functionality
-- Implement proper canvas content verification instead of stub functions
-- Add comprehensive interaction testing
-
-**Implementation Details:**
-- Fix `count_sticky_notes()` function to actually count rendered notes using cursor detection ✅
-- Implement `get_sticky_note_at_point()` to verify note positions using cursor behavior ✅
-- Add tests for note selection, deletion, and visual feedback ✅
-- Test multi-note scenarios and edge cases ✅
-- Verify canvas rendering accuracy with different zoom levels ✅
-- Add performance benchmarks for rendering many notes ✅
-- Add new test functions: `assert_multi_note_scenario` and `assert_zoom_with_notes` ✅
-
-### 3. Add Documentation ✅
-- Add comprehensive documentation to all modules and public functions
-- Improve code comments and API documentation
-
-**Implementation Details:**
-- Add module-level documentation to all `src/*.rs` files ✅
-- Document public structs, enums, and functions with `///` comments ✅
-- Add implementation notes for complex algorithms (coordinate transforms, etc.) ✅
-- Document WebAssembly-specific code sections ✅
-- Add README updates for new features and API usage
-
-## Medium Priority Tasks
-
-### 4. Enhance Text Rendering
+### 1. Enhance Text Rendering
 - Implement text wrapping for sticky notes
 - Improve typography and text layout
 - Add text editing capabilities
@@ -57,7 +17,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Consider adding text selection and editing UI
 - Support different fonts and text styling
 
-### 5. Add Mobile Support
+### 2. Add Mobile Support
 - Implement touch event handling for mobile devices
 - Add gesture recognition for pinch-to-zoom and multi-touch interactions
 
@@ -68,20 +28,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Test on mobile browsers and ensure responsive design
 - Handle touch vs mouse event conflicts
 
-### 6. Improve Error Handling ✅
-- Add more specific error types instead of generic JsValue
-- Implement graceful error recovery in WebAssembly code
+### 3. Performance Optimizations
 
-**Implementation Details:**
-- Define custom error enum for application-specific errors ✅
-- Replace `JsValue::from_str()` with structured error types ✅
-- Add error recovery mechanisms (retry, fallback behavior) ✅
-- Improve error logging with more context ✅
-- Add error boundaries for WebAssembly panics ✅
-
-### 7. Performance Optimizations
-
-#### 7.1 Spatial Indexing for Hit Testing
+#### 3.1 Spatial Indexing for Hit Testing
 - Implement efficient data structure for note hit testing
 - Replace linear search with spatial indexing (quadtree or similar)
 
@@ -91,7 +40,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Update note addition/removal to maintain spatial index
 - Benchmark performance improvement with many notes
 
-#### 7.2 View Culling for Rendering
+#### 3.2 View Culling for Rendering
 - Only render sticky notes visible in the current viewport
 - Implement frustum culling for canvas elements
 
@@ -101,7 +50,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Update culling when viewport changes (pan/zoom)
 - Measure rendering performance with 100+ notes
 
-#### 7.3 Grid Rendering Optimization
+#### 3.3 Grid Rendering Optimization
 - Optimize background grid rendering for large zoom levels
 - Implement adaptive grid density
 
@@ -111,7 +60,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Reduce grid density at high zoom levels
 - Optimize grid line calculation and drawing
 
-#### 7.4 Performance Monitoring
+#### 3.4 Performance Monitoring
 - Add frame rate monitoring and performance profiling
 - Implement performance metrics collection
 
@@ -121,7 +70,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Monitor memory usage and note count
 - Add performance logging for debugging
 
-#### 7.5 WebGL Acceleration (Future)
+#### 3.5 WebGL Acceleration (Future)
 - Consider WebGL acceleration for complex rendering
 - Evaluate WebGL vs Canvas 2D performance trade-offs
 
@@ -131,9 +80,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Compare performance with Canvas 2D
 - Consider implementation if significant benefits found
 
-## Low Priority Tasks
+## Medium Priority Tasks
 
-### 8. Visual Polish
+### 4. Visual Polish
 - Add visual enhancements like shadows, rounded corners, and animations
 - Improve overall UI aesthetics
 
@@ -144,7 +93,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Improve color scheme and visual hierarchy
 - Add loading states and transitions
 
-### 9. Accessibility Improvements
+### 5. Accessibility Improvements
 - Enhance ARIA labels and keyboard navigation
 - Ensure WCAG compliance
 
@@ -155,7 +104,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Ensure sufficient color contrast
 - Add keyboard shortcuts documentation
 
-### 10. Persistence
+## Low Priority Tasks
+
+### 6. Persistence
 - Add save/load functionality for sticky notes
 - Implement data serialization
 
@@ -166,7 +117,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Handle data migration for future versions
 - Add autosave functionality
 
-### 11. Undo/Redo System
+### 7. Undo/Redo System
 - Implement command pattern for reversible actions
 - Add undo/redo functionality for all user actions
 
