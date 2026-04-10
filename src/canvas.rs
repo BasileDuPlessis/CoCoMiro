@@ -107,6 +107,51 @@ pub fn render_canvas(
     }
     ctx.stroke();
 
+    // Render sticky notes
+    for note in &state.sticky_notes.notes {
+        // Calculate screen position from world coordinates
+        let mut screen_x = note.x - state.viewport.pan_x;
+        let mut screen_y = note.y - state.viewport.pan_y;
+
+        // Apply zoom transformation
+        screen_x *= state.viewport.zoom;
+        screen_y *= state.viewport.zoom;
+        let screen_width = note.width * state.viewport.zoom;
+        let screen_height = note.height * state.viewport.zoom;
+
+        // Draw note background
+        ctx.set_fill_style_str(&note.color);
+        ctx.fill_rect(screen_x, screen_y, screen_width, screen_height);
+
+        // Draw note border
+        ctx.set_stroke_style_str(if Some(note.id) == state.sticky_notes.selected_note_id {
+            "#2563eb" // Blue border for selected notes
+        } else {
+            "#374151" // Gray border for unselected notes
+        });
+        ctx.set_line_width(2.0);
+        ctx.stroke_rect(screen_x, screen_y, screen_width, screen_height);
+
+        // Draw note content text (placeholder for now)
+        if !note.content.is_empty() {
+            ctx.set_fill_style_str("#000000");
+            ctx.set_font("14px Inter, sans-serif");
+            ctx.set_text_align("left");
+            ctx.set_text_baseline("top");
+            // Add some padding
+            let text_x = screen_x + 8.0;
+            let text_y = screen_y + 8.0;
+            // Simple text rendering (no wrapping for now)
+            let mut y_offset = 0.0;
+            for line in note.content.lines() {
+                if !line.is_empty() {
+                    ctx.fill_text(line, text_x, text_y + y_offset)?;
+                    y_offset += 18.0; // Line height
+                }
+            }
+        }
+    }
+
     let center_x = (width / 2.0) + state.viewport.pan_x;
     let center_y = (height / 2.0) + state.viewport.pan_y;
 

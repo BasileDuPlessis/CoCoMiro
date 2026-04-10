@@ -21,7 +21,7 @@ impl StickyNote {
             y,
             width: 200.0,
             height: 150.0,
-            content: String::new(),
+            content: "New note".to_string(),
             color: "#ffff88".to_string(),
         }
     }
@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(note.y, 20.0);
         assert_eq!(note.width, 200.0);
         assert_eq!(note.height, 150.0);
-        assert!(note.content.is_empty());
+        assert_eq!(note.content, "New note");
         assert_eq!(note.color, "#ffff88");
         assert!(note.id > 0);
     }
