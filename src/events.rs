@@ -189,6 +189,10 @@ pub fn setup_event_listeners(
             let mouse_x = event.client_x() as f64;
             let mouse_y = event.client_y() as f64;
 
+            // Update mouse position in app state
+            state.borrow_mut().mouse_x = mouse_x;
+            state.borrow_mut().mouse_y = mouse_y;
+
             // Handle toolbar dragging first
             let did_toolbar_move = toolbar_state
                 .borrow_mut()
@@ -205,7 +209,7 @@ pub fn setup_event_listeners(
                 let world_pos = state.borrow().viewport.world_point_at(
                     mouse_x, mouse_y, viewport_width, viewport_height
                 );
-                let mut sticky_notes = &mut state.borrow_mut().sticky_notes;
+                let sticky_notes = &mut state.borrow_mut().sticky_notes;
                 if sticky_notes.is_dragging {
                     sticky_notes.drag_to(world_pos.0, world_pos.1);
                     true
@@ -394,6 +398,15 @@ pub fn setup_event_listeners(
                     viewport.reset();
                     crate::log_info("Viewport reset to default");
                     true
+                }
+                "Delete" | "Backspace" => {
+                    if state.borrow().sticky_notes.selected_note_id.is_some() {
+                        state.borrow_mut().sticky_notes.delete_selected();
+                        crate::log_info("Deleted selected sticky note");
+                        true
+                    } else {
+                        false
+                    }
                 }
                 _ => false,
             };

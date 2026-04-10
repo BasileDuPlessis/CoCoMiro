@@ -71,18 +71,18 @@ Implement a new feature allowing users to create draggable sticky notes on the i
 - In mouseup handler, call `state.sticky_notes.end_drag()`
 - Convert screen coordinates to world coordinates for position updates
 
-### 6. Selection and Interaction
+### 6. Selection and Interaction ✅
 - Add selection state for sticky notes (highlight selected note)
 - Implement click-to-select behavior for sticky notes
 - Handle keyboard interactions (delete selected sticky note, etc.)
 - Update cursor appearance when hovering over draggable sticky notes
 
 **Implementation Details:**
-- Add `selected_note_id: Option<u32>` to `StickyNotesState`
-- In mousedown handler, if clicking on note, set `selected_note_id = Some(note_id)`
-- Add keyboard event handler for Delete key to remove selected note
-- Update cursor in `render_canvas`: if hovering over note, set cursor to "grab"
-- Add visual selection indicator (thicker border, different color) in rendering
+- Add `selected_note_id: Option<u32>` to `StickyNotesState` ✅
+- In mousedown handler, if clicking on note, set `selected_note_id = Some(note_id)` ✅
+- Add keyboard event handler for Delete key to remove selected note ✅
+- Update cursor in `render_canvas`: if hovering over note, set cursor to "grab" ✅
+- Add visual selection indicator (thicker border, different color) in rendering ✅
 
 ### 7. Positioning and Layout
 - Implement logic to determine center position of viewport

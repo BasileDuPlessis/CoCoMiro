@@ -165,14 +165,25 @@ pub fn render_canvas(
     canvas.set_attribute("data-pan-x", &format!("{:.2}", state.viewport.pan_x))?;
     canvas.set_attribute("data-pan-y", &format!("{:.2}", state.viewport.pan_y))?;
     canvas.set_attribute("data-zoom", &format!("{:.2}", state.viewport.zoom))?;
-    canvas.style().set_property(
-        "cursor",
-        if state.viewport.is_dragging {
+
+    // Determine cursor based on interaction state
+    let cursor = if state.sticky_notes.is_dragging {
+        "grabbing"
+    } else {
+        // Check if hovering over a sticky note
+        let world_pos = state.viewport.world_point_at(
+            state.mouse_x, state.mouse_y, width, height
+        );
+        if state.sticky_notes.find_note_at(world_pos.0, world_pos.1).is_some() {
+            "grab"
+        } else if state.viewport.is_dragging {
             "grabbing"
         } else {
             "grab"
-        },
-    )?;
+        }
+    };
+
+    canvas.style().set_property("cursor", cursor)?;
 
     status.set_text_content(Some(&format!(
         "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {}",

@@ -21,6 +21,8 @@ pub mod viewport;
 pub struct AppState {
     pub viewport: viewport::ViewportState,
     pub sticky_notes: sticky_notes::StickyNotesState,
+    pub mouse_x: f64,
+    pub mouse_y: f64,
 }
 
 #[cfg(any(test, target_arch = "wasm32"))]
@@ -29,6 +31,8 @@ impl Default for AppState {
         Self {
             viewport: viewport::ViewportState::default(),
             sticky_notes: sticky_notes::StickyNotesState::default(),
+            mouse_x: 0.0,
+            mouse_y: 0.0,
         }
     }
 }
