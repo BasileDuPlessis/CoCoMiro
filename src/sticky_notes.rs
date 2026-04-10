@@ -107,8 +107,35 @@ impl StickyNotesState {
             viewport_height,
         );
         let offset = self.notes.len() as f64 * 20.0;
-        let note_x = center_world_x + offset;
-        let note_y = center_world_y + offset;
+        let mut note_x = center_world_x + offset;
+        let mut note_y = center_world_y + offset;
+
+        // Calculate visible world bounds to ensure note stays on screen
+        let top_left_world = viewport_state.world_point_at(0.0, 0.0, viewport_width, viewport_height);
+        let bottom_right_world = viewport_state.world_point_at(viewport_width, viewport_height, viewport_width, viewport_height);
+
+        // Adjust position to keep note within visible bounds with some margin
+        let margin = 50.0; // pixels in screen space, converted to world space
+        let margin_world = margin / viewport_state.zoom;
+
+        let min_x = top_left_world.0 + margin_world;
+        let max_x = bottom_right_world.0 - margin_world - (200.0 / viewport_state.zoom); // account for note width in world space
+        let min_y = top_left_world.1 + margin_world;
+        let max_y = bottom_right_world.1 - margin_world - (150.0 / viewport_state.zoom); // account for note height in world space
+
+        // Only clamp if the bounds are reasonable (visible area is large enough for the note)
+        let visible_width = max_x - min_x;
+        let visible_height = max_y - min_y;
+        let note_world_width = 200.0 / viewport_state.zoom;
+        let note_world_height = 150.0 / viewport_state.zoom;
+
+        if visible_width > note_world_width + 2.0 * margin_world && visible_height > note_world_height + 2.0 * margin_world {
+            // Bounds are reasonable, clamp the position
+            note_x = note_x.clamp(min_x, max_x);
+            note_y = note_y.clamp(min_y, max_y);
+        }
+        // Otherwise, don't clamp - let the note be placed at the calculated position
+
         let note = StickyNote::new(note_x, note_y);
         self.add_note(note);
     }

@@ -84,18 +84,18 @@ Implement a new feature allowing users to create draggable sticky notes on the i
 - Update cursor in `render_canvas`: if hovering over note, set cursor to "grab" ✅
 - Add visual selection indicator (thicker border, different color) in rendering ✅
 
-### 7. Positioning and Layout
+### 7. Positioning and Layout ✅
 - Implement logic to determine center position of viewport
 - Create offset calculation function (e.g., +20px right, +20px down per new note)
 - Ensure sticky notes stay within reasonable bounds
 - Handle viewport zoom/pan affecting sticky note positioning
 
 **Implementation Details:**
-- Center calculation already handled in task 3
-- Offset logic: linear offset based on note count
-- Consider bounds checking to keep notes visible
-- Ensure zoom affects visual size but not world position
-- Add bounds checking in `add_note_at_viewport_center` to prevent notes from being placed off-screen
+- Center calculation already handled in task 3 ✅
+- Offset logic: linear offset based on note count ✅
+- Consider bounds checking to keep notes visible ✅
+- Ensure zoom affects visual size but not world position ✅
+- Add bounds checking in `add_note_at_viewport_center` to prevent notes from being placed off-screen ✅
 
 ### 8. Testing and Validation
 - Add unit tests for sticky note creation and positioning
