@@ -56,7 +56,7 @@ Implement a new feature allowing users to create draggable sticky notes on the i
 - Handle selection highlighting with different colors
 - Ensure rendering happens after grid but before status updates
 
-### 5. Dragging Functionality
+### 5. Dragging Functionality ✅
 - Implement mouse event handling for sticky note dragging in `events.rs`
 - Detect when mouse is over a sticky note (hit testing)
 - Track drag state (which sticky note is being dragged)
@@ -64,12 +64,12 @@ Implement a new feature allowing users to create draggable sticky notes on the i
 - Prevent canvas panning when dragging sticky notes
 
 **Implementation Details:**
-- Add drag state to `StickyNotesState`: `is_dragging: bool`, `drag_offset: Option<(f64, f64)>`
-- In mousedown handler, check `state.sticky_notes.find_note_at(mouse_x, mouse_y)` first
-- If note found, call `state.sticky_notes.start_drag(note_id, mouse_x, mouse_y)` and prevent canvas drag
-- In mousemove handler, call `state.sticky_notes.drag_to(mouse_x, mouse_y)` if dragging
-- In mouseup handler, call `state.sticky_notes.end_drag()`
-- Convert screen coordinates to world coordinates for position updates
+- Add drag state to `StickyNotesState`: `is_dragging: bool`, `drag_offset: Option<(f64, f64)>` ✅
+- In mousedown handler, check `state.sticky_notes.find_note_at(mouse_x, mouse_y)` first ✅
+- If note found, call `state.sticky_notes.start_drag(note_id, mouse_x, mouse_y)` and prevent canvas drag ✅
+- In mousemove handler, call `state.sticky_notes.drag_to(mouse_x, mouse_y)` if dragging ✅
+- In mouseup handler, call `state.sticky_notes.end_drag()` ✅
+- Convert screen coordinates to world coordinates for position updates ✅
 
 ### 6. Selection and Interaction ✅
 - Add selection state for sticky notes (highlight selected note)
