@@ -10,8 +10,7 @@
 //! 1. Clear canvas with background color
 //! 2. Draw grid lines based on zoom level
 //! 3. Render all sticky notes with selection highlighting
-//! 4. Draw center crosshair for reference
-//! 5. Update status text and canvas attributes
+//! 4. Update status text and canvas attributes
 //!
 //! ## Coordinate Transformations
 //!
@@ -230,18 +229,6 @@ pub fn render_canvas(
             }
         }
     }
-
-    let center_x = (width / 2.0) + state.viewport.pan_x;
-    let center_y = (height / 2.0) + state.viewport.pan_y;
-
-    ctx.begin_path();
-    ctx.set_stroke_style_str("#2563eb");
-    ctx.set_line_width(2.0);
-    ctx.move_to(center_x - (20.0 * zoom), center_y);
-    ctx.line_to(center_x + (20.0 * zoom), center_y);
-    ctx.move_to(center_x, center_y - (20.0 * zoom));
-    ctx.line_to(center_x, center_y + (20.0 * zoom));
-    ctx.stroke();
 
     canvas.set_attribute("data-ready", "true")?;
     canvas.set_attribute("data-pan-x", &format!("{:.2}", state.viewport.pan_x))?;
