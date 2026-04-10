@@ -118,11 +118,14 @@ pub fn setup_event_listeners(
         move || {
             let viewport_width = f64::from(canvas.client_width().max(1));
             let viewport_height = f64::from(canvas.client_height().max(1));
+
+            let viewport = state.borrow().viewport.clone();
             state.borrow_mut().sticky_notes.add_note_at_viewport_center(
                 viewport_width,
                 viewport_height,
-                &state.borrow().viewport,
+                &viewport,
             );
+
             render();
             crate::log_info("Added new sticky note");
         }
