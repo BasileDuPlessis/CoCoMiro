@@ -234,7 +234,7 @@ pub fn setup_event_listeners(
             }
 
             // Handle canvas dragging
-            let did_move = { state.borrow_mut().viewport.drag_to(event.client_x() as f64, event.client_y() as f64) };
+            let did_move = { state.borrow_mut().viewport.drag_to(mouse_x, mouse_y) };
 
             if did_move {
                 render();
