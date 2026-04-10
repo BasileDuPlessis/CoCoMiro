@@ -11,12 +11,9 @@ const ZOOM_STEP_FACTOR: f64 = 1.1;
 const KEYBOARD_PAN_STEP: f64 = 40.0;
 
 #[cfg(target_arch = "wasm32")]
-pub fn end_drag_if_needed(
-    state: &Rc<RefCell<crate::viewport::ViewportState>>,
-    render: &Rc<dyn Fn()>,
-) {
-    if state.borrow().is_dragging {
-        state.borrow_mut().end_drag();
+pub fn end_drag_if_needed(state: &Rc<RefCell<crate::AppState>>, render: &Rc<dyn Fn()>) {
+    if state.borrow().viewport.is_dragging {
+        state.borrow_mut().viewport.end_drag();
         render();
     }
 }
@@ -37,7 +34,7 @@ pub fn setup_event_listeners(
     canvas: &HtmlCanvasElement,
     _workspace: &HtmlElement,
     toolbar: &HtmlElement,
-    state: &Rc<RefCell<crate::viewport::ViewportState>>,
+    state: &Rc<RefCell<crate::AppState>>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     render: &Rc<dyn Fn()>,
     position_toolbar: &Rc<dyn Fn()>,
@@ -63,8 +60,13 @@ pub fn setup_event_listeners(
             }
             state
                 .borrow_mut()
+                .viewport
                 .start_drag(event.client_x() as f64, event.client_y() as f64);
-            crate::log_info(&format!("Canvas drag started at ({}, {})", event.client_x(), event.client_y()));
+            crate::log_info(&format!(
+                "Canvas drag started at ({}, {})",
+                event.client_x(),
+                event.client_y()
+            ));
             render();
         }
     }));
@@ -126,6 +128,7 @@ pub fn setup_event_listeners(
             let did_move = {
                 state
                     .borrow_mut()
+                    .viewport
                     .drag_to(event.client_x() as f64, event.client_y() as f64)
             };
 
@@ -145,7 +148,7 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |_event: MouseEvent| {
-            let was_dragging = state.borrow().is_dragging;
+            let was_dragging = state.borrow().viewport.is_dragging;
             let toolbar_was_dragging = toolbar_state.borrow().is_dragging;
             end_drag_if_needed(&state, &render);
             end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
@@ -205,16 +208,22 @@ pub fn setup_event_listeners(
             let viewport_width = f64::from(canvas.client_width().max(1));
             let viewport_height = f64::from(canvas.client_height().max(1));
 
-            let old_zoom = state.borrow().zoom;
-            state.borrow_mut().zoom_at(
+            let old_zoom = state.borrow().viewport.zoom;
+            state.borrow_mut().viewport.zoom_at(
                 factor,
                 event.offset_x() as f64,
                 event.offset_y() as f64,
                 viewport_width,
                 viewport_height,
             );
-            let new_zoom = state.borrow().zoom;
-            crate::log_info(&format!("Zoom changed from {:.2} to {:.2} at ({}, {})", old_zoom, new_zoom, event.offset_x(), event.offset_y()));
+            let new_zoom = state.borrow().viewport.zoom;
+            crate::log_info(&format!(
+                "Zoom changed from {:.2} to {:.2} at ({}, {})",
+                old_zoom,
+                new_zoom,
+                event.offset_x(),
+                event.offset_y()
+            ));
             render();
         }
     }));
@@ -229,7 +238,7 @@ pub fn setup_event_listeners(
         move |event: KeyboardEvent| {
             let viewport_width = f64::from(canvas.client_width().max(1));
             let viewport_height = f64::from(canvas.client_height().max(1));
-            let mut viewport = state.borrow_mut();
+            let mut viewport = &mut state.borrow_mut().viewport;
 
             let handled = match event.key().as_str() {
                 "ArrowLeft" => {
@@ -261,7 +270,10 @@ pub fn setup_event_listeners(
                         viewport_width,
                         viewport_height,
                     );
-                    crate::log_info(&format!("Zoomed in from {:.2} to {:.2}", old_zoom, viewport.zoom));
+                    crate::log_info(&format!(
+                        "Zoomed in from {:.2} to {:.2}",
+                        old_zoom, viewport.zoom
+                    ));
                     true
                 }
                 "-" | "_" => {
@@ -273,7 +285,10 @@ pub fn setup_event_listeners(
                         viewport_width,
                         viewport_height,
                     );
-                    crate::log_info(&format!("Zoomed out from {:.2} to {:.2}", old_zoom, viewport.zoom));
+                    crate::log_info(&format!(
+                        "Zoomed out from {:.2} to {:.2}",
+                        old_zoom, viewport.zoom
+                    ));
                     true
                 }
                 "0" | "Home" => {
@@ -284,7 +299,6 @@ pub fn setup_event_listeners(
                 _ => false,
             };
 
-            drop(viewport);
             if handled {
                 event.prevent_default();
                 render();

@@ -12,8 +12,26 @@ use web_sys::{CanvasRenderingContext2d, window};
 pub mod app;
 pub mod canvas;
 pub mod events;
+pub mod sticky_notes;
 pub mod toolbar;
 pub mod viewport;
+
+#[cfg(any(test, target_arch = "wasm32"))]
+#[derive(Debug, Clone)]
+pub struct AppState {
+    pub viewport: viewport::ViewportState,
+    pub sticky_notes: sticky_notes::StickyNotesState,
+}
+
+#[cfg(any(test, target_arch = "wasm32"))]
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            viewport: viewport::ViewportState::default(),
+            sticky_notes: sticky_notes::StickyNotesState::default(),
+        }
+    }
+}
 
 #[cfg(target_arch = "wasm32")]
 thread_local! {
@@ -51,7 +69,7 @@ fn start_impl() -> Result<(), JsValue> {
         .dyn_into::<CanvasRenderingContext2d>()?;
     canvas::resize_canvas(&canvas, &context)?;
 
-    let state = Rc::new(RefCell::new(viewport::ViewportState::default()));
+    let state = Rc::new(RefCell::new(AppState::default()));
     let toolbar_state = Rc::new(RefCell::new(toolbar::FloatingToolbarState::default()));
     let is_rendering = Rc::new(Cell::new(false));
     let render: Rc<dyn Fn()> = Rc::new({

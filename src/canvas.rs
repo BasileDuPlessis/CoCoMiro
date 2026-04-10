@@ -77,13 +77,13 @@ pub fn render_canvas(
     ctx: &CanvasRenderingContext2d,
     canvas: &HtmlCanvasElement,
     status: &HtmlElement,
-    state: &crate::viewport::ViewportState,
+    state: &crate::AppState,
 ) -> Result<(), JsValue> {
     let (width, height) = canvas_css_size(canvas)?;
-    let zoom = state.zoom;
+    let zoom = state.viewport.zoom;
     let grid_spacing = (GRID_BASE_SPACING * zoom).clamp(GRID_MIN_SPACING, GRID_MAX_SPACING);
-    let offset_x = state.pan_x.rem_euclid(grid_spacing);
-    let offset_y = state.pan_y.rem_euclid(grid_spacing);
+    let offset_x = state.viewport.pan_x.rem_euclid(grid_spacing);
+    let offset_y = state.viewport.pan_y.rem_euclid(grid_spacing);
 
     ctx.set_fill_style_str("#f8fafc");
     ctx.fill_rect(0.0, 0.0, width, height);
@@ -107,8 +107,8 @@ pub fn render_canvas(
     }
     ctx.stroke();
 
-    let center_x = (width / 2.0) + state.pan_x;
-    let center_y = (height / 2.0) + state.pan_y;
+    let center_x = (width / 2.0) + state.viewport.pan_x;
+    let center_y = (height / 2.0) + state.viewport.pan_y;
 
     ctx.begin_path();
     ctx.set_stroke_style_str("#2563eb");
@@ -120,12 +120,12 @@ pub fn render_canvas(
     ctx.stroke();
 
     canvas.set_attribute("data-ready", "true")?;
-    canvas.set_attribute("data-pan-x", &format!("{:.2}", state.pan_x))?;
-    canvas.set_attribute("data-pan-y", &format!("{:.2}", state.pan_y))?;
-    canvas.set_attribute("data-zoom", &format!("{:.2}", state.zoom))?;
+    canvas.set_attribute("data-pan-x", &format!("{:.2}", state.viewport.pan_x))?;
+    canvas.set_attribute("data-pan-y", &format!("{:.2}", state.viewport.pan_y))?;
+    canvas.set_attribute("data-zoom", &format!("{:.2}", state.viewport.zoom))?;
     canvas.style().set_property(
         "cursor",
-        if state.is_dragging {
+        if state.viewport.is_dragging {
             "grabbing"
         } else {
             "grab"
@@ -134,7 +134,7 @@ pub fn render_canvas(
 
     status.set_text_content(Some(&format!(
         "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {}",
-        state.pan_x, state.pan_y, state.zoom, STATUS_HELP_TEXT
+        state.viewport.pan_x, state.viewport.pan_y, state.viewport.zoom, STATUS_HELP_TEXT
     )));
 
     Ok(())
