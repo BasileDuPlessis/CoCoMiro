@@ -70,8 +70,8 @@ pub fn setup_event_listeners(
                 crate::log_js_error("canvas focus failed", &error);
             }
 
-            let mouse_x = event.client_x() as f64;
-            let mouse_y = event.client_y() as f64;
+            let mouse_x = event.offset_x() as f64;
+            let mouse_y = event.offset_y() as f64;
 
             // Check for sticky note first
             let note_hit = {
@@ -195,15 +195,15 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |event: MouseEvent| {
-            let mouse_x = event.client_x() as f64;
-            let mouse_y = event.client_y() as f64;
+            let mouse_x = event.offset_x() as f64;
+            let mouse_y = event.offset_y() as f64;
 
             // Update mouse position in app state
             state.borrow_mut().mouse_x = mouse_x;
             state.borrow_mut().mouse_y = mouse_y;
 
             // Handle toolbar dragging first
-            let did_toolbar_move = toolbar_state.borrow_mut().drag_to(mouse_x, mouse_y);
+            let did_toolbar_move = toolbar_state.borrow_mut().drag_to(event.client_x() as f64, event.client_y() as f64);
             if did_toolbar_move {
                 position_toolbar();
                 return;
@@ -234,7 +234,7 @@ pub fn setup_event_listeners(
             }
 
             // Handle canvas dragging
-            let did_move = { state.borrow_mut().viewport.drag_to(mouse_x, mouse_y) };
+            let did_move = { state.borrow_mut().viewport.drag_to(event.client_x() as f64, event.client_y() as f64) };
 
             if did_move {
                 render();
