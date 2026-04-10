@@ -1,3 +1,32 @@
+//! # Canvas Rendering Engine
+//!
+//! This module handles all canvas-based rendering for the CoCoMiro application.
+//! It provides functions for drawing the grid, sticky notes, and managing the
+//! canvas viewport with proper HiDPI support.
+//!
+//! ## Rendering Pipeline
+//!
+//! The rendering process follows this order:
+//! 1. Clear canvas with background color
+//! 2. Draw grid lines based on zoom level
+//! 3. Render all sticky notes with selection highlighting
+//! 4. Draw center crosshair for reference
+//! 5. Update status text and canvas attributes
+//!
+//! ## Coordinate Transformations
+//!
+//! The module handles transformations between world coordinates (sticky note positions)
+//! and screen coordinates (canvas pixels) accounting for:
+//! - Viewport pan offset
+//! - Zoom scaling
+//! - Canvas device pixel ratio for HiDPI displays
+//!
+//! ## Performance Considerations
+//!
+//! - Grid spacing adapts to zoom level for optimal visual density
+//! - Canvas is resized efficiently with proper device pixel ratio handling
+//! - Rendering uses immediate mode for simplicity and performance
+
 #[cfg(target_arch = "wasm32")]
 use crate::toolbar::TOOLBAR_EDGE_PADDING;
 #[cfg(target_arch = "wasm32")]
@@ -6,33 +35,57 @@ use wasm_bindgen::JsValue;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
 
 #[cfg(target_arch = "wasm32")]
+/// Fallback viewport width when window dimensions are unavailable
 const FALLBACK_VIEWPORT_WIDTH: f64 = 1280.0;
 #[cfg(target_arch = "wasm32")]
+/// Fallback viewport height when window dimensions are unavailable
 const FALLBACK_VIEWPORT_HEIGHT: f64 = 840.0;
 #[cfg(target_arch = "wasm32")]
+/// Horizontal margin around canvas for layout
 const CANVAS_HORIZONTAL_MARGIN: f64 = 32.0;
 #[cfg(target_arch = "wasm32")]
+/// Vertical margin around canvas for layout
 const CANVAS_VERTICAL_MARGIN: f64 = 96.0;
 #[cfg(target_arch = "wasm32")]
+/// Minimum canvas edge length to ensure usability
 const MIN_CANVAS_EDGE: f64 = 320.0;
 #[cfg(target_arch = "wasm32")]
+/// Base spacing for grid lines in world coordinates
 const GRID_BASE_SPACING: f64 = 48.0;
 #[cfg(target_arch = "wasm32")]
+/// Minimum grid spacing to prevent overcrowding
 const GRID_MIN_SPACING: f64 = 24.0;
 #[cfg(target_arch = "wasm32")]
+/// Maximum grid spacing to maintain visual reference
 const GRID_MAX_SPACING: f64 = 120.0;
 #[cfg(target_arch = "wasm32")]
+/// Default help text shown in status area
 const STATUS_HELP_TEXT: &str = "Drag to pan, scroll to zoom, or use the arrow keys and +/-.";
 
 #[cfg(target_arch = "wasm32")]
-pub fn canvas_css_size(canvas: &HtmlCanvasElement) -> Result<(f64, f64), JsValue> {
-    let browser_window = window().ok_or_else(|| JsValue::from_str("window is unavailable"))?;
+/// Calculates the CSS size for the canvas element based on viewport dimensions.
+///
+/// This function determines the appropriate canvas size considering:
+/// - Browser window inner dimensions
+/// - Configured margins for UI elements
+/// - Minimum size constraints for usability
+///
+/// # Arguments
+/// * `canvas` - The HTML canvas element
+///
+/// # Returns
+/// * `Ok((width, height))` - CSS dimensions for the canvas
+/// * `Err(AppError)` - Failed to access window or canvas properties
+pub fn canvas_css_size(canvas: &HtmlCanvasElement) -> crate::AppResult<(f64, f64)> {
+    let browser_window = window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
     let viewport_width = browser_window
-        .inner_width()?
+        .inner_width()
+        .map_err(|_| crate::AppError::BrowserEnv("failed to get window inner width".to_string()))?
         .as_f64()
         .unwrap_or(FALLBACK_VIEWPORT_WIDTH);
     let viewport_height = browser_window
-        .inner_height()?
+        .inner_height()
+        .map_err(|_| crate::AppError::BrowserEnv("failed to get window inner height".to_string()))?
         .as_f64()
         .unwrap_or(FALLBACK_VIEWPORT_HEIGHT);
 
@@ -49,11 +102,26 @@ pub fn canvas_css_size(canvas: &HtmlCanvasElement) -> Result<(f64, f64), JsValue
 }
 
 #[cfg(target_arch = "wasm32")]
+/// Resizes the canvas element and updates its rendering context for HiDPI displays.
+///
+/// This function handles the complex process of canvas resizing by:
+/// 1. Calculating appropriate CSS size for layout
+/// 2. Setting CSS properties for proper layout
+/// 3. Setting actual canvas bitmap size accounting for device pixel ratio
+/// 4. Configuring the rendering context transform for crisp rendering
+///
+/// # Arguments
+/// * `canvas` - The HTML canvas element to resize
+/// * `ctx` - The 2D rendering context for the canvas
+///
+/// # Returns
+/// * `Ok(())` - Canvas resized successfully
+/// * `Err(AppError)` - Failed to resize or configure canvas
 pub fn resize_canvas(
     canvas: &HtmlCanvasElement,
     ctx: &CanvasRenderingContext2d,
-) -> Result<(), JsValue> {
-    let browser_window = window().ok_or_else(|| JsValue::from_str("window is unavailable"))?;
+) -> crate::AppResult<()> {
+    let browser_window = window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
     let (width, height) = canvas_css_size(canvas)?;
     // Keep CSS size stable while allocating a denser backing store for Retina/HiDPI displays.
     let device_pixel_ratio = browser_window.device_pixel_ratio().max(1.0);
@@ -73,12 +141,26 @@ pub fn resize_canvas(
 }
 
 #[cfg(target_arch = "wasm32")]
+/// Renders the complete canvas scene including grid, sticky notes, and UI elements.
+///
+/// This is the main rendering function that draws the entire application state.
+/// The rendering order ensures proper layering and visual hierarchy.
+///
+/// # Arguments
+/// * `ctx` - The 2D canvas rendering context
+/// * `canvas` - The HTML canvas element being rendered to
+/// * `status` - The status text element to update
+/// * `state` - The complete application state to render
+///
+/// # Returns
+/// * `Ok(())` - Rendering completed successfully
+/// * `Err(AppError)` - Rendering failed
 pub fn render_canvas(
     ctx: &CanvasRenderingContext2d,
     canvas: &HtmlCanvasElement,
     status: &HtmlElement,
     state: &crate::AppState,
-) -> Result<(), JsValue> {
+) -> crate::AppResult<()> {
     let (width, height) = canvas_css_size(canvas)?;
     let zoom = state.viewport.zoom;
     let grid_spacing = (GRID_BASE_SPACING * zoom).clamp(GRID_MIN_SPACING, GRID_MAX_SPACING);
@@ -202,7 +284,7 @@ pub fn sync_toolbar_position(
     toolbar: &HtmlElement,
     workspace: &HtmlElement,
     state: &mut crate::toolbar::FloatingToolbarState,
-) -> Result<(), JsValue> {
+) -> crate::AppResult<()> {
     let max_x = (f64::from(workspace.client_width() - toolbar.offset_width())
         - TOOLBAR_EDGE_PADDING)
         .max(TOOLBAR_EDGE_PADDING);

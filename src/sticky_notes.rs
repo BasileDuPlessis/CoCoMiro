@@ -1,19 +1,69 @@
+//! # Sticky Notes Module
+//!
+//! This module manages the creation, storage, and manipulation of sticky notes
+//! in the CoCoMiro infinite canvas application.
+//!
+//! ## Architecture
+//!
+//! The module consists of two main components:
+//! - `StickyNote`: Represents individual sticky notes with position, size, content, and appearance
+//! - `StickyNotesState`: Manages the collection of notes and handles selection/dragging state
+//!
+//! ## Coordinate System
+//!
+//! All coordinates are in world space (not screen space), allowing notes to exist
+//! anywhere on the infinite canvas regardless of viewport position or zoom level.
+//!
+//! ## ID Generation
+//!
+//! Note IDs are generated using an atomic counter to ensure uniqueness across
+//! the application lifetime, even with concurrent operations.
+//!
+//! ## Drag Operations
+//!
+//! The module supports dragging notes with offset tracking to maintain smooth
+//! interaction. When a drag starts, the offset between the mouse cursor and note
+//! position is recorded, ensuring the note moves relative to the cursor.
+
 use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Debug, Clone, PartialEq)]
+/// Represents a single sticky note on the infinite canvas.
+///
+/// Each sticky note has a unique ID, position in world coordinates,
+/// dimensions, text content, and background color. Notes are rendered
+/// as rectangles with text content and can be dragged around the canvas.
 pub struct StickyNote {
+    /// Unique identifier for this note (auto-generated)
     pub id: u32,
+    /// X-coordinate of the top-left corner in world space
     pub x: f64,
+    /// Y-coordinate of the top-left corner in world space
     pub y: f64,
+    /// Width of the note in world units
     pub width: f64,
+    /// Height of the note in world units
     pub height: f64,
+    /// Text content displayed on the note
     pub content: String,
+    /// Background color as a hex string (e.g., "#ffff88")
     pub color: String,
 }
 
 static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 
 impl StickyNote {
+    /// Creates a new sticky note at the specified world coordinates.
+    ///
+    /// The note is assigned a unique ID, default dimensions (200x150),
+    /// default content ("New note"), and default color (#ffff88).
+    ///
+    /// # Arguments
+    /// * `x` - X-coordinate of the top-left corner in world space
+    /// * `y` - Y-coordinate of the top-left corner in world space
+    ///
+    /// # Returns
+    /// A new `StickyNote` instance with default properties
     pub fn new(x: f64, y: f64) -> Self {
         Self {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
@@ -26,35 +76,62 @@ impl StickyNote {
         }
     }
 
+    /// Checks if the given point lies within this note's boundaries.
+    ///
+    /// This method is used for hit testing during mouse interactions,
+    /// determining whether a click or drag operation should affect this note.
+    ///
+    /// # Arguments
+    /// * `px` - X-coordinate of the test point in world space
+    /// * `py` - Y-coordinate of the test point in world space
+    ///
+    /// # Returns
+    /// `true` if the point is inside the note's rectangle, `false` otherwise
     pub fn contains_point(&self, px: f64, py: f64) -> bool {
         px >= self.x && px <= self.x + self.width && py >= self.y && py <= self.y + self.height
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+/// Manages the collection of sticky notes and their interaction state.
+///
+/// This struct maintains the list of all notes on the canvas and tracks
+/// the current selection and dragging state. It provides methods for
+/// adding, finding, and manipulating notes during user interactions.
 pub struct StickyNotesState {
+    /// All sticky notes currently on the canvas
     pub notes: Vec<StickyNote>,
+    /// ID of the currently selected note (if any)
     pub selected_note_id: Option<u32>,
+    /// Whether a note is currently being dragged
     pub is_dragging: bool,
+    /// Offset between mouse cursor and note position during drag operations
     pub drag_offset: Option<(f64, f64)>,
 }
 
-impl Default for StickyNotesState {
-    fn default() -> Self {
-        Self {
-            notes: Vec::new(),
-            selected_note_id: None,
-            is_dragging: false,
-            drag_offset: None,
-        }
-    }
-}
-
 impl StickyNotesState {
+    /// Adds a new sticky note to the collection.
+    ///
+    /// The note is appended to the notes vector. No validation is performed
+    /// on the note's properties - it is assumed to be properly constructed.
+    ///
+    /// # Arguments
+    /// * `note` - The `StickyNote` instance to add
     pub fn add_note(&mut self, note: StickyNote) {
         self.notes.push(note);
     }
 
+    /// Finds the topmost note that contains the given point.
+    ///
+    /// Notes are checked in reverse order (last added first) so that
+    /// visually topmost notes are selected when notes overlap.
+    ///
+    /// # Arguments
+    /// * `px` - X-coordinate of the test point in world space
+    /// * `py` - Y-coordinate of the test point in world space
+    ///
+    /// # Returns
+    /// The ID of the note containing the point, or `None` if no note contains it
     pub fn find_note_at(&self, px: f64, py: f64) -> Option<u32> {
         // Check in reverse order so top notes are selected first
         for note in self.notes.iter().rev() {
@@ -69,6 +146,16 @@ impl StickyNotesState {
         self.notes.iter_mut().find(|n| n.id == id)
     }
 
+    /// Initiates a drag operation for the specified note.
+    ///
+    /// This method records the offset between the mouse cursor and the note's
+    /// current position, marks the note as selected, and sets the dragging state.
+    /// The offset ensures smooth dragging where the note moves relative to the cursor.
+    ///
+    /// # Arguments
+    /// * `note_id` - ID of the note to start dragging
+    /// * `mouse_x` - Current X-coordinate of the mouse cursor in world space
+    /// * `mouse_y` - Current Y-coordinate of the mouse cursor in world space
     pub fn start_drag(&mut self, note_id: u32, mouse_x: f64, mouse_y: f64) {
         if let Some(note) = self.notes.iter().find(|n| n.id == note_id) {
             self.is_dragging = true;
@@ -77,22 +164,44 @@ impl StickyNotesState {
         }
     }
 
+    /// Updates the position of the currently dragged note.
+    ///
+    /// This method moves the selected note to follow the mouse cursor,
+    /// maintaining the drag offset established when dragging started.
+    /// Only has effect if a drag operation is currently active.
+    ///
+    /// # Arguments
+    /// * `mouse_x` - Current X-coordinate of the mouse cursor in world space
+    /// * `mouse_y` - Current Y-coordinate of the mouse cursor in world space
     pub fn drag_to(&mut self, mouse_x: f64, mouse_y: f64) {
-        if let (true, Some((offset_x, offset_y))) = (self.is_dragging, self.drag_offset) {
-            if let Some(note_id) = self.selected_note_id {
-                if let Some(note) = self.get_note_mut(note_id) {
-                    note.x = mouse_x - offset_x;
-                    note.y = mouse_y - offset_y;
-                }
-            }
+        if let (true, Some((offset_x, offset_y))) = (self.is_dragging, self.drag_offset)
+            && let Some(note_id) = self.selected_note_id
+            && let Some(note) = self.get_note_mut(note_id) {
+            note.x = mouse_x - offset_x;
+            note.y = mouse_y - offset_y;
         }
     }
 
+    /// Terminates the current drag operation.
+    ///
+    /// This method resets the dragging state and clears the drag offset,
+    /// allowing new drag operations to start cleanly.
     pub fn end_drag(&mut self) {
         self.is_dragging = false;
         self.drag_offset = None;
     }
 
+    /// Adds a new note positioned at the center of the current viewport.
+    ///
+    /// This method creates a note at the viewport center in world coordinates,
+    /// with a small offset based on the number of existing notes to prevent
+    /// exact overlap. The note is positioned to be visible within the current
+    /// viewport bounds.
+    ///
+    /// # Arguments
+    /// * `viewport_width` - Width of the viewport in screen pixels
+    /// * `viewport_height` - Height of the viewport in screen pixels
+    /// * `viewport_state` - Current viewport state for coordinate transformation
     #[cfg(any(test, target_arch = "wasm32"))]
     pub fn add_note_at_viewport_center(
         &mut self,
@@ -148,6 +257,10 @@ impl StickyNotesState {
         self.add_note(note);
     }
 
+    /// Deletes the currently selected sticky note.
+    ///
+    /// This method removes the selected note from the collection and clears
+    /// the selection. If no note is currently selected, this method does nothing.
     pub fn delete_selected(&mut self) {
         if let Some(id) = self.selected_note_id {
             self.notes.retain(|n| n.id != id);

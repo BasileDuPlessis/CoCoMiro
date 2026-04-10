@@ -1,3 +1,33 @@
+//! # Viewport Module
+//!
+//! This module manages the viewport/camera system for the CoCoMiro infinite canvas.
+//!
+//! ## Architecture
+//!
+//! The viewport represents the visible portion of the infinite 2D world. It handles:
+//! - Pan operations (translating the view)
+//! - Zoom operations (scaling the view)
+//! - Coordinate transformations between screen and world space
+//! - Drag operations for panning
+//!
+//! ## Coordinate Systems
+//!
+//! - **Screen coordinates**: Pixel positions relative to the canvas element (0,0 at top-left)
+//! - **World coordinates**: Infinite 2D space where content exists, independent of screen
+//!
+//! The viewport transforms between these coordinate systems using pan and zoom parameters.
+//!
+//! ## Zoom Constraints
+//!
+//! Zoom is constrained between `MIN_ZOOM` (0.5) and `MAX_ZOOM` (2.5) to maintain
+//! usability and prevent extreme scaling that could cause rendering issues.
+//!
+//! ## Pan and Zoom Interaction
+//!
+//! - **Panning**: Moves the viewport over the world space
+//! - **Zooming**: Scales the view while keeping a point stationary under the cursor
+//! - **Dragging**: Smooth viewport panning via mouse drag operations
+
 #[cfg(any(test, target_arch = "wasm32"))]
 const DEFAULT_ZOOM: f64 = 1.0;
 #[cfg(any(test, target_arch = "wasm32"))]
@@ -7,21 +37,50 @@ const MAX_ZOOM: f64 = 2.5;
 
 #[cfg(any(test, target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq)]
+/// Represents the current viewport/camera state for the infinite canvas.
+///
+/// The viewport defines which portion of the infinite world is currently visible
+/// on screen, including position (pan), scale (zoom), and interaction state (dragging).
 pub struct ViewportState {
+    /// Horizontal offset of the viewport center in world coordinates
     pub pan_x: f64,
+    /// Vertical offset of the viewport center in world coordinates
     pub pan_y: f64,
+    /// Current zoom level (scale factor), constrained between MIN_ZOOM and MAX_ZOOM
     pub zoom: f64,
+    /// Whether the viewport is currently being dragged (panned)
     pub is_dragging: bool,
+    /// Last recorded mouse position during drag operations
     pub last_mouse_pos: Option<(f64, f64)>,
 }
 
 #[cfg(any(test, target_arch = "wasm32"))]
 impl ViewportState {
+    /// Initiates a viewport drag (pan) operation.
+    ///
+    /// This method sets the dragging state and records the initial mouse
+    /// position to establish the drag offset for smooth panning.
+    ///
+    /// # Arguments
+    /// * `x` - Initial X-coordinate of the mouse cursor in screen pixels
+    /// * `y` - Initial Y-coordinate of the mouse cursor in screen pixels
     pub fn start_drag(&mut self, x: f64, y: f64) {
         self.is_dragging = true;
         self.last_mouse_pos = Some((x, y));
     }
 
+    /// Updates the viewport position during a drag operation.
+    ///
+    /// This method pans the viewport to follow the mouse cursor, maintaining
+    /// the offset established when dragging started. Only has effect if
+    /// a drag operation is currently active.
+    ///
+    /// # Arguments
+    /// * `x` - Current X-coordinate of the mouse cursor in screen pixels
+    /// * `y` - Current Y-coordinate of the mouse cursor in screen pixels
+    ///
+    /// # Returns
+    /// `true` if the viewport position was updated, `false` if not dragging
     pub fn drag_to(&mut self, x: f64, y: f64) -> bool {
         if !self.is_dragging {
             return false;
@@ -37,24 +96,61 @@ impl ViewportState {
         false
     }
 
+    /// Terminates the current viewport drag operation.
+    ///
+    /// This method resets the dragging state and clears the mouse position tracking,
+    /// allowing new drag operations to start cleanly.
     pub fn end_drag(&mut self) {
         self.is_dragging = false;
         self.last_mouse_pos = None;
     }
 
+    /// Pans the viewport by the specified delta amounts.
+    ///
+    /// This method translates the viewport position in world coordinates,
+    /// effectively moving the view over the infinite canvas.
+    ///
+    /// # Arguments
+    /// * `delta_x` - Amount to pan horizontally in screen pixels
+    /// * `delta_y` - Amount to pan vertically in screen pixels
     pub fn pan_by(&mut self, delta_x: f64, delta_y: f64) {
         self.pan_x += delta_x;
         self.pan_y += delta_y;
     }
 
+    /// Resets the viewport to its default state.
+    ///
+    /// This method restores the viewport to the origin (0,0) with default zoom,
+    /// clearing any pan or zoom that has been applied. Equivalent to creating
+    /// a new default ViewportState.
     pub fn reset(&mut self) {
         *self = Self::default();
     }
 
+    /// Applies a zoom factor to the viewport, centered on the current center.
+    ///
+    /// This method scales the viewport by multiplying the current zoom by the factor,
+    /// clamping the result to stay within the allowed zoom range (MIN_ZOOM to MAX_ZOOM).
+    ///
+    /// # Arguments
+    /// * `factor` - Zoom multiplier (e.g., 1.1 for 10% zoom in, 0.9 for 10% zoom out)
     pub fn zoom_by(&mut self, factor: f64) {
         self.zoom = (self.zoom * factor).clamp(MIN_ZOOM, MAX_ZOOM);
     }
 
+    /// Converts a screen coordinate to world coordinates.
+    ///
+    /// This method transforms a point from screen pixel coordinates to world coordinates,
+    /// taking into account the current pan and zoom of the viewport.
+    ///
+    /// # Arguments
+    /// * `screen_x` - X-coordinate in screen pixels (relative to canvas top-left)
+    /// * `screen_y` - Y-coordinate in screen pixels (relative to canvas top-left)
+    /// * `viewport_width` - Width of the viewport in screen pixels
+    /// * `viewport_height` - Height of the viewport in screen pixels
+    ///
+    /// # Returns
+    /// A tuple `(world_x, world_y)` representing the point in world coordinates
     pub fn world_point_at(
         &self,
         screen_x: f64,
@@ -71,6 +167,21 @@ impl ViewportState {
         )
     }
 
+    /// Applies a zoom factor centered on a specific screen point.
+    ///
+    /// This method zooms the viewport while keeping the world point under the cursor
+    /// stationary. It first calculates the world coordinates under the cursor, applies
+    /// the zoom, then adjusts the pan so the cursor remains over the same world point.
+    ///
+    /// This creates the intuitive "zoom toward cursor" behavior where the point
+    /// under the mouse stays fixed during zoom operations.
+    ///
+    /// # Arguments
+    /// * `factor` - Zoom multiplier
+    /// * `cursor_x` - X-coordinate of the cursor in screen pixels
+    /// * `cursor_y` - Y-coordinate of the cursor in screen pixels
+    /// * `viewport_width` - Width of the viewport in screen pixels
+    /// * `viewport_height` - Height of the viewport in screen pixels
     pub fn zoom_at(
         &mut self,
         factor: f64,
