@@ -110,12 +110,9 @@ pub fn render_canvas(
     // Render sticky notes
     for note in &state.sticky_notes.notes {
         // Calculate screen position from world coordinates
-        let mut screen_x = note.x - state.viewport.pan_x;
-        let mut screen_y = note.y - state.viewport.pan_y;
-
-        // Apply zoom transformation
-        screen_x *= state.viewport.zoom;
-        screen_y *= state.viewport.zoom;
+        // This matches the center cross positioning: screen = world * zoom + center + pan
+        let screen_x = note.x * state.viewport.zoom + width / 2.0 + state.viewport.pan_x;
+        let screen_y = note.y * state.viewport.zoom + height / 2.0 + state.viewport.pan_y;
         let screen_width = note.width * state.viewport.zoom;
         let screen_height = note.height * state.viewport.zoom;
 
