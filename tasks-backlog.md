@@ -5,32 +5,46 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 
 ## High Priority Tasks
 
-### 1. Enhance Text Rendering
-- Implement text wrapping for sticky notes
-- Improve typography and text layout
-- Add text editing capabilities
+### 1. Enhance Text Editing
+- Implement proper text editing for sticky notes
+- Add text input, selection, and editing capabilities
+- Improve text rendering and layout
 
 **Implementation Details:**
-- Modify `canvas.rs` render function to handle multi-line text
-- Implement word wrapping algorithm for note content
-- Add text metrics calculation for proper line height
-- Consider adding text selection and editing UI
-- Support different fonts and text styling
+- Add text input mode for sticky notes (double-click to edit)
+- Implement text selection and cursor positioning
+- Add keyboard shortcuts for text editing (Ctrl+A, Ctrl+C, Ctrl+V, etc.)
+- Support multi-line text with proper line breaks
+- Add text formatting options (bold, italic, etc.)
+- Improve text rendering quality and font handling
 
-### 2. Add Mobile Support
-- Implement touch event handling for mobile devices
-- Add gesture recognition for pinch-to-zoom and multi-touch interactions
+### 2. Add Persistence
+- Implement save/load functionality for sticky notes
+- Add data serialization and local storage
 
 **Implementation Details:**
-- Add touch event listeners in `events.rs` for `touchstart`, `touchmove`, `touchend`
-- Implement pinch gesture detection for zoom
-- Add single-touch drag support for canvas and notes
-- Test on mobile browsers and ensure responsive design
-- Handle touch vs mouse event conflicts
+- Add serialization support for `AppState` using serde
+- Implement local storage API for browser persistence
+- Add save/load buttons to toolbar
+- Support export/import of notes as JSON
+- Add autosave functionality
+- Handle data migration for future versions
 
-### 3. Performance Optimizations
+### 3. Implement Undo/Redo System
+- Add command pattern for reversible actions
+- Implement undo/redo functionality for all user actions
 
-#### 3.1 Spatial Indexing for Hit Testing
+**Implementation Details:**
+- Design command pattern for actions (create, edit, move, delete notes)
+- Implement undo/redo stack with history management
+- Add keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+- Add undo/redo buttons to toolbar
+- Handle complex operations (bulk actions, etc.)
+- Add visual feedback for undo/redo state
+
+### 4. Performance Optimizations
+
+#### 4.1 Spatial Indexing for Hit Testing
 - Implement efficient data structure for note hit testing
 - Replace linear search with spatial indexing (quadtree or similar)
 
@@ -40,7 +54,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Update note addition/removal to maintain spatial index
 - Benchmark performance improvement with many notes
 
-#### 3.2 View Culling for Rendering
+#### 4.2 View Culling for Rendering
 - Only render sticky notes visible in the current viewport
 - Implement frustum culling for canvas elements
 
@@ -50,7 +64,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Update culling when viewport changes (pan/zoom)
 - Measure rendering performance with 100+ notes
 
-#### 3.3 Grid Rendering Optimization
+#### 4.3 Grid Rendering Optimization
 - Optimize background grid rendering for large zoom levels
 - Implement adaptive grid density
 
@@ -60,7 +74,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Reduce grid density at high zoom levels
 - Optimize grid line calculation and drawing
 
-#### 3.4 Performance Monitoring
+#### 4.4 Performance Monitoring
 - Add frame rate monitoring and performance profiling
 - Implement performance metrics collection
 
@@ -70,7 +84,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Monitor memory usage and note count
 - Add performance logging for debugging
 
-#### 3.5 WebGL Acceleration (Future)
+#### 4.5 WebGL Acceleration (Future)
 - Consider WebGL acceleration for complex rendering
 - Evaluate WebGL vs Canvas 2D performance trade-offs
 
@@ -82,7 +96,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 
 ## Medium Priority Tasks
 
-### 4. Visual Polish
+### 5. Visual Polish
 - Add visual enhancements like shadows, rounded corners, and animations
 - Improve overall UI aesthetics
 
@@ -93,7 +107,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Improve color scheme and visual hierarchy
 - Add loading states and transitions
 
-### 5. Accessibility Improvements
+### 6. Accessibility Improvements
 - Enhance ARIA labels and keyboard navigation
 - Ensure WCAG compliance
 
@@ -106,27 +120,16 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 
 ## Low Priority Tasks
 
-### 6. Persistence
-- Add save/load functionality for sticky notes
-- Implement data serialization
+### 7. Add Mobile Support
+- Implement touch event handling for mobile devices
+- Add gesture recognition for pinch-to-zoom and multi-touch interactions
 
 **Implementation Details:**
-- Add serialization support for `AppState` (serde)
-- Implement local storage or file-based persistence
-- Add export/import functionality
-- Handle data migration for future versions
-- Add autosave functionality
-
-### 7. Undo/Redo System
-- Implement command pattern for reversible actions
-- Add undo/redo functionality for all user actions
-
-**Implementation Details:**
-- Design command pattern for actions (create note, move note, delete note, etc.)
-- Implement undo/redo stack with history management
-- Add keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-- Handle complex operations (bulk actions, etc.)
-- Add visual feedback for undo/redo state
+- Add touch event listeners in `events.rs` for `touchstart`, `touchmove`, `touchend`
+- Implement pinch gesture detection for zoom
+- Add single-touch drag support for canvas and notes
+- Test on mobile browsers and ensure responsive design
+- Handle touch vs mouse event conflicts
 
 ## Implementation Notes
 - All changes must maintain compatibility with both host and WebAssembly targets
