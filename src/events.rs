@@ -282,16 +282,8 @@ pub fn setup_event_listeners(
     on_toolbar_mouse_down.forget();
 
     // Click on add note button
-    /// Handles click events on the "Add Note" button to create new sticky notes.
-    ///
-    /// This function creates a new sticky note positioned at the center of the current
-    /// viewport. The note is added to the application state and the canvas is re-rendered
-    /// to display the new note immediately.
-    ///
-    /// # Arguments
-    /// * `canvas` - Reference to the canvas element for viewport dimensions
-    /// * `state` - Reference to application state for adding the note
-    /// * `render` - Closure to trigger canvas re-rendering
+    // Handles click events on the "Add Note" button to create new sticky notes.
+    // Creates a new sticky note positioned at the center of the current viewport.
     let on_add_note_click = Closure::<dyn FnMut()>::wrap(Box::new({
         let canvas = canvas.clone();
         let state = state.clone();
