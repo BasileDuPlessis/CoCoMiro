@@ -6,17 +6,56 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 ## High Priority Tasks
 
 ### 1. Enhance Text Editing
-- Implement proper text editing for sticky notes
-- Add text input, selection, and editing capabilities
-- Improve text rendering and layout
+
+#### 1.1 Basic Text Input Mode
+- Implement double-click to edit sticky notes
+- Add simple text input functionality
 
 **Implementation Details:**
-- Add text input mode for sticky notes (double-click to edit)
+- Add double-click event handler on sticky notes
+- Create text input overlay/mode for editing
+- Handle basic text input and confirmation (Enter/Escape)
+- Update note content and re-render canvas
+
+#### 1.2 Advanced Text Editing
 - Implement text selection and cursor positioning
-- Add keyboard shortcuts for text editing (Ctrl+A, Ctrl+C, Ctrl+V, etc.)
+- Add keyboard shortcuts for text editing
+
+**Implementation Details:**
+- Add cursor positioning and text selection
+- Implement keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V, etc.)
+- Handle arrow keys for cursor movement
+- Support text deletion and insertion at cursor
+
+#### 1.3 Multi-line Text Support
 - Support multi-line text with proper line breaks
-- Add text formatting options (bold, italic, etc.)
+- Implement text wrapping for long lines
+
+**Implementation Details:**
+- Handle Enter key for line breaks
+- Implement text wrapping algorithm
+- Update text rendering for multi-line display
+- Adjust note height based on content
+
+#### 1.4 Text Formatting Options
+- Add text formatting capabilities (bold, italic, etc.)
+- Implement rich text editing
+
+**Implementation Details:**
+- Add formatting toolbar or keyboard shortcuts
+- Support basic formatting (bold, italic, underline)
+- Store formatting information with text content
+- Render formatted text appropriately
+
+#### 1.5 Text Rendering Improvements
 - Improve text rendering quality and font handling
+- Optimize text display performance
+
+**Implementation Details:**
+- Upgrade font rendering quality
+- Add better font choices and sizing
+- Optimize text rendering performance
+- Handle different text sizes and styles
 
 ### 2. Add Persistence
 - Implement save/load functionality for sticky notes
