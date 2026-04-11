@@ -108,6 +108,105 @@ pub fn end_toolbar_drag_if_needed(
 }
 
 #[cfg(target_arch = "wasm32")]
+/// Creates a text input overlay positioned over a sticky note for editing.
+///
+/// This function creates an HTML input element that overlays the specified sticky note,
+/// allowing the user to edit the note's text content. The input is styled to match the
+/// note's appearance and positioned exactly over it.
+///
+/// # Arguments
+/// * `canvas` - The canvas element for coordinate calculations
+/// * `state` - Reference to application state containing the note
+/// * `note_id` - ID of the note to create input overlay for
+fn create_text_input_overlay(
+    canvas: &HtmlCanvasElement,
+    state: &Rc<RefCell<crate::AppState>>,
+    note_id: u32,
+) {
+    let browser_window = match window() {
+        Some(w) => w,
+        None => {
+            crate::log_warn("Cannot create text input overlay: window unavailable");
+            return;
+        }
+    };
+
+    let document = match browser_window.document() {
+        Some(d) => d,
+        None => {
+            crate::log_warn("Cannot create text input overlay: document unavailable");
+            return;
+        }
+    };
+
+    // Get note details
+    let note = match state.borrow().sticky_notes.notes.iter().find(|n| n.id == note_id) {
+        Some(n) => n.clone(),
+        None => {
+            crate::log_warn(&format!("Cannot create input overlay for note {}: note not found", note_id));
+            return;
+        }
+    };
+
+    // Calculate screen position from world coordinates
+    let viewport_width = f64::from(canvas.client_width().max(1));
+    let viewport_height = f64::from(canvas.client_height().max(1));
+    let zoom = state.borrow().viewport.zoom;
+    let pan_x = state.borrow().viewport.pan_x;
+    let pan_y = state.borrow().viewport.pan_y;
+
+    let screen_x = note.x * zoom + viewport_width / 2.0 + pan_x;
+    let screen_y = note.y * zoom + viewport_height / 2.0 + pan_y;
+    let screen_width = note.width * zoom;
+    let screen_height = note.height * zoom;
+
+    // Create input element
+    let input = match document.create_element("input") {
+        Ok(el) => el,
+        Err(_) => {
+            crate::log_warn("Cannot create text input element");
+            return;
+        }
+    };
+
+    let input: web_sys::HtmlInputElement = match input.dyn_into() {
+        Ok(inp) => inp,
+        Err(_) => {
+            crate::log_warn("Cannot convert element to input");
+            return;
+        }
+    };
+
+    // Style the input to match the note
+    let _ = input.style().set_property("position", "absolute");
+    let _ = input.style().set_property("left", &format!("{}px", screen_x));
+    let _ = input.style().set_property("top", &format!("{}px", screen_y));
+    let _ = input.style().set_property("width", &format!("{}px", screen_width));
+    let _ = input.style().set_property("height", &format!("{}px", screen_height));
+    let _ = input.style().set_property("font-size", "14px");
+    let _ = input.style().set_property("font-family", "Inter, sans-serif");
+    let _ = input.style().set_property("border", "2px solid #2563eb");
+    let _ = input.style().set_property("border-radius", "4px");
+    let _ = input.style().set_property("padding", "8px");
+    let _ = input.style().set_property("background-color", &note.color);
+    let _ = input.style().set_property("color", "#000000");
+    let _ = input.style().set_property("outline", "none");
+    let _ = input.style().set_property("z-index", "1000");
+
+    // Set initial value and focus
+    input.set_value(&note.content);
+    let _ = input.focus();
+    let _ = input.select();
+
+    // Add to document
+    if let Some(body) = document.body() {
+        let _ = body.append_child(&input);
+    }
+
+    crate::log_info(&format!("Created text input overlay for note {}", note_id));
+}
+
+#[cfg(target_arch = "wasm32")]
 /// Sets up all event listeners for the CoCoMiro application.
 ///
 /// This function establishes comprehensive event handling by:
@@ -644,12 +743,13 @@ pub fn setup_event_listeners(
         .map_err(|e| js_error_to_app_error(e, "failed to attach keydown listener to canvas"))?;
     on_key_down.forget();
 
-    // Double-click detection for text editing (Task 1.1.1)
-    // Handles double-click events on the canvas to detect sticky note selection.
+    // Double-click detection for text editing (Task 1.1.1 & 1.1.2)
+    // Handles double-click events on the canvas to detect sticky note selection
+    // and create text input overlay for editing.
     //
-    // This function checks if a double-click occurred on a sticky note and logs
-    // the event for debugging purposes. It prevents the default double-click behavior
-    // to avoid text selection or other browser actions.
+    // This function checks if a double-click occurred on a sticky note and creates
+    // a positioned input overlay for text editing. It prevents the default double-click
+    // behavior to avoid text selection or other browser actions.
     //
     // Arguments:
     // * event - The double-click event
@@ -682,9 +782,12 @@ pub fn setup_event_listeners(
                 .find_note_at(world_pos.0, world_pos.1)
             {
                 crate::log_info(&format!(
-                    "Double-click detected on sticky note {} at world position ({:.1}, {:.1})",
+                    "Double-click detected on sticky note {} at world position ({:.1}, {:.1}) - creating input overlay",
                     note_id, world_pos.0, world_pos.1
                 ));
+
+                // Create text input overlay for the selected note
+                create_text_input_overlay(&canvas, &state, note_id);
             } else {
                 crate::log_info(&format!(
                     "Double-click detected on canvas at world position ({:.1}, {:.1}) - no note selected",
