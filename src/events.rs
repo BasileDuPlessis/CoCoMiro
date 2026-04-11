@@ -36,7 +36,7 @@ use std::{cell::RefCell, rc::Rc};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 #[cfg(target_arch = "wasm32")]
-use web_sys::{HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent, WheelEvent, window};
+use web_sys::{Element, HtmlCanvasElement, HtmlElement, HtmlInputElement, KeyboardEvent, MouseEvent, WheelEvent, window};
 
 #[cfg(target_arch = "wasm32")]
 /// Zoom factor applied per wheel event (1.1 = 10% zoom per step)
@@ -105,6 +105,165 @@ pub fn end_toolbar_drag_if_needed(
         state.borrow_mut().end_drag();
         position_toolbar();
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Enters text editing mode for a sticky note.
+///
+/// This function creates a temporary text input element positioned over the specified
+/// sticky note, allowing the user to edit its content. The input handles Enter (confirm)
+/// and Escape (cancel) key presses.
+///
+/// # Arguments
+/// * `canvas` - The canvas element for positioning calculations
+/// * `state` - Reference to application state containing the note
+/// * `note_id` - ID of the note to edit
+/// * `render` - Closure to trigger canvas re-rendering after editing
+fn enter_text_editing_mode(
+    canvas: &HtmlCanvasElement,
+    state: Rc<RefCell<crate::AppState>>,
+    note_id: u32,
+    render: Rc<dyn Fn()>,
+) {
+    let browser_window = match window() {
+        Some(w) => w,
+        None => {
+            crate::log_warn("Cannot enter text editing mode: window unavailable");
+            return;
+        }
+    };
+
+    let document = match browser_window.document() {
+        Some(d) => d,
+        None => {
+            crate::log_warn("Cannot enter text editing mode: document unavailable");
+            return;
+        }
+    };
+
+    // Find the note
+    let note = match state.borrow().sticky_notes.notes.iter().find(|n| n.id == note_id) {
+        Some(n) => n.clone(),
+        None => {
+            crate::log_warn(&format!("Cannot edit note {}: note not found", note_id));
+            return;
+        }
+    };
+
+    // Calculate screen position of the note
+    let viewport_width = f64::from(canvas.client_width().max(1));
+    let viewport_height = f64::from(canvas.client_height().max(1));
+    let zoom = state.borrow().viewport.zoom;
+    let pan_x = state.borrow().viewport.pan_x;
+    let pan_y = state.borrow().viewport.pan_y;
+
+    let screen_x = note.x * zoom + viewport_width / 2.0 + pan_x;
+    let screen_y = note.y * zoom + viewport_height / 2.0 + pan_y;
+    let screen_width = note.width * zoom;
+    let screen_height = note.height * zoom;
+
+    // Create text input element
+    let input = match document.create_element("input") {
+        Ok(el) => el,
+        Err(_) => {
+            crate::log_warn("Cannot create text input element");
+            return;
+        }
+    };
+
+    let input: web_sys::HtmlInputElement = match input.dyn_into() {
+        Ok(inp) => inp,
+        Err(_) => {
+            crate::log_warn("Cannot convert element to input");
+            return;
+        }
+    };
+
+    // Style the input to match the note
+    let _ = input.style().set_property("position", "absolute");
+    let _ = input.style().set_property("left", &format!("{}px", screen_x));
+    let _ = input.style().set_property("top", &format!("{}px", screen_y));
+    let _ = input.style().set_property("width", &format!("{}px", screen_width));
+    let _ = input.style().set_property("height", &format!("{}px", screen_height));
+    let _ = input.style().set_property("font-size", "14px");
+    let _ = input.style().set_property("font-family", "Inter, sans-serif");
+    let _ = input.style().set_property("border", "2px solid #2563eb");
+    let _ = input.style().set_property("border-radius", "4px");
+    let _ = input.style().set_property("padding", "8px");
+    let _ = input.style().set_property("background-color", &note.color);
+    let _ = input.style().set_property("z-index", "1000");
+    let _ = input.style().set_property("outline", "none");
+
+    // Set initial value
+    input.set_value(&note.content);
+
+    // Focus and select all text
+    let _ = input.focus();
+    let _ = input.select();
+
+    // Add to document
+    if let Some(body) = document.body() {
+        let _ = body.append_child(&input);
+    }
+
+    // Handle key events
+    let state_clone = state.clone();
+    let render_clone = render.clone();
+    let input_clone = input.clone();
+
+    let on_keydown = Closure::<dyn FnMut(KeyboardEvent)>::wrap(Box::new(move |event: KeyboardEvent| {
+        match event.key().as_str() {
+            "Enter" => {
+                // Confirm edit
+                let new_content = input_clone.value();
+                state_clone.borrow_mut().sticky_notes.update_note_content(note_id, new_content);
+                render_clone();
+
+                // Remove input
+                if let Some(parent) = input_clone.parent_element() {
+                    let _: Result<web_sys::Node, _> = parent.remove_child(&input_clone);
+                }
+
+                crate::log_info(&format!("Updated note {} content", note_id));
+            }
+            "Escape" => {
+                // Cancel edit - just remove input without saving
+                if let Some(parent) = input_clone.parent_element() {
+                    let _: Result<web_sys::Node, _> = parent.remove_child(&input_clone);
+                }
+
+                crate::log_info(&format!("Cancelled editing note {}", note_id));
+            }
+            _ => {
+                // Allow other keys (typing, navigation, etc.)
+                event.stop_propagation();
+            }
+        }
+    }));
+
+    let _ = input.add_event_listener_with_callback("keydown", on_keydown.as_ref().unchecked_ref());
+    on_keydown.forget();
+
+    // Handle blur (clicking outside)
+    let input_clone2 = input.clone();
+    let on_blur = Closure::<dyn FnMut()>::wrap(Box::new(move || {
+        // Confirm edit on blur
+        let new_content = input_clone2.value();
+        state.borrow_mut().sticky_notes.update_note_content(note_id, new_content);
+        render();
+
+        // Remove input
+        if let Some(parent) = input_clone2.parent_element() {
+            let _: Result<web_sys::Node, _> = parent.remove_child(&input_clone2);
+        }
+
+        crate::log_info(&format!("Updated note {} content (blur)", note_id));
+    }));
+
+    let _ = input.add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref());
+    on_blur.forget();
+
+    crate::log_info(&format!("Entered text editing mode for note {}", note_id));
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -230,6 +389,50 @@ pub fn setup_event_listeners(
     canvas.add_event_listener_with_callback("mousedown", on_mouse_down.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to canvas"))?;
     on_mouse_down.forget();
+
+    // Double-click on canvas for text editing
+    /// Handles double-click events on the canvas to enter text editing mode for sticky notes.
+    ///
+    /// This function checks if a double-click occurred on a sticky note and, if so,
+    /// creates a text input overlay positioned over the note for editing its content.
+    /// The input accepts text entry and updates the note content when confirmed with Enter
+    /// or cancelled with Escape.
+    ///
+    /// # Arguments
+    /// * `event` - The double-click event
+    /// * `state` - Reference to application state
+    /// * `render` - Closure to trigger canvas re-rendering
+    let on_double_click = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
+        let canvas = canvas.clone();
+        let state = state.clone();
+        let render = render.clone();
+        move |event: MouseEvent| {
+            let mouse_x = event.offset_x() as f64;
+            let mouse_y = event.offset_y() as f64;
+
+            // Check if double-click is on a sticky note
+            let viewport_width = f64::from(canvas.client_width().max(1));
+            let viewport_height = f64::from(canvas.client_height().max(1));
+            let world_pos = state.borrow().viewport.world_point_at(
+                mouse_x,
+                mouse_y,
+                viewport_width,
+                viewport_height,
+            );
+
+            if let Some(note_id) = state
+                .borrow()
+                .sticky_notes
+                .find_note_at(world_pos.0, world_pos.1)
+            {
+                // Enter text editing mode for this note
+                enter_text_editing_mode(&canvas, state.clone(), note_id, render.clone());
+            }
+        }
+    }));
+    canvas.add_event_listener_with_callback("dblclick", on_double_click.as_ref().unchecked_ref())
+        .map_err(|e| js_error_to_app_error(e, "failed to attach dblclick listener to canvas"))?;
+    on_double_click.forget();
 
     // Mouse down on toolbar handle
     /// Handles mouse down events on the toolbar to initiate toolbar dragging.
