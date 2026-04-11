@@ -1,5 +1,25 @@
 # CoCoMiro Copilot Instructions
 
+## 🚨 CRITICAL VALIDATION PROTOCOL
+**STOP AND VALIDATE: Never assume code works - always test compilation**
+
+### Before suggesting ANY code changes:
+1. **Check current compilation status** with `cargo check --target wasm32-unknown-unknown`
+2. **Run existing tests** with `cargo test`
+3. **Verify WASM builds** with `trunk build --release`
+
+### After ANY code suggestion:
+1. **Immediately test compilation** - Don't wait for user feedback
+2. **Report actual results** - Include exact error messages if any
+3. **Fix issues before proceeding** - Don't suggest more code until current code compiles
+4. **Use tools proactively** - Run `cargo check` and `get_errors` after changes
+
+### Error Reporting Protocol:
+- **Include full error output** - Don't summarize, show exact compiler messages
+- **Stop on first error** - Fix compilation errors before logic errors
+- **Ask for clarification** - If unsure about error meaning, ask user
+- **Test incrementally** - Small changes, frequent validation
+
 ## Project context
 - `CoCoMiro` is a small **Rust + WebAssembly infinite canvas** project.
 - Main application logic lives in `src/lib.rs`.
@@ -27,9 +47,13 @@
 - **Tests are required** for bug fixes and behavior changes.
 - Add or update tests when changing logic.
 - Do not consider work complete without verification.
-- **CRITICAL**: Always test both compilation targets before finishing:
-  - Host target: `cargo check && cargo test`
-  - WebAssembly target: `cargo check --target wasm32-unknown-unknown`
+- **MANDATORY VALIDATION WORKFLOW**:
+  - ✅ `cargo check` (host compilation)
+  - ✅ `cargo test` (unit tests)
+  - ✅ `cargo check --target wasm32-unknown-unknown` (WASM compilation)
+  - ✅ `trunk build --release` (full WASM build)
+  - ✅ `cargo fmt` (code formatting)
+- **STOP if any step fails** - Fix compilation errors immediately
 - Before finishing a meaningful change, run the relevant checks such as:
   - `cargo fmt`
   - `cargo test`
