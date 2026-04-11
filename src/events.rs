@@ -644,5 +644,58 @@ pub fn setup_event_listeners(
         .map_err(|e| js_error_to_app_error(e, "failed to attach keydown listener to canvas"))?;
     on_key_down.forget();
 
+    // Double-click detection for text editing (Task 1.1.1)
+    /// Handles double-click events on the canvas to detect sticky note selection.
+    ///
+    /// This function checks if a double-click occurred on a sticky note and logs
+    /// the event for debugging purposes. It prevents the default double-click behavior
+    /// to avoid text selection or other browser actions.
+    ///
+    /// # Arguments
+    /// * `event` - The double-click event
+    /// * `state` - Reference to application state for coordinate conversion
+    /// * `canvas` - Reference to canvas element for viewport dimensions
+    let on_double_click = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
+        let state = state.clone();
+        let canvas = canvas.clone();
+        move |event: MouseEvent| {
+            event.prevent_default();
+
+            let mouse_x = event.offset_x() as f64;
+            let mouse_y = event.offset_y() as f64;
+
+            // Convert screen coordinates to world coordinates
+            let viewport_width = f64::from(canvas.client_width().max(1));
+            let viewport_height = f64::from(canvas.client_height().max(1));
+
+            let world_pos = state.borrow().viewport.world_point_at(
+                mouse_x,
+                mouse_y,
+                viewport_width,
+                viewport_height,
+            );
+
+            // Check if double-click is on a sticky note
+            if let Some(note_id) = state
+                .borrow()
+                .sticky_notes
+                .find_note_at(world_pos.0, world_pos.1)
+            {
+                crate::log_info(&format!(
+                    "Double-click detected on sticky note {} at world position ({:.1}, {:.1})",
+                    note_id, world_pos.0, world_pos.1
+                ));
+            } else {
+                crate::log_info(&format!(
+                    "Double-click detected on canvas at world position ({:.1}, {:.1}) - no note selected",
+                    world_pos.0, world_pos.1
+                ));
+            }
+        }
+    }));
+    canvas.add_event_listener_with_callback("dblclick", on_double_click.as_ref().unchecked_ref())
+        .map_err(|e| js_error_to_app_error(e, "failed to attach dblclick listener to canvas"))?;
+    on_double_click.forget();
+
     Ok(())
 }
