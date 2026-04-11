@@ -11,11 +11,53 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Implement double-click to edit sticky notes
 - Add simple text input functionality
 
+##### 1.1.1 Double-Click Detection ✅ COMPLETED
+- Add double-click event handler on canvas
+- Detect which sticky note was double-clicked
+- Prevent default double-click behavior
+
 **Implementation Details:**
-- Add double-click event handler on sticky notes
-- Create text input overlay/mode for editing
-- Handle basic text input and confirmation (Enter/Escape)
+- Attach `dblclick` event listener to canvas element
+- Calculate world coordinates from mouse position
+- Find which sticky note contains the click point
+- Log the double-click event for debugging
+
+##### 1.1.2 Text Input Overlay Creation ✅ COMPLETED
+- Create HTML input element overlay
+- Position input element over the selected sticky note
+- Style input to match note appearance
+- Focus and select text in input
+
+**Implementation Details:**
+- Create `HtmlInputElement` programmatically with proper styling
+- Calculate screen position from world coordinates and zoom level
+- Apply note-matching styles (background color, border, font, padding)
+- Position overlay with absolute positioning and high z-index
+- Focus input and select all text for immediate editing
+
+##### 1.1.3 Basic Text Editing
+- Handle text input and basic editing operations
+- Support typing, backspace, and basic navigation
+- Update input value as user types
+
+**Implementation Details:**
+- Attach `input` event listener to handle text changes
+- Allow standard text editing operations
+- Prevent event propagation to avoid canvas interactions
+- Maintain input focus during editing
+
+##### 1.1.4 Input Confirmation and Cleanup
+- Handle Enter key to confirm changes
+- Handle Escape key to cancel editing
 - Update note content and re-render canvas
+- Remove input overlay and restore normal interaction
+
+**Implementation Details:**
+- Attach `keydown` event listener for Enter/Escape handling
+- Attach `blur` event listener for clicking outside
+- Update `StickyNote.content` with new text
+- Remove input element from DOM
+- Trigger canvas re-rendering
 
 #### 1.2 Advanced Text Editing
 - Implement text selection and cursor positioning

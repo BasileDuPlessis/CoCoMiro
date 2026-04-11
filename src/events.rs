@@ -34,6 +34,8 @@
 #[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
 #[cfg(target_arch = "wasm32")]
+use js_sys;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 #[cfg(target_arch = "wasm32")]
 use web_sys::{HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent, WheelEvent, window};
@@ -160,6 +162,28 @@ fn create_text_input_overlay(
     let screen_width = note.width * zoom;
     let screen_height = note.height * zoom;
 
+    // Get canvas position relative to the document using getBoundingClientRect
+    let canvas_js: &JsValue = canvas.as_ref();
+    let rect_js = js_sys::Reflect::get(canvas_js, &"getBoundingClientRect".into())
+        .unwrap()
+        .dyn_into::<js_sys::Function>()
+        .unwrap()
+        .call0(canvas_js)
+        .unwrap();
+    
+    let canvas_left = js_sys::Reflect::get(&rect_js, &"left".into())
+        .unwrap()
+        .as_f64()
+        .unwrap();
+    let canvas_top = js_sys::Reflect::get(&rect_js, &"top".into())
+        .unwrap()
+        .as_f64()
+        .unwrap();
+
+    // Calculate document-relative position for the overlay
+    let overlay_left = canvas_left + screen_x;
+    let overlay_top = canvas_top + screen_y;
+
     // Create input element
     let input = match document.create_element("input") {
         Ok(el) => el,
@@ -179,8 +203,8 @@ fn create_text_input_overlay(
 
     // Style the input to match the note
     let _ = input.style().set_property("position", "absolute");
-    let _ = input.style().set_property("left", &format!("{}px", screen_x));
-    let _ = input.style().set_property("top", &format!("{}px", screen_y));
+    let _ = input.style().set_property("left", &format!("{}px", overlay_left));
+    let _ = input.style().set_property("top", &format!("{}px", overlay_top));
     let _ = input.style().set_property("width", &format!("{}px", screen_width));
     let _ = input.style().set_property("height", &format!("{}px", screen_height));
     let _ = input.style().set_property("font-size", "14px");
@@ -248,21 +272,21 @@ pub fn setup_event_listeners(
         .ok_or_else(|| crate::AppError::BrowserEnv("could not access the browser document".to_string()))?;
 
     // Mouse down on canvas
-    /// Handles mouse down events on the canvas to initiate drag operations.
-    ///
-    /// This function determines the type of interaction based on:
-    /// 1. Which mouse button was pressed (left for panning/dragging, right for context menu)
-    /// 2. Whether the target element is a sticky note or the canvas background
-    /// 3. Current application state (tool selection, existing drag state)
-    ///
-    /// For sticky notes, it initiates note dragging. For canvas background,
-    /// it starts viewport panning. The function prevents default browser behavior
-    /// and captures the mouse to ensure smooth drag operations.
-    ///
-    /// # Arguments
-    /// * `event` - The mouse down event
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger re-rendering
+    // Handles mouse down events on the canvas to initiate drag operations.
+    //
+    // This function determines the type of interaction based on:
+    // 1. Which mouse button was pressed (left for panning/dragging, right for context menu)
+    // 2. Whether the target element is a sticky note or the canvas background
+    // 3. Current application state (tool selection, existing drag state)
+    //
+    // For sticky notes, it initiates note dragging. For canvas background,
+    // it starts viewport panning. The function prevents default browser behavior
+    // and captures the mouse to ensure smooth drag operations.
+    //
+    // Arguments:
+    // * event - The mouse down event
+    // * state - Reference to application state
+    // * render - Closure to trigger re-rendering
     let on_mouse_down = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
         let state = state.clone();
@@ -331,19 +355,19 @@ pub fn setup_event_listeners(
     on_mouse_down.forget();
 
     // Mouse down on toolbar handle
-    /// Handles mouse down events on the toolbar to initiate toolbar dragging.
-    ///
-    /// This function allows users to reposition the floating toolbar by dragging
-    /// its handle. It checks that the event target is the toolbar handle element
-    /// and initiates the drag operation by updating the toolbar state.
-    ///
-    /// The toolbar drag is independent of canvas interactions and allows users
-    /// to move the toolbar to their preferred position on screen.
-    ///
-    /// # Arguments
-    /// * `event` - The mouse down event on the toolbar
-    /// * `toolbar_state` - Reference to toolbar state for drag tracking
-    /// * `position_toolbar` - Closure to update toolbar position during drag
+    // Handles mouse down events on the toolbar to initiate toolbar dragging.
+    //
+    // This function allows users to reposition the floating toolbar by dragging
+    // its handle. It checks that the event target is the toolbar handle element
+    // and initiates the drag operation by updating the toolbar state.
+    //
+    // The toolbar drag is independent of canvas interactions and allows users
+    // to move the toolbar to their preferred position on screen.
+    //
+    // Arguments:
+    // * event - The mouse down event on the toolbar
+    // * toolbar_state - Reference to toolbar state for drag tracking
+    // * position_toolbar - Closure to update toolbar position during drag
     let on_toolbar_mouse_down = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
         let toolbar_state = toolbar_state.clone();
@@ -413,24 +437,24 @@ pub fn setup_event_listeners(
     on_add_note_click.forget();
 
     // Mouse move
-    /// Handles mouse move events for continuous drag operations and hover effects.
-    ///
-    /// This function updates the mouse position in the application state and handles
-    /// ongoing drag operations for both sticky notes and the viewport. It prioritizes
-    /// toolbar dragging over canvas interactions.
-    ///
-    /// The function performs the following operations in order:
-    /// 1. Updates current mouse coordinates in app state
-    /// 2. Handles toolbar dragging if active
-    /// 3. Handles sticky note dragging if active
-    /// 4. Handles viewport panning if active
-    ///
-    /// # Arguments
-    /// * `event` - The mouse move event
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger re-rendering
-    /// * `toolbar_state` - Reference to toolbar state
-    /// * `position_toolbar` - Closure to update toolbar position
+    // Handles mouse move events for continuous drag operations and hover effects.
+    //
+    // This function updates the mouse position in the application state and handles
+    // ongoing drag operations for both sticky notes and the viewport. It prioritizes
+    // toolbar dragging over canvas interactions.
+    //
+    // The function performs the following operations in order:
+    // 1. Updates current mouse coordinates in app state
+    // 2. Handles toolbar dragging if active
+    // 3. Handles sticky note dragging if active
+    // 4. Handles viewport panning if active
+    //
+    // Arguments:
+    // * event - The mouse move event
+    // * state - Reference to application state
+    // * render - Closure to trigger re-rendering
+    // * toolbar_state - Reference to toolbar state
+    // * position_toolbar - Closure to update toolbar position
     let on_mouse_move = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
         let state = state.clone();
@@ -489,19 +513,19 @@ pub fn setup_event_listeners(
     on_mouse_move.forget();
 
     // Mouse up
-    /// Handles mouse up events to complete drag operations.
-    ///
-    /// This function terminates any active drag operations (viewport panning,
-    /// sticky note dragging, or toolbar dragging) and logs the completion.
-    /// It ensures that drag state is properly cleaned up and the final position
-    /// is rendered.
-    ///
-    /// # Arguments
-    /// * `event` - The mouse up event (unused)
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger final re-rendering
-    /// * `toolbar_state` - Reference to toolbar state
-    /// * `position_toolbar` - Closure to update final toolbar position
+    // Handles mouse up events to complete drag operations.
+    //
+    // This function terminates any active drag operations (viewport panning,
+    // sticky note dragging, or toolbar dragging) and logs the completion.
+    // It ensures that drag state is properly cleaned up and the final position
+    // is rendered.
+    //
+    // Arguments:
+    // * event - The mouse up event (unused)
+    // * state - Reference to application state
+    // * render - Closure to trigger final re-rendering
+    // * toolbar_state - Reference to toolbar state
+    // * position_toolbar - Closure to update final toolbar position
     let on_mouse_up = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
@@ -530,18 +554,18 @@ pub fn setup_event_listeners(
     on_mouse_up.forget();
 
     // Mouse leave document
-    /// Handles mouse leave events to clean up drag operations when the mouse exits the document.
-    ///
-    /// This function ensures that any active drag operations are properly terminated
-    /// when the mouse leaves the document area, preventing stuck drag states.
-    /// It's important for maintaining consistent application state during edge cases.
-    ///
-    /// # Arguments
-    /// * `event` - The mouse leave event (unused)
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger re-rendering
-    /// * `toolbar_state` - Reference to toolbar state
-    /// * `position_toolbar` - Closure to update toolbar position
+    // Handles mouse leave events to clean up drag operations when the mouse exits the document.
+    //
+    // This function ensures that any active drag operations are properly terminated
+    // when the mouse leaves the document area, preventing stuck drag states.
+    // It's important for maintaining consistent application state during edge cases.
+    //
+    // Arguments:
+    // * event - The mouse leave event (unused)
+    // * state - Reference to application state
+    // * render - Closure to trigger re-rendering
+    // * toolbar_state - Reference to toolbar state
+    // * position_toolbar - Closure to update toolbar position
     let on_mouse_leave = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
@@ -558,17 +582,17 @@ pub fn setup_event_listeners(
     on_mouse_leave.forget();
 
     // Blur window
-    /// Handles window blur events to clean up drag operations when the window loses focus.
-    ///
-    /// This function ensures that any active drag operations are properly terminated
-    /// when the browser window loses focus, preventing stuck drag states that could
-    /// occur if the user switches tabs or applications during a drag operation.
-    ///
-    /// # Arguments
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger re-rendering
-    /// * `toolbar_state` - Reference to toolbar state
-    /// * `position_toolbar` - Closure to update toolbar position
+    // Handles window blur events to clean up drag operations when the window loses focus.
+    //
+    // This function ensures that any active drag operations are properly terminated
+    // when the browser window loses focus, preventing stuck drag states that could
+    // occur if the user switches tabs or applications during a drag operation.
+    //
+    // Arguments:
+    // * state - Reference to application state
+    // * render - Closure to trigger re-rendering
+    // * toolbar_state - Reference to toolbar state
+    // * position_toolbar - Closure to update toolbar position
     let on_blur = Closure::<dyn FnMut()>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
@@ -584,24 +608,24 @@ pub fn setup_event_listeners(
     on_blur.forget();
 
     // Wheel
-    /// Handles mouse wheel events for zoom functionality.
-    ///
-    /// This function implements smooth zooming centered on the mouse cursor position.
-    /// It calculates the zoom factor based on wheel direction and applies it to the
-    /// viewport, maintaining the world point under the cursor stationary during zoom.
-    ///
-    /// Zoom behavior:
-    /// - Wheel up (negative delta_y): Zoom in by ZOOM_STEP_FACTOR
-    /// - Wheel down (positive delta_y): Zoom out by 1/ZOOM_STEP_FACTOR
-    ///
-    /// The zoom is centered on the current mouse position to provide intuitive
-    /// navigation experience.
-    ///
-    /// # Arguments
-    /// * `event` - The wheel event
-    /// * `canvas` - Reference to the canvas element
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger re-rendering
+    // Handles mouse wheel events for zoom functionality.
+    //
+    // This function implements smooth zooming centered on the mouse cursor position.
+    // It calculates the zoom factor based on wheel direction and applies it to the
+    // viewport, maintaining the world point under the cursor stationary during zoom.
+    //
+    // Zoom behavior:
+    // - Wheel up (negative delta_y): Zoom in by ZOOM_STEP_FACTOR
+    // - Wheel down (positive delta_y): Zoom out by 1/ZOOM_STEP_FACTOR
+    //
+    // The zoom is centered on the current mouse position to provide intuitive
+    // navigation experience.
+    //
+    // Arguments:
+    // * event - The wheel event
+    // * canvas - Reference to the canvas element
+    // * state - Reference to application state
+    // * render - Closure to trigger re-rendering
     let on_wheel = Closure::<dyn FnMut(WheelEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
         let state = state.clone();
@@ -640,22 +664,22 @@ pub fn setup_event_listeners(
     on_wheel.forget();
 
     // Key down
-    /// Handles keyboard events for viewport navigation and note management.
-    ///
-    /// This function provides keyboard shortcuts for common operations:
-    /// - Arrow keys: Pan the viewport in the respective direction
-    /// - +/-: Zoom in/out centered on viewport center
-    /// - 0/Home: Reset viewport to default position and zoom
-    /// - Delete/Backspace: Delete the currently selected sticky note
-    ///
-    /// All handled keys prevent default browser behavior to avoid conflicts
-    /// with page scrolling or other browser shortcuts.
-    ///
-    /// # Arguments
-    /// * `event` - The keyboard event
-    /// * `canvas` - Reference to the canvas element
-    /// * `state` - Reference to application state
-    /// * `render` - Closure to trigger re-rendering
+    // Handles keyboard events for viewport navigation and note management.
+    //
+    // This function provides keyboard shortcuts for common operations:
+    // - Arrow keys: Pan the viewport in the respective direction
+    // - +/-: Zoom in/out centered on viewport center
+    // - 0/Home: Reset viewport to default position and zoom
+    // - Delete/Backspace: Delete the currently selected sticky note
+    //
+    // All handled keys prevent default browser behavior to avoid conflicts
+    // with page scrolling or other browser shortcuts.
+    //
+    // # Arguments
+    // * `event` - The keyboard event
+    // * `canvas` - Reference to the canvas element
+    // * `state` - Reference to application state
+    // * `render` - Closure to trigger re-rendering
     let on_key_down = Closure::<dyn FnMut(KeyboardEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
         let state = state.clone();

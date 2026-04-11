@@ -23,7 +23,7 @@
 //! ```
 
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use web_sys::{Document, HtmlCanvasElement, HtmlElement};
 

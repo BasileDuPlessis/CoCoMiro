@@ -29,8 +29,6 @@
 #[cfg(target_arch = "wasm32")]
 use crate::toolbar::TOOLBAR_EDGE_PADDING;
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsValue;
-#[cfg(target_arch = "wasm32")]
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
 
 #[cfg(target_arch = "wasm32")]
