@@ -61,6 +61,22 @@ When making changes:
 
 Never skip the WebAssembly check - it catches issues that host compilation misses!
 
+## Code Style Tips
+
+### Documentation Comments
+- Use `///` for **public API documentation** (functions, structs, modules)
+- Use `//` for **implementation comments** inside functions
+- This prevents "unused doc comment" warnings from the Rust compiler
+
+**Example:**
+```rust
+/// This function adds two numbers (public API documentation)
+pub fn add(a: i32, b: i32) -> i32 {
+    // Implementation detail comment
+    a + b
+}
+```
+
 ### Troubleshooting the browser build
 
 If `cargo test` passes but the app does not start in the browser:

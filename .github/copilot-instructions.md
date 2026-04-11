@@ -42,6 +42,7 @@
 - Favor clear names, predictable control flow, and maintainable logic.
 - Leave the codebase cleaner than you found it when possible.
 - **Ensure code compiles for both host and WebAssembly targets**
+- **Use correct comment types**: `///` for public API documentation, `//` for implementation comments
 
 ## Testing requirements
 - **Tests are required** for bug fixes and behavior changes.
