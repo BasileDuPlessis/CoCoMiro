@@ -645,16 +645,16 @@ pub fn setup_event_listeners(
     on_key_down.forget();
 
     // Double-click detection for text editing (Task 1.1.1)
-    /// Handles double-click events on the canvas to detect sticky note selection.
-    ///
-    /// This function checks if a double-click occurred on a sticky note and logs
-    /// the event for debugging purposes. It prevents the default double-click behavior
-    /// to avoid text selection or other browser actions.
-    ///
-    /// # Arguments
-    /// * `event` - The double-click event
-    /// * `state` - Reference to application state for coordinate conversion
-    /// * `canvas` - Reference to canvas element for viewport dimensions
+    // Handles double-click events on the canvas to detect sticky note selection.
+    //
+    // This function checks if a double-click occurred on a sticky note and logs
+    // the event for debugging purposes. It prevents the default double-click behavior
+    // to avoid text selection or other browser actions.
+    //
+    // Arguments:
+    // * event - The double-click event
+    // * state - Reference to application state for coordinate conversion
+    // * canvas - Reference to canvas element for viewport dimensions
     let on_double_click = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let canvas = canvas.clone();
