@@ -98,56 +98,151 @@ impl PerformanceMetrics {
     }
 }
 
-/// Wraps text to fit within a specified width using estimated character width.
+/// Represents a segment of text with formatting information
+#[cfg(target_arch = "wasm32")]
+#[derive(Debug, Clone)]
+struct TextSegment {
+    text: String,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+}
+
+/// Parses markdown-style formatting from text and returns formatted segments
 ///
-/// This function splits text into lines that fit within the given pixel width,
-/// breaking at word boundaries when possible. Uses an estimated average character
-/// width for simplicity.
+/// Supports:
+/// - **text** for bold
+/// - *text* for italic
+/// - __text__ for underline
 ///
 /// # Arguments
-/// * `text` - The text to wrap
-/// * `max_width` - Maximum width in pixels for each line
-/// * `font_size` - Font size in pixels (default 14)
+/// * `text` - The text to parse for formatting
 ///
 /// # Returns
-/// A vector of strings, each representing a wrapped line
+/// A vector of TextSegment objects representing the parsed text
 #[cfg(target_arch = "wasm32")]
-fn wrap_text(text: &str, max_width: f64, font_size: f64) -> Vec<String> {
-    let mut lines = Vec::new();
-    let words: Vec<&str> = text.split_whitespace().collect();
+fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
+    let mut segments = Vec::new();
+    let mut remaining = text;
 
-    if words.is_empty() {
-        return lines;
-    }
+    while !remaining.is_empty() {
+        // Find the next formatting marker
+        let bold_start = remaining.find("**");
+        let italic_start = remaining.find('*').filter(|&pos| {
+            // Make sure it's not part of ** (bold)
+            pos + 1 >= remaining.len() || &remaining[pos..pos + 2] != "**"
+        });
+        let underline_start = remaining.find("__");
 
-    // Estimate average character width (rough approximation)
-    let avg_char_width = font_size * 0.6; // Approximate for most fonts
-    let max_chars_per_line = (max_width / avg_char_width) as usize;
+        // Find the earliest marker
+        let mut earliest_pos = None;
+        let mut marker_type = None;
 
-    let mut current_line = String::new();
-
-    for word in words {
-        let test_line = if current_line.is_empty() {
-            word.to_string()
-        } else {
-            format!("{} {}", current_line, word)
-        };
-
-        if test_line.len() <= max_chars_per_line {
-            current_line = test_line;
-        } else {
-            if !current_line.is_empty() {
-                lines.push(current_line);
+        if let Some(pos) = bold_start {
+            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
+                earliest_pos = Some(pos);
+                marker_type = Some("bold");
             }
-            current_line = word.to_string();
+        }
+        if let Some(pos) = italic_start {
+            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
+                earliest_pos = Some(pos);
+                marker_type = Some("italic");
+            }
+        }
+        if let Some(pos) = underline_start {
+            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
+                earliest_pos = Some(pos);
+                marker_type = Some("underline");
+            }
+        }
+
+        if let (Some(pos), Some(marker)) = (earliest_pos, marker_type) {
+            // Add text before the marker as plain text
+            if pos > 0 {
+                segments.push(TextSegment {
+                    text: remaining[..pos].to_string(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                });
+            }
+
+            // Find the closing marker
+            let marker_len = if marker == "bold" || marker == "underline" {
+                2
+            } else {
+                1
+            };
+            let marker_text = if marker == "bold" {
+                "**"
+            } else if marker == "underline" {
+                "__"
+            } else {
+                "*"
+            };
+
+            if let Some(end_pos) = remaining[pos + marker_len..].find(marker_text) {
+                let end_pos = pos + marker_len + end_pos;
+                let formatted_text = &remaining[pos + marker_len..end_pos];
+
+                segments.push(TextSegment {
+                    text: formatted_text.to_string(),
+                    bold: marker == "bold",
+                    italic: marker == "italic",
+                    underline: marker == "underline",
+                });
+
+                remaining = &remaining[end_pos + marker_len..];
+            } else {
+                // No closing marker found, treat as plain text
+                segments.push(TextSegment {
+                    text: remaining[pos..].to_string(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                });
+                break;
+            }
+        } else {
+            // No more markers, add remaining text as plain
+            segments.push(TextSegment {
+                text: remaining.to_string(),
+                bold: false,
+                italic: false,
+                underline: false,
+            });
+            break;
         }
     }
 
-    if !current_line.is_empty() {
-        lines.push(current_line);
+    segments
+}
+
+/// Creates a CSS font string based on text formatting
+///
+/// # Arguments
+/// * `segment` - The text segment with formatting information
+/// * `base_size` - Base font size in pixels
+///
+/// # Returns
+/// A CSS font property string
+#[cfg(target_arch = "wasm32")]
+fn format_font(segment: &TextSegment, base_size: f64) -> String {
+    let mut styles = Vec::new();
+
+    if segment.italic {
+        styles.push("italic".to_string());
     }
 
-    lines
+    if segment.bold {
+        styles.push("bold".to_string());
+    }
+
+    styles.push(format!("{}px", base_size));
+    styles.push("Inter, sans-serif".to_string());
+
+    styles.join(" ")
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -346,10 +441,8 @@ pub fn render_canvas(
         ctx.set_line_width(2.0);
         ctx.stroke_rect(screen_x, screen_y, screen_width, screen_height);
 
-        // Draw note content text with wrapping
+        // Draw note content text with rich formatting and wrapping
         if !note.content.is_empty() {
-            ctx.set_fill_style_str("#000000");
-            ctx.set_font("14px Inter, sans-serif");
             ctx.set_text_align("left");
             ctx.set_text_baseline("top");
             // Add some padding
@@ -357,22 +450,162 @@ pub fn render_canvas(
             let text_y = screen_y + 8.0;
             let max_text_width = screen_width - 16.0; // Account for padding
 
-            // Process text with line breaks and wrapping
+            // Parse the entire content for formatting
+            let formatted_segments = parse_formatted_text(&note.content);
+
+            // Process text with line breaks and wrapping while preserving formatting
             let mut all_lines = Vec::new();
-            for line in note.content.lines() {
-                if line.is_empty() {
-                    all_lines.push(String::new());
-                } else {
-                    let wrapped_lines = wrap_text(line, max_text_width, 14.0);
-                    all_lines.extend(wrapped_lines);
+            let mut current_line_segments = Vec::new();
+            let mut current_line_width = 0.0;
+
+            for segment in formatted_segments {
+                // Handle line breaks in the segment
+                let lines_in_segment: Vec<&str> = segment.text.lines().collect();
+
+                for (i, line_part) in lines_in_segment.iter().enumerate() {
+                    if i > 0 {
+                        // This is a new line due to \n, finalize current line and start new one
+                        if !current_line_segments.is_empty() {
+                            all_lines.push(current_line_segments);
+                            current_line_segments = Vec::new();
+                            current_line_width = 0.0;
+                        }
+                    }
+
+                    if line_part.is_empty() {
+                        continue;
+                    }
+
+                    // Process the line part character by character to preserve spaces
+                    let chars: Vec<char> = line_part.chars().collect();
+                    let mut current_word = String::new();
+
+                    for (_char_idx, &ch) in chars.iter().enumerate() {
+                        if ch.is_whitespace() {
+                            // Finish current word if any
+                            if !current_word.is_empty() {
+                                let word_segment = TextSegment {
+                                    text: current_word.clone(),
+                                    bold: segment.bold,
+                                    italic: segment.italic,
+                                    underline: segment.underline,
+                                };
+
+                                // Calculate word width
+                                let font = format_font(&word_segment, 14.0);
+                                ctx.set_font(&font);
+                                let word_width = ctx.measure_text(&word_segment.text)?.width();
+
+                                // Check if adding this word would exceed line width
+                                if current_line_width + word_width <= max_text_width
+                                    || current_line_segments.is_empty()
+                                {
+                                    current_line_segments.push(word_segment);
+                                    current_line_width += word_width;
+                                } else {
+                                    // Start new line
+                                    if !current_line_segments.is_empty() {
+                                        all_lines.push(current_line_segments);
+                                    }
+                                    current_line_segments = vec![word_segment];
+                                    current_line_width = word_width;
+                                }
+                                current_word.clear();
+                            }
+
+                            // Add space
+                            let space_segment = TextSegment {
+                                text: ch.to_string(),
+                                bold: segment.bold,
+                                italic: segment.italic,
+                                underline: segment.underline,
+                            };
+
+                            ctx.set_font(&format_font(&space_segment, 14.0));
+                            let space_width = ctx.measure_text(&space_segment.text)?.width();
+
+                            if current_line_width + space_width <= max_text_width
+                                || current_line_segments.is_empty()
+                            {
+                                current_line_segments.push(space_segment);
+                                current_line_width += space_width;
+                            } else {
+                                // Start new line with space
+                                if !current_line_segments.is_empty() {
+                                    all_lines.push(current_line_segments);
+                                }
+                                current_line_segments = vec![space_segment];
+                                current_line_width = space_width;
+                            }
+                        } else {
+                            current_word.push(ch);
+                        }
+                    }
+
+                    // Add the last word if any
+                    if !current_word.is_empty() {
+                        let word_segment = TextSegment {
+                            text: current_word,
+                            bold: segment.bold,
+                            italic: segment.italic,
+                            underline: segment.underline,
+                        };
+
+                        // Calculate word width
+                        let font = format_font(&word_segment, 14.0);
+                        ctx.set_font(&font);
+                        let word_width = ctx.measure_text(&word_segment.text)?.width();
+
+                        // Check if adding this word would exceed line width
+                        if current_line_width + word_width <= max_text_width
+                            || current_line_segments.is_empty()
+                        {
+                            current_line_segments.push(word_segment);
+                            current_line_width += word_width;
+                        } else {
+                            // Start new line
+                            if !current_line_segments.is_empty() {
+                                all_lines.push(current_line_segments);
+                            }
+                            current_line_segments = vec![word_segment];
+                            current_line_width = word_width;
+                        }
+                    }
                 }
+            }
+
+            // Add the last line if not empty
+            if !current_line_segments.is_empty() {
+                all_lines.push(current_line_segments);
             }
 
             // Render all lines
             let mut y_offset = 0.0;
-            for line in all_lines {
-                if !line.is_empty() {
-                    ctx.fill_text(&line, text_x, text_y + y_offset)?;
+            for line_segments in all_lines {
+                let mut x_offset = 0.0;
+                for segment in line_segments {
+                    let font = format_font(&segment, 14.0);
+                    ctx.set_font(&font);
+
+                    // Set text decoration for underline
+                    if segment.underline {
+                        ctx.set_stroke_style_str("#000000");
+                        ctx.set_line_width(1.0);
+                        let text_width = ctx.measure_text(&segment.text)?.width();
+                        let underline_y = text_y + y_offset + 14.0 + 1.0; // Below baseline
+                        ctx.begin_path();
+                        ctx.move_to(text_x + x_offset, underline_y);
+                        ctx.line_to(text_x + x_offset + text_width, underline_y);
+                        ctx.stroke();
+                    }
+
+                    // Draw the text
+                    ctx.set_fill_style_str("#000000");
+                    ctx.fill_text(&segment.text, text_x + x_offset, text_y + y_offset)?;
+
+                    // Update x offset for next segment
+                    let segment_width = ctx.measure_text(&segment.text)?.width();
+                    x_offset += segment_width;
                 }
                 y_offset += 18.0; // Line height
             }

@@ -13,6 +13,210 @@ use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 
+/// Creates a formatting toolbar positioned above the text input overlay.
+///
+/// This function creates an HTML toolbar element with formatting buttons
+/// (bold, italic, underline) that appears above the text input area.
+/// The toolbar is styled to match the application design and handles
+/// button clicks to apply text formatting.
+///
+/// # Arguments
+/// * `document` - Reference to the browser document object
+/// * `textarea` - The textarea element the toolbar controls
+/// * `overlay_left` - Left position of the text input overlay
+/// * `overlay_top` - Top position of the text input overlay
+/// * `screen_width` - Width of the text input overlay
+///
+/// # Returns
+/// The created toolbar HTML element
+#[cfg(target_arch = "wasm32")]
+fn create_formatting_toolbar(
+    document: &web_sys::Document,
+    textarea: &web_sys::HtmlTextAreaElement,
+    overlay_left: f64,
+    overlay_top: f64,
+    screen_width: f64,
+) -> Result<web_sys::HtmlElement, String> {
+    // Create toolbar container
+    let toolbar = document
+        .create_element("div")
+        .map_err(|_| "Cannot create toolbar element")?;
+
+    let toolbar: web_sys::HtmlElement = toolbar
+        .dyn_into()
+        .map_err(|_| "Cannot convert toolbar to HtmlElement")?;
+
+    // Style the toolbar
+    let _ = toolbar.style().set_property("position", "absolute");
+    let _ = toolbar
+        .style()
+        .set_property("left", &format!("{}px", overlay_left));
+    let _ = toolbar
+        .style()
+        .set_property("top", &format!("{}px", overlay_top - 40.0)); // Position above textarea
+    let _ = toolbar
+        .style()
+        .set_property("width", &format!("{}px", screen_width.min(200.0))); // Limit max width
+    let _ = toolbar.style().set_property("height", "32px");
+    let _ = toolbar.style().set_property("background-color", "#ffffff");
+    let _ = toolbar.style().set_property("border", "1px solid #e5e7eb");
+    let _ = toolbar.style().set_property("border-radius", "4px");
+    let _ = toolbar
+        .style()
+        .set_property("box-shadow", "0 1px 3px rgba(0, 0, 0, 0.1)");
+    let _ = toolbar.style().set_property("display", "flex");
+    let _ = toolbar.style().set_property("align-items", "center");
+    let _ = toolbar.style().set_property("padding", "4px");
+    let _ = toolbar.style().set_property("gap", "2px");
+    let _ = toolbar.style().set_property("z-index", "1001"); // Higher than textarea
+    let _ = toolbar.style().set_property("font-size", "12px");
+
+    // Create bold button
+    let bold_button = document
+        .create_element("button")
+        .map_err(|_| "Cannot create bold button")?;
+    bold_button.set_text_content(Some("B"));
+    let _ = bold_button.set_attribute("title", "Bold");
+    let _ = bold_button.set_attribute("aria-label", "Make text bold");
+    style_formatting_button(&bold_button, "font-weight: bold;")?;
+
+    // Create italic button
+    let italic_button = document
+        .create_element("button")
+        .map_err(|_| "Cannot create italic button")?;
+    italic_button.set_text_content(Some("I"));
+    let _ = italic_button.set_attribute("title", "Italic");
+    let _ = italic_button.set_attribute("aria-label", "Make text italic");
+    style_formatting_button(&italic_button, "font-style: italic;")?;
+
+    // Create underline button
+    let underline_button = document
+        .create_element("button")
+        .map_err(|_| "Cannot create underline button")?;
+    underline_button.set_text_content(Some("U"));
+    let _ = underline_button.set_attribute("title", "Underline");
+    let _ = underline_button.set_attribute("aria-label", "Underline text");
+    style_formatting_button(&underline_button, "text-decoration: underline;")?;
+
+    // Add buttons to toolbar
+    let _ = toolbar.append_child(&bold_button);
+    let _ = toolbar.append_child(&italic_button);
+    let _ = toolbar.append_child(&underline_button);
+
+    // Add click handlers for formatting buttons
+    add_formatting_handler(&bold_button, "bold", textarea)?;
+    add_formatting_handler(&italic_button, "italic", textarea)?;
+    add_formatting_handler(&underline_button, "underline", textarea)?;
+
+    Ok(toolbar)
+}
+
+/// Styles a formatting button with consistent appearance.
+///
+/// # Arguments
+/// * `button` - The button element to style
+/// * `font_style` - CSS font styling to apply to the button text
+#[cfg(target_arch = "wasm32")]
+fn style_formatting_button(button: &web_sys::Element, font_style: &str) -> Result<(), String> {
+    let style = button
+        .dyn_ref::<web_sys::HtmlElement>()
+        .ok_or("Button is not an HtmlElement")?
+        .style();
+
+    let _ = style.set_property("width", "24px");
+    let _ = style.set_property("height", "24px");
+    let _ = style.set_property("border", "1px solid #d1d5db");
+    let _ = style.set_property("border-radius", "3px");
+    let _ = style.set_property("background-color", "#ffffff");
+    let _ = style.set_property("color", "#374151");
+    let _ = style.set_property("cursor", "pointer");
+    let _ = style.set_property("display", "flex");
+    let _ = style.set_property("align-items", "center");
+    let _ = style.set_property("justify-content", "center");
+    let _ = style.set_property("font-size", "12px");
+    let _ = style.set_property("font-family", "Inter, sans-serif");
+    let _ = style.set_property(
+        &font_style.split(':').next().unwrap_or(""),
+        &font_style.split(':').nth(1).unwrap_or("").trim(),
+    );
+    let _ = style.set_property("user-select", "none");
+    let _ = style.set_property("transition", "background-color 0.1s");
+
+    Ok(())
+}
+
+/// Adds a click handler to a formatting button.
+///
+/// # Arguments
+/// * `button` - The button element to add handler to
+/// * `format_type` - The type of formatting ("bold", "italic", "underline")
+/// * `textarea` - The textarea element to apply formatting to
+#[cfg(target_arch = "wasm32")]
+fn add_formatting_handler(
+    button: &web_sys::Element,
+    format_type: &str,
+    textarea: &web_sys::HtmlTextAreaElement,
+) -> Result<(), String> {
+    let textarea = textarea.clone();
+    let format_type = format_type.to_string();
+
+    let closure = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            event.prevent_default();
+            event.stop_propagation();
+
+            // For now, just log the formatting action
+            // TODO: Implement actual text formatting logic
+            crate::log_info(&format!("Applying {} formatting", format_type));
+
+            // Simple implementation: wrap selected text or insert at cursor
+            if let (Ok(Some(start)), Ok(Some(end))) =
+                (textarea.selection_start(), textarea.selection_end())
+            {
+                let current_value = textarea.value();
+                let start_usize = start as usize;
+                let end_usize = end as usize;
+
+                let (prefix, suffix) = match format_type.as_str() {
+                    "bold" => ("**", "**"),
+                    "italic" => ("*", "*"),
+                    "underline" => ("__", "__"),
+                    _ => ("", ""),
+                };
+
+                if start == end {
+                    // No selection, insert at cursor
+                    let before = &current_value[..start_usize];
+                    let after = &current_value[start_usize..];
+                    let new_value = format!("{}{}{}{}", before, prefix, suffix, after);
+                    textarea.set_value(&new_value);
+                    let new_cursor_pos = start + prefix.len() as u32;
+                    let _ = textarea.set_selection_start(Some(new_cursor_pos));
+                    let _ = textarea.set_selection_end(Some(new_cursor_pos));
+                } else {
+                    // Has selection, wrap selected text
+                    let before = &current_value[..start_usize];
+                    let after = &current_value[end_usize..];
+                    let selected = &current_value[start_usize..end_usize];
+                    let new_value = format!("{}{}{}{}{}", before, prefix, selected, suffix, after);
+                    textarea.set_value(&new_value);
+                    let new_start = start + prefix.len() as u32;
+                    let new_end = end + prefix.len() as u32;
+                    let _ = textarea.set_selection_start(Some(new_start));
+                    let _ = textarea.set_selection_end(Some(new_end));
+                }
+            }
+        },
+    ));
+
+    button
+        .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+        .map_err(|_| "Failed to add click event listener")?;
+
+    closure.forget();
+    Ok(())
+}
+
 /// Creates a text input overlay positioned over a sticky note for editing.
 ///
 /// This function creates an HTML textarea element that overlays the specified sticky note,
@@ -117,6 +321,21 @@ pub fn create_text_input_overlay(
         }
     };
 
+    // Create formatting toolbar
+    let toolbar = match create_formatting_toolbar(
+        &document,
+        &textarea,
+        overlay_left,
+        overlay_top,
+        screen_width,
+    ) {
+        Ok(tb) => tb,
+        Err(e) => {
+            crate::log_warn(&format!("Cannot create formatting toolbar: {}", e));
+            return;
+        }
+    };
+
     // Style the textarea to match the note
     let _ = textarea.style().set_property("position", "absolute");
     let _ = textarea
@@ -154,7 +373,9 @@ pub fn create_text_input_overlay(
 
     // Set initial height based on note height
     let initial_screen_height = screen_height;
-    let _ = textarea.style().set_property("height", &format!("{}px", initial_screen_height));
+    let _ = textarea
+        .style()
+        .set_property("height", &format!("{}px", initial_screen_height));
 
     let _ = textarea.focus();
     let _ = textarea.select();
@@ -175,7 +396,9 @@ pub fn create_text_input_overlay(
 
                 // Adjust textarea height to fit content
                 let scroll_height = textarea.scroll_height() as f64;
-                let _ = textarea.style().set_property("height", &format!("{}px", scroll_height));
+                let _ = textarea
+                    .style()
+                    .set_property("height", &format!("{}px", scroll_height));
 
                 // Adjust note height based on textarea height in world coordinates
                 let min_height = 150.0; // Minimum note height
@@ -204,6 +427,7 @@ pub fn create_text_input_overlay(
             let render = render.clone();
             let note_id = note_id;
             let textarea = textarea.clone();
+            let toolbar = toolbar.clone();
             let document = document.clone();
             let original_content = original_content.clone();
             move |event: web_sys::KeyboardEvent| {
@@ -252,10 +476,14 @@ pub fn create_text_input_overlay(
                         // Check if Ctrl or Shift is held for confirmation
                         if event.ctrl_key() || event.shift_key() {
                             // Confirm changes - content already updated via input handler
-                            crate::log_info(&format!("Text editing confirmed for note {}", note_id));
+                            crate::log_info(&format!(
+                                "Text editing confirmed for note {}",
+                                note_id
+                            ));
 
                             // Remove the textarea overlay
                             if let Some(body) = document.body() {
+                                let _ = body.remove_child(&toolbar);
                                 let _ = body.remove_child(&textarea);
                             }
                         } else {
@@ -272,6 +500,7 @@ pub fn create_text_input_overlay(
 
                         // Remove the textarea overlay
                         if let Some(body) = document.body() {
+                            let _ = body.remove_child(&toolbar);
                             let _ = body.remove_child(&textarea);
                         }
 
@@ -291,11 +520,34 @@ pub fn create_text_input_overlay(
         });
     on_keydown.forget();
 
+    // Add mousedown handler to toolbar to prevent blur from removing overlay
+    let toolbar_clicked = Rc::new(RefCell::new(false));
+    let toolbar_clicked_clone = toolbar_clicked.clone();
+    let toolbar_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
+        Box::new(move |_event: web_sys::Event| {
+            *toolbar_clicked_clone.borrow_mut() = true;
+        }),
+    );
+    toolbar
+        .add_event_listener_with_callback("mousedown", toolbar_mousedown.as_ref().unchecked_ref())
+        .unwrap_or_else(|_| {
+            crate::log_warn("Failed to attach toolbar mousedown event listener");
+        });
+    toolbar_mousedown.forget();
+
     // Attach blur event listener for clicking outside
     let on_blur = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new({
         let document = document.clone();
         let textarea = textarea.clone();
+        let toolbar = toolbar.clone();
+        let toolbar_clicked = toolbar_clicked.clone();
         move |_event: web_sys::Event| {
+            // Check if toolbar was clicked (preventing overlay removal)
+            if *toolbar_clicked.borrow() {
+                *toolbar_clicked.borrow_mut() = false; // Reset flag
+                return;
+            }
+
             // Confirm changes when focus is lost
             crate::log_info(&format!(
                 "Text editing confirmed (blur) for note {}",
@@ -304,6 +556,7 @@ pub fn create_text_input_overlay(
 
             // Remove the textarea overlay
             if let Some(body) = document.body() {
+                let _ = body.remove_child(&toolbar);
                 let _ = body.remove_child(&textarea);
             }
         }
@@ -317,6 +570,7 @@ pub fn create_text_input_overlay(
 
     // Add to document
     if let Some(body) = document.body() {
+        let _ = body.append_child(&toolbar);
         let _ = body.append_child(&textarea);
     }
 
