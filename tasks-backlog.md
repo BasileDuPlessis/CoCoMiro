@@ -147,20 +147,57 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Maintain keyboard shortcuts and navigation
 - Prevent event propagation to canvas during editing
 
-##### 1.4.6 Implement HTML-Based Rich Text Editing
-- Replace markdown formatting with proper HTML-based rich text editing
-- Make toolbar buttons apply real formatting instead of markdown syntax
-- Convert HTML content to markdown for canvas rendering
+##### 1.4.6 Implement Toolbar Button Formatting
+- Make toolbar buttons apply real HTML formatting using document.execCommand()
+- Replace logging-only handlers with actual formatting functionality
 
 **Implementation Details:**
-- Use document.execCommand() API for bold, italic, underline formatting
-- Store HTML content from contenteditable div
-- Implement HTML-to-markdown conversion for canvas rendering
-- Handle paste operations to preserve HTML formatting
-- Support undo/redo within contenteditable context
-- Maintain cursor position and selection during formatting operations
+- Use document.execCommand('bold'), document.execCommand('italic'), document.execCommand('underline')
+- Handle button clicks to apply formatting to selected text or at cursor position
+- Maintain cursor position and text selection during formatting operations
+- Test formatting works correctly with contenteditable div
 
-##### 1.4.7 Add ContentEditable Accessibility
+##### 1.4.7 Store HTML Content in Notes
+- Modify note storage to handle HTML content instead of plain text
+- Update text input handling to store HTML from contenteditable
+
+**Implementation Details:**
+- Store HTML content directly in StickyNote.content field
+- Update input event handler to preserve HTML formatting
+- Handle conversion between HTML and plain text for backward compatibility
+- Ensure existing plain text notes continue to work
+
+##### 1.4.8 Implement HTML-to-Markdown Conversion
+- Create HTML parsing function to convert HTML to markdown for canvas rendering
+- Update parse_formatted_text() to handle HTML tags instead of markdown
+
+**Implementation Details:**
+- Parse <b>, <i>, <u> tags and convert to markdown equivalents
+- Handle nested formatting and overlapping tags
+- Update canvas rendering to use HTML-based parsing
+- Maintain backward compatibility with existing markdown parsing
+
+##### 1.4.9 Handle Rich Text Paste Operations
+- Implement paste event handling to preserve HTML formatting
+- Clean and sanitize pasted content
+
+**Implementation Details:**
+- Add paste event listener to contenteditable div
+- Preserve HTML formatting from clipboard
+- Strip unwanted elements (scripts, styles) for security
+- Handle plain text paste operations
+
+##### 1.4.10 Add ContentEditable Undo/Redo Support
+- Implement undo/redo functionality within contenteditable context
+- Handle browser's native undo/redo behavior
+
+**Implementation Details:**
+- Support Ctrl+Z/Ctrl+Y keyboard shortcuts
+- Handle undo/redo state management
+- Preserve formatting during undo/redo operations
+- Integrate with browser's native contenteditable undo/redo
+
+##### 1.4.11 Add ContentEditable Accessibility
 - Ensure contenteditable div is accessible to screen readers
 - Add proper ARIA labels and keyboard navigation
 - Handle focus management between canvas and editing mode
@@ -172,12 +209,14 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Add visual focus indicators that match application design
 - Test with screen readers and accessibility tools
 
-##### 1.4.8 Add Keyboard Shortcuts for Formatting
+##### 1.4.12 Add Keyboard Shortcuts for Formatting
 - Implement keyboard shortcuts for text formatting
 - Support common shortcuts (Ctrl+B, Ctrl+I, Ctrl+U)
 
 **Implementation Details:**
 - Add keyboard event handling for formatting shortcuts
+- Integrate with toolbar button functionality
+- Handle shortcuts within contenteditable context
 - Integrate with contenteditable div
 - Provide visual feedback for active formatting
 - Document available shortcuts
