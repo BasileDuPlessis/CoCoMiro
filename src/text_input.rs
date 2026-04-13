@@ -167,7 +167,10 @@ fn add_formatting_handler(
 
             // For now, just log the formatting action
             // TODO: Implement actual text formatting logic for contenteditable
-            crate::log_info(&format!("Applying {} formatting to contenteditable", format_type));
+            crate::log_info(&format!(
+                "Applying {} formatting to contenteditable",
+                format_type
+            ));
 
             // Focus the contenteditable to keep it active
             let _ = contenteditable.focus();
@@ -322,8 +325,8 @@ pub fn create_text_input_overlay(
     let _ = contenteditable
         .style()
         .set_property("font-family", "Inter, sans-serif");
-    let _ = contenteditable.style().set_property("border", "2px solid #2563eb");
-    let _ = contenteditable.style().set_property("border-radius", "4px");
+    let _ = contenteditable.style().set_property("border", "none");
+    let _ = contenteditable.style().set_property("border-radius", "0px");
     let _ = contenteditable.style().set_property("padding", "8px");
     let _ = contenteditable
         .style()
@@ -332,10 +335,16 @@ pub fn create_text_input_overlay(
     let _ = contenteditable.style().set_property("outline", "none");
     let _ = contenteditable.style().set_property("z-index", "1000");
     let _ = contenteditable.style().set_property("text-align", "left");
-    let _ = contenteditable.style().set_property("box-sizing", "border-box");
+    let _ = contenteditable
+        .style()
+        .set_property("box-sizing", "border-box");
     let _ = contenteditable.style().set_property("overflow", "hidden");
-    let _ = contenteditable.style().set_property("white-space", "pre-wrap");
-    let _ = contenteditable.style().set_property("word-wrap", "break-word");
+    let _ = contenteditable
+        .style()
+        .set_property("white-space", "pre-wrap");
+    let _ = contenteditable
+        .style()
+        .set_property("word-wrap", "break-word");
     let _ = contenteditable.style().set_property("line-height", "1.2");
 
     // Set initial content and focus

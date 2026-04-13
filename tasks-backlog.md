@@ -95,16 +95,15 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Handle button clicks to apply formatting
 
 ##### 1.4.2 Implement Rich Text Storage ✅ COMPLETED
-- Extend note data structure to store formatting information
-- Support basic formatting metadata (bold, italic, underline ranges)
+- Extend note data structure to store HTML formatting
+- Support HTML content in note text field
 - Maintain backward compatibility with plain text
 
 **Implementation Details:**
-- Add `TextFormat` struct to represent formatting spans with start/end positions and style flags
-- Add `formatting: Vec<TextFormat>` field to `StickyNote` struct
-- Initialize formatting as empty vector in `StickyNote::new()` for backward compatibility
-- Plain text notes have empty formatting vector, rich text notes have populated formatting spans
-- Update module documentation to describe rich text architecture
+- Store HTML content directly in `StickyNote.content` field
+- Plain text notes remain as plain text, rich text notes contain HTML
+- HTML content gets converted to markdown for canvas rendering
+- Update module documentation to describe HTML-based rich text architecture
 
 ##### 1.4.3 Implement Rich Text Rendering ✅ COMPLETED
 - Render formatted text on canvas with appropriate styles
@@ -112,9 +111,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Handle overlapping formatting ranges
 
 **Implementation Details:**
-- Extended canvas text rendering for rich text with markdown parsing
+- Extended canvas text rendering for rich text with HTML parsing
 - Added `TextSegment` struct to represent formatted text segments
-- Implemented `parse_formatted_text()` to parse **bold**, *italic*, __underline__ markdown
+- Implemented `parse_formatted_text()` to parse HTML tags (<b>, <i>, <u>)
 - Added `format_font()` to create CSS font strings with appropriate styles
 - Modified rendering to handle text wrapping while preserving formatting
 - Underline implemented with canvas stroke operations
@@ -133,9 +132,10 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Maintained existing toolbar integration and formatting functionality
 - Added proper HTML content handling (innerHTML with <br> tags for line breaks)
 - Implemented toolbar click prevention to avoid premature overlay removal
+- Removed border and border-radius for perfect visual blending with rendered note
 - Simplified formatting buttons to maintain focus (full formatting implementation deferred)
 
-##### 1.4.5 Update ContentEditable Event Handling
+##### 1.4.5 Update ContentEditable Event Handling ✅ COMPLETED
 - Adapt event handlers for contenteditable div behavior
 - Handle input, blur, and keyboard events appropriately
 - Prevent canvas interactions during editing
@@ -147,17 +147,18 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Maintain keyboard shortcuts and navigation
 - Prevent event propagation to canvas during editing
 
-##### 1.4.6 Integrate Rich Text with ContentEditable
-- Ensure markdown formatting works with contenteditable div
-- Handle paste operations and text formatting
-- Maintain cursor position and selection during formatting
+##### 1.4.6 Implement HTML-Based Rich Text Editing
+- Replace markdown formatting with proper HTML-based rich text editing
+- Make toolbar buttons apply real formatting instead of markdown syntax
+- Convert HTML content to markdown for canvas rendering
 
 **Implementation Details:**
-- Adapt formatting button handlers for contenteditable selection
-- Implement paste event handling to preserve formatting
-- Handle cursor positioning after formatting operations
+- Use document.execCommand() API for bold, italic, underline formatting
+- Store HTML content from contenteditable div
+- Implement HTML-to-markdown conversion for canvas rendering
+- Handle paste operations to preserve HTML formatting
 - Support undo/redo within contenteditable context
-- Maintain markdown syntax conversion for canvas rendering
+- Maintain cursor position and selection during formatting operations
 
 ##### 1.4.7 Add ContentEditable Accessibility
 - Ensure contenteditable div is accessible to screen readers

@@ -684,8 +684,8 @@ mod integration_tests {
         // Convert world position to screen coordinates for mouse interaction
         let center_x = 800.0 / 2.0;
         let center_y = 600.0 / 2.0;
-        let screen_note_x = 100.0 * app_state.viewport.zoom + center_x + app_state.viewport.pan_x;
-        let screen_note_y = 100.0 * app_state.viewport.zoom + center_y + app_state.viewport.pan_y;
+        let _screen_note_x = 100.0 * app_state.viewport.zoom + center_x + app_state.viewport.pan_x;
+        let _screen_note_y = 100.0 * app_state.viewport.zoom + center_y + app_state.viewport.pan_y;
 
         // Start drag at the note's screen position
         app_state.sticky_notes.start_drag(note_id, 100.0, 100.0); // World coordinates
