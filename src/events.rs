@@ -114,16 +114,18 @@ pub fn end_toolbar_drag_if_needed(
 ///
 /// This function creates an HTML input element that overlays the specified sticky note,
 /// allowing the user to edit the note's text content. The input is styled to match the
-/// note's appearance and positioned exactly over it.
+/// note's appearance and includes event handling for text input.
 ///
 /// # Arguments
 /// * `canvas` - The canvas element for coordinate calculations
 /// * `state` - Reference to application state containing the note
 /// * `note_id` - ID of the note to create input overlay for
+/// * `render` - Closure to trigger canvas re-rendering when content changes
 fn create_text_input_overlay(
     canvas: &HtmlCanvasElement,
     state: &Rc<RefCell<crate::AppState>>,
     note_id: u32,
+    render: &Rc<dyn Fn()>,
 ) {
     let browser_window = match window() {
         Some(w) => w,
@@ -181,50 +183,79 @@ fn create_text_input_overlay(
         .unwrap();
 
     // Calculate document-relative position for the overlay
+    // Position textarea to align with canvas text (which starts 8px from top)
     let overlay_left = canvas_left + screen_x;
     let overlay_top = canvas_top + screen_y;
 
-    // Create input element
-    let input = match document.create_element("input") {
+    // Create textarea element for multiline text editing
+    let textarea = match document.create_element("textarea") {
         Ok(el) => el,
         Err(_) => {
-            crate::log_warn("Cannot create text input element");
+            crate::log_warn("Cannot create text textarea element");
             return;
         }
     };
 
-    let input: web_sys::HtmlInputElement = match input.dyn_into() {
-        Ok(inp) => inp,
+    let textarea: web_sys::HtmlTextAreaElement = match textarea.dyn_into() {
+        Ok(ta) => ta,
         Err(_) => {
-            crate::log_warn("Cannot convert element to input");
+            crate::log_warn("Cannot convert element to textarea");
             return;
         }
     };
 
-    // Style the input to match the note
-    let _ = input.style().set_property("position", "absolute");
-    let _ = input.style().set_property("left", &format!("{}px", overlay_left));
-    let _ = input.style().set_property("top", &format!("{}px", overlay_top));
-    let _ = input.style().set_property("width", &format!("{}px", screen_width));
-    let _ = input.style().set_property("height", &format!("{}px", screen_height));
-    let _ = input.style().set_property("font-size", "14px");
-    let _ = input.style().set_property("font-family", "Inter, sans-serif");
-    let _ = input.style().set_property("border", "2px solid #2563eb");
-    let _ = input.style().set_property("border-radius", "4px");
-    let _ = input.style().set_property("padding", "8px");
-    let _ = input.style().set_property("background-color", &note.color);
-    let _ = input.style().set_property("color", "#000000");
-    let _ = input.style().set_property("outline", "none");
-    let _ = input.style().set_property("z-index", "1000");
+    // Style the textarea to match the note
+    let _ = textarea.style().set_property("position", "absolute");
+    let _ = textarea.style().set_property("left", &format!("{}px", overlay_left));
+    let _ = textarea.style().set_property("top", &format!("{}px", overlay_top));
+    let _ = textarea.style().set_property("width", &format!("{}px", screen_width));
+    let _ = textarea.style().set_property("height", &format!("{}px", screen_height));
+    let _ = textarea.style().set_property("font-size", "14px");
+    let _ = textarea.style().set_property("font-family", "Inter, sans-serif");
+    let _ = textarea.style().set_property("border", "2px solid #2563eb");
+    let _ = textarea.style().set_property("border-radius", "4px");
+    let _ = textarea.style().set_property("padding", "8px");
+    let _ = textarea.style().set_property("background-color", &note.color);
+    let _ = textarea.style().set_property("color", "#000000");
+    let _ = textarea.style().set_property("outline", "none");
+    let _ = textarea.style().set_property("z-index", "1000");
+    let _ = textarea.style().set_property("text-align", "left");
+    let _ = textarea.style().set_property("box-sizing", "border-box");
+    let _ = textarea.style().set_property("resize", "none");
+    let _ = textarea.style().set_property("overflow", "hidden");
 
     // Set initial value and focus
-    input.set_value(&note.content);
-    let _ = input.focus();
-    let _ = input.select();
+    textarea.set_value(&note.content);
+    let _ = textarea.focus();
+    let _ = textarea.select();
+
+    // Attach input event listener to handle text changes
+    let on_input = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new({
+        let state = state.clone();
+        let render = render.clone();
+        let note_id = note_id;
+        let textarea = textarea.clone();
+        move |event: web_sys::Event| {
+            event.stop_propagation();
+            
+            // Update the note content with the current textarea value
+            if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
+                note.content = textarea.value();
+            }
+            
+            // Re-render the canvas to show the updated text
+            render();
+        }
+    }));
+    textarea.add_event_listener_with_callback("input", on_input.as_ref().unchecked_ref())
+        .unwrap_or_else(|_| {
+            crate::log_warn("Failed to attach input event listener");
+        });
+    on_input.forget();
 
     // Add to document
     if let Some(body) = document.body() {
-        let _ = body.append_child(&input);
+        let _ = body.append_child(&textarea);
     }
 
     crate::log_info(&format!("Created text input overlay for note {}", note_id));
@@ -782,6 +813,7 @@ pub fn setup_event_listeners(
     let on_double_click = Closure::<dyn FnMut(MouseEvent)>::wrap(Box::new({
         let state = state.clone();
         let canvas = canvas.clone();
+        let render = render.clone();
         move |event: MouseEvent| {
             event.prevent_default();
 
@@ -811,7 +843,7 @@ pub fn setup_event_listeners(
                 ));
 
                 // Create text input overlay for the selected note
-                create_text_input_overlay(&canvas, &state, note_id);
+                create_text_input_overlay(&canvas, &state, note_id, &render);
             } else {
                 crate::log_info(&format!(
                     "Double-click detected on canvas at world position ({:.1}, {:.1}) - no note selected",
