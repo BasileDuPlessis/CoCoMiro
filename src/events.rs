@@ -253,6 +253,77 @@ fn create_text_input_overlay(
         });
     on_input.forget();
 
+    // Store original content for potential cancellation
+    let original_content = note.content.clone();
+
+    // Attach keydown event listener for Enter/Escape handling
+    let on_keydown = Closure::<dyn FnMut(KeyboardEvent)>::wrap(Box::new({
+        let state = state.clone();
+        let render = render.clone();
+        let note_id = note_id;
+        let textarea = textarea.clone();
+        let document = document.clone();
+        let original_content = original_content.clone();
+        move |event: KeyboardEvent| {
+            event.stop_propagation();
+            
+            match event.key().as_str() {
+                "Enter" => {
+                    // Confirm changes - content already updated via input handler
+                    crate::log_info(&format!("Text editing confirmed for note {}", note_id));
+                    
+                    // Remove the textarea overlay
+                    if let Some(body) = document.body() {
+                        let _ = body.remove_child(&textarea);
+                    }
+                }
+                "Escape" => {
+                    // Cancel editing - restore original content
+                    if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
+                        note.content = original_content.clone();
+                    }
+                    crate::log_info(&format!("Text editing cancelled for note {}", note_id));
+                    
+                    // Remove the textarea overlay
+                    if let Some(body) = document.body() {
+                        let _ = body.remove_child(&textarea);
+                    }
+                    
+                    // Re-render to show restored content
+                    render();
+                }
+                _ => {
+                    // Allow other keys to be handled normally
+                }
+            }
+        }
+    }));
+    textarea.add_event_listener_with_callback("keydown", on_keydown.as_ref().unchecked_ref())
+        .unwrap_or_else(|_| {
+            crate::log_warn("Failed to attach keydown event listener");
+        });
+    on_keydown.forget();
+
+    // Attach blur event listener for clicking outside
+    let on_blur = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new({
+        let document = document.clone();
+        let textarea = textarea.clone();
+        move |_event: web_sys::Event| {
+            // Confirm changes when focus is lost
+            crate::log_info(&format!("Text editing confirmed (blur) for note {}", note_id));
+            
+            // Remove the textarea overlay
+            if let Some(body) = document.body() {
+                let _ = body.remove_child(&textarea);
+            }
+        }
+    }));
+    textarea.add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
+        .unwrap_or_else(|_| {
+            crate::log_warn("Failed to attach blur event listener");
+        });
+    on_blur.forget();
+
     // Add to document
     if let Some(body) = document.body() {
         let _ = body.append_child(&textarea);
