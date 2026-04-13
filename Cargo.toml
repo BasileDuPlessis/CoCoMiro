@@ -22,6 +22,7 @@ web-sys = { version = "0.3", features = [
     "KeyboardEvent",
     "MouseEvent",
     "Node",
+    "Performance",
     "WheelEvent",
     "Window",
     "console",

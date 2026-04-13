@@ -30,6 +30,78 @@
 use crate::toolbar::TOOLBAR_EDGE_PADDING;
 #[cfg(target_arch = "wasm32")]
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
+#[cfg(target_arch = "wasm32")]
+use std::cell::RefCell;
+
+#[cfg(target_arch = "wasm32")]
+/// Performance metrics for monitoring rendering performance
+#[derive(Debug, Clone)]
+struct PerformanceMetrics {
+    /// Timestamp of the last frame (in milliseconds)
+    last_frame_time: f64,
+    /// Current FPS calculation
+    fps: f64,
+    /// Last measured render time (in milliseconds)
+    last_render_time: f64,
+    /// Frame count for averaging
+    frame_count: u32,
+    /// Accumulated render times for averaging
+    render_time_accumulator: f64,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Default for PerformanceMetrics {
+    fn default() -> Self {
+        Self {
+            last_frame_time: 0.0,
+            fps: 0.0,
+            last_render_time: 0.0,
+            frame_count: 0,
+            render_time_accumulator: 0.0,
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl PerformanceMetrics {
+    /// Updates FPS calculation based on current timestamp
+    fn update_fps(&mut self, current_time: f64) {
+        if self.last_frame_time > 0.0 {
+            let delta_time = current_time - self.last_frame_time;
+            if delta_time > 0.0 {
+                self.fps = 1000.0 / delta_time;
+            }
+        }
+        self.last_frame_time = current_time;
+    }
+
+    /// Records render time and updates averages
+    fn record_render_time(&mut self, render_time: f64) {
+        self.last_render_time = render_time;
+        self.render_time_accumulator += render_time;
+        self.frame_count += 1;
+
+        // Reset accumulator every 60 frames to keep averages fresh
+        if self.frame_count >= 60 {
+            self.frame_count = 0;
+            self.render_time_accumulator = 0.0;
+        }
+    }
+
+    /// Gets the average render time over recent frames
+    fn average_render_time(&self) -> f64 {
+        if self.frame_count > 0 {
+            self.render_time_accumulator / self.frame_count as f64
+        } else {
+            self.last_render_time
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+    static PERFORMANCE_METRICS: RefCell<PerformanceMetrics> = RefCell::new(PerformanceMetrics::default());
+}
 
 #[cfg(target_arch = "wasm32")]
 /// Fallback viewport width when window dimensions are unavailable
@@ -158,6 +230,18 @@ pub fn render_canvas(
     status: &HtmlElement,
     state: &crate::AppState,
 ) -> crate::AppResult<()> {
+    // Start performance timing
+    let performance = window()
+        .and_then(|w| w.performance())
+        .ok_or_else(|| crate::AppError::BrowserEnv("performance API unavailable".to_string()))?;
+    let start_time = performance.now();
+
+    // Update FPS
+    PERFORMANCE_METRICS.with(|metrics| {
+        let mut metrics = metrics.borrow_mut();
+        metrics.update_fps(start_time);
+    });
+
     let (width, height) = canvas_css_size(canvas)?;
     let zoom = state.viewport.zoom;
     let grid_spacing = (GRID_BASE_SPACING * zoom).clamp(GRID_MIN_SPACING, GRID_MAX_SPACING);
@@ -256,9 +340,24 @@ pub fn render_canvas(
 
     canvas.style().set_property("cursor", cursor)?;
 
+    // Record render time
+    let end_time = performance.now();
+    let render_time = end_time - start_time;
+    PERFORMANCE_METRICS.with(|metrics| {
+        let mut metrics = metrics.borrow_mut();
+        metrics.record_render_time(render_time);
+    });
+
+    // Get performance metrics for display
+    let (fps, avg_render_time) = PERFORMANCE_METRICS.with(|metrics| {
+        let metrics = metrics.borrow();
+        (metrics.fps, metrics.average_render_time())
+    });
+
     status.set_text_content(Some(&format!(
-        "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {}",
-        state.viewport.pan_x, state.viewport.pan_y, state.viewport.zoom, STATUS_HELP_TEXT
+        "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {:.0} FPS · {:.1}ms · {} notes · {}",
+        state.viewport.pan_x, state.viewport.pan_y, state.viewport.zoom, 
+        fps, avg_render_time, state.sticky_notes.notes.len(), STATUS_HELP_TEXT
     )));
 
     Ok(())
