@@ -5,8 +5,9 @@
 //!
 //! ## Architecture
 //!
-//! The module consists of two main components:
-//! - `StickyNote`: Represents individual sticky notes with position, size, content, and appearance
+//! The module consists of three main components:
+//! - `TextFormat`: Represents formatting information for text ranges
+//! - `StickyNote`: Represents individual sticky notes with position, size, content, formatting, and appearance
 //! - `StickyNotesState`: Manages the collection of notes and handles selection/dragging state
 //!
 //! ## Coordinate System
@@ -24,15 +25,39 @@
 //! The module supports dragging notes with offset tracking to maintain smooth
 //! interaction. When a drag starts, the offset between the mouse cursor and note
 //! position is recorded, ensuring the note moves relative to the cursor.
+//!
+//! ## Rich Text Support
+//!
+//! Notes support rich text formatting through the `formatting` field, which contains
+//! a vector of `TextFormat` spans. Each span defines formatting (bold, italic, underline)
+//! for a character range in the content string. Empty formatting vector indicates plain text.
 
 use std::sync::atomic::{AtomicU32, Ordering};
+
+#[derive(Debug, Clone, PartialEq)]
+/// Represents formatting information for a range of text in a sticky note.
+///
+/// Each format span defines the start and end character positions in the content
+/// string and the formatting flags to apply (bold, italic, underline).
+pub struct TextFormat {
+    /// Start character position (inclusive) in the content string
+    pub start: usize,
+    /// End character position (exclusive) in the content string
+    pub end: usize,
+    /// Whether this range should be rendered in bold
+    pub bold: bool,
+    /// Whether this range should be rendered in italic
+    pub italic: bool,
+    /// Whether this range should be rendered with underline
+    pub underline: bool,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 /// Represents a single sticky note on the infinite canvas.
 ///
 /// Each sticky note has a unique ID, position in world coordinates,
-/// dimensions, text content, and background color. Notes are rendered
-/// as rectangles with text content and can be dragged around the canvas.
+/// dimensions, text content, formatting information, and background color.
+/// Notes are rendered as rectangles with text content and can be dragged around the canvas.
 pub struct StickyNote {
     /// Unique identifier for this note (auto-generated)
     pub id: u32,
@@ -46,6 +71,8 @@ pub struct StickyNote {
     pub height: f64,
     /// Text content displayed on the note
     pub content: String,
+    /// Rich text formatting spans applied to the content
+    pub formatting: Vec<TextFormat>,
     /// Background color as a hex string (e.g., "#ffff88")
     pub color: String,
 }
@@ -56,7 +83,7 @@ impl StickyNote {
     /// Creates a new sticky note at the specified world coordinates.
     ///
     /// The note is assigned a unique ID, default dimensions (200x150),
-    /// default content ("New note"), and default color (#ffff88).
+    /// default content ("New note"), no formatting, and default color (#ffff88).
     ///
     /// # Arguments
     /// * `x` - X-coordinate of the top-left corner in world space
@@ -72,6 +99,7 @@ impl StickyNote {
             width: 200.0,
             height: 150.0,
             content: "New note".to_string(),
+            formatting: Vec::new(),
             color: "#ffff88".to_string(),
         }
     }

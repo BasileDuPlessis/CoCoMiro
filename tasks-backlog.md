@@ -83,7 +83,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Add text formatting capabilities (bold, italic, etc.)
 - Implement rich text editing
 
-##### 1.4.1 Add Formatting Toolbar
+##### 1.4.1 Add Formatting Toolbar ✅ COMPLETED
 - Create a formatting toolbar with bold, italic, underline buttons
 - Position toolbar near text input overlay
 - Style toolbar to match application design
@@ -94,16 +94,17 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Include icons or text labels for each formatting option
 - Handle button clicks to apply formatting
 
-##### 1.4.2 Implement Rich Text Storage
+##### 1.4.2 Implement Rich Text Storage ✅ COMPLETED
 - Extend note data structure to store formatting information
 - Support basic formatting metadata (bold, italic, underline ranges)
 - Maintain backward compatibility with plain text
 
 **Implementation Details:**
-- Add formatting data structure to `StickyNote`
-- Store formatting as ranges with style attributes
-- Serialize/deserialize formatting data
-- Handle migration from plain text notes
+- Add `TextFormat` struct to represent formatting spans with start/end positions and style flags
+- Add `formatting: Vec<TextFormat>` field to `StickyNote` struct
+- Initialize formatting as empty vector in `StickyNote::new()` for backward compatibility
+- Plain text notes have empty formatting vector, rich text notes have populated formatting spans
+- Update module documentation to describe rich text architecture
 
 ##### 1.4.3 Implement Rich Text Rendering
 - Render formatted text on canvas with appropriate styles
