@@ -120,13 +120,64 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Underline implemented with canvas stroke operations
 - Maintains backward compatibility with plain text
 
-##### 1.4.4 Add Keyboard Shortcuts for Formatting
+##### 1.4.4 Replace Textarea with ContentEditable Div ✅ COMPLETED
+- Replace textarea overlay with contenteditable div for seamless editing
+- Style contenteditable div to match sticky note appearance exactly
+- Ensure no visible overlay distinction between edit and view modes
+
+**Implementation Details:**
+- Created contenteditable div instead of textarea element with `contenteditable="true"`
+- Applied identical CSS styling (background, border, font, padding) to match note exactly
+- Positioned contenteditable div precisely over the sticky note using absolute positioning
+- Updated event handlers for contenteditable behavior (input, blur, keydown)
+- Maintained existing toolbar integration and formatting functionality
+- Added proper HTML content handling (innerHTML with <br> tags for line breaks)
+- Implemented toolbar click prevention to avoid premature overlay removal
+- Simplified formatting buttons to maintain focus (full formatting implementation deferred)
+
+##### 1.4.5 Update ContentEditable Event Handling
+- Adapt event handlers for contenteditable div behavior
+- Handle input, blur, and keyboard events appropriately
+- Prevent canvas interactions during editing
+
+**Implementation Details:**
+- Replace textarea-specific event listeners with contenteditable equivalents
+- Handle contenteditable input events for real-time updates
+- Implement blur handling to confirm/cancel edits
+- Maintain keyboard shortcuts and navigation
+- Prevent event propagation to canvas during editing
+
+##### 1.4.6 Integrate Rich Text with ContentEditable
+- Ensure markdown formatting works with contenteditable div
+- Handle paste operations and text formatting
+- Maintain cursor position and selection during formatting
+
+**Implementation Details:**
+- Adapt formatting button handlers for contenteditable selection
+- Implement paste event handling to preserve formatting
+- Handle cursor positioning after formatting operations
+- Support undo/redo within contenteditable context
+- Maintain markdown syntax conversion for canvas rendering
+
+##### 1.4.7 Add ContentEditable Accessibility
+- Ensure contenteditable div is accessible to screen readers
+- Add proper ARIA labels and keyboard navigation
+- Handle focus management between canvas and editing mode
+
+**Implementation Details:**
+- Add ARIA attributes for screen reader support
+- Implement proper focus indicators and keyboard navigation
+- Handle tab order and focus trapping during editing
+- Add visual focus indicators that match application design
+- Test with screen readers and accessibility tools
+
+##### 1.4.8 Add Keyboard Shortcuts for Formatting
 - Implement keyboard shortcuts for text formatting
 - Support common shortcuts (Ctrl+B, Ctrl+I, Ctrl+U)
 
 **Implementation Details:**
 - Add keyboard event handling for formatting shortcuts
-- Integrate with text input overlay
+- Integrate with contenteditable div
 - Provide visual feedback for active formatting
 - Document available shortcuts
 

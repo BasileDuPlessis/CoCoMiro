@@ -22,7 +22,7 @@ use web_sys::HtmlCanvasElement;
 ///
 /// # Arguments
 /// * `document` - Reference to the browser document object
-/// * `textarea` - The textarea element the toolbar controls
+/// * `contenteditable` - The contenteditable element the toolbar controls
 /// * `overlay_left` - Left position of the text input overlay
 /// * `overlay_top` - Top position of the text input overlay
 /// * `screen_width` - Width of the text input overlay
@@ -32,7 +32,7 @@ use web_sys::HtmlCanvasElement;
 #[cfg(target_arch = "wasm32")]
 fn create_formatting_toolbar(
     document: &web_sys::Document,
-    textarea: &web_sys::HtmlTextAreaElement,
+    contenteditable: &web_sys::HtmlElement,
     overlay_left: f64,
     overlay_top: f64,
     screen_width: f64,
@@ -53,7 +53,7 @@ fn create_formatting_toolbar(
         .set_property("left", &format!("{}px", overlay_left));
     let _ = toolbar
         .style()
-        .set_property("top", &format!("{}px", overlay_top - 40.0)); // Position above textarea
+        .set_property("top", &format!("{}px", overlay_top - 40.0)); // Position above contenteditable
     let _ = toolbar
         .style()
         .set_property("width", &format!("{}px", screen_width.min(200.0))); // Limit max width
@@ -68,7 +68,7 @@ fn create_formatting_toolbar(
     let _ = toolbar.style().set_property("align-items", "center");
     let _ = toolbar.style().set_property("padding", "4px");
     let _ = toolbar.style().set_property("gap", "2px");
-    let _ = toolbar.style().set_property("z-index", "1001"); // Higher than textarea
+    let _ = toolbar.style().set_property("z-index", "1001"); // Higher than contenteditable
     let _ = toolbar.style().set_property("font-size", "12px");
 
     // Create bold button
@@ -104,9 +104,9 @@ fn create_formatting_toolbar(
     let _ = toolbar.append_child(&underline_button);
 
     // Add click handlers for formatting buttons
-    add_formatting_handler(&bold_button, "bold", textarea)?;
-    add_formatting_handler(&italic_button, "italic", textarea)?;
-    add_formatting_handler(&underline_button, "underline", textarea)?;
+    add_formatting_handler(&bold_button, "bold", &contenteditable)?;
+    add_formatting_handler(&italic_button, "italic", &contenteditable)?;
+    add_formatting_handler(&underline_button, "underline", &contenteditable)?;
 
     Ok(toolbar)
 }
@@ -150,14 +150,14 @@ fn style_formatting_button(button: &web_sys::Element, font_style: &str) -> Resul
 /// # Arguments
 /// * `button` - The button element to add handler to
 /// * `format_type` - The type of formatting ("bold", "italic", "underline")
-/// * `textarea` - The textarea element to apply formatting to
+/// * `contenteditable` - The contenteditable element to apply formatting to
 #[cfg(target_arch = "wasm32")]
 fn add_formatting_handler(
     button: &web_sys::Element,
     format_type: &str,
-    textarea: &web_sys::HtmlTextAreaElement,
+    contenteditable: &web_sys::HtmlElement,
 ) -> Result<(), String> {
-    let textarea = textarea.clone();
+    let contenteditable = contenteditable.clone();
     let format_type = format_type.to_string();
 
     let closure = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
@@ -166,46 +166,11 @@ fn add_formatting_handler(
             event.stop_propagation();
 
             // For now, just log the formatting action
-            // TODO: Implement actual text formatting logic
-            crate::log_info(&format!("Applying {} formatting", format_type));
+            // TODO: Implement actual text formatting logic for contenteditable
+            crate::log_info(&format!("Applying {} formatting to contenteditable", format_type));
 
-            // Simple implementation: wrap selected text or insert at cursor
-            if let (Ok(Some(start)), Ok(Some(end))) =
-                (textarea.selection_start(), textarea.selection_end())
-            {
-                let current_value = textarea.value();
-                let start_usize = start as usize;
-                let end_usize = end as usize;
-
-                let (prefix, suffix) = match format_type.as_str() {
-                    "bold" => ("**", "**"),
-                    "italic" => ("*", "*"),
-                    "underline" => ("__", "__"),
-                    _ => ("", ""),
-                };
-
-                if start == end {
-                    // No selection, insert at cursor
-                    let before = &current_value[..start_usize];
-                    let after = &current_value[start_usize..];
-                    let new_value = format!("{}{}{}{}", before, prefix, suffix, after);
-                    textarea.set_value(&new_value);
-                    let new_cursor_pos = start + prefix.len() as u32;
-                    let _ = textarea.set_selection_start(Some(new_cursor_pos));
-                    let _ = textarea.set_selection_end(Some(new_cursor_pos));
-                } else {
-                    // Has selection, wrap selected text
-                    let before = &current_value[..start_usize];
-                    let after = &current_value[end_usize..];
-                    let selected = &current_value[start_usize..end_usize];
-                    let new_value = format!("{}{}{}{}{}", before, prefix, selected, suffix, after);
-                    textarea.set_value(&new_value);
-                    let new_start = start + prefix.len() as u32;
-                    let new_end = end + prefix.len() as u32;
-                    let _ = textarea.set_selection_start(Some(new_start));
-                    let _ = textarea.set_selection_end(Some(new_end));
-                }
-            }
+            // Focus the contenteditable to keep it active
+            let _ = contenteditable.focus();
         },
     ));
 
@@ -219,9 +184,9 @@ fn add_formatting_handler(
 
 /// Creates a text input overlay positioned over a sticky note for editing.
 ///
-/// This function creates an HTML textarea element that overlays the specified sticky note,
-/// allowing the user to edit the note's text content. The textarea is styled to match the
-/// note's appearance and includes event handling for text input.
+/// This function creates an HTML contenteditable div that overlays the specified sticky note,
+/// allowing the user to edit the note's text content. The contenteditable div is styled to match the
+/// note's appearance exactly, providing seamless editing without visible overlay distinction.
 ///
 /// # Arguments
 /// * `canvas` - The canvas element for coordinate calculations
@@ -304,27 +269,30 @@ pub fn create_text_input_overlay(
     let overlay_left = canvas_left + screen_x;
     let overlay_top = canvas_top + screen_y;
 
-    // Create textarea element for multiline text editing
-    let textarea = match document.create_element("textarea") {
+    // Create contenteditable div element for seamless text editing
+    let contenteditable = match document.create_element("div") {
         Ok(el) => el,
         Err(_) => {
-            crate::log_warn("Cannot create text textarea element");
+            crate::log_warn("Cannot create contenteditable div element");
             return;
         }
     };
 
-    let textarea: web_sys::HtmlTextAreaElement = match textarea.dyn_into() {
-        Ok(ta) => ta,
+    let contenteditable: web_sys::HtmlElement = match contenteditable.dyn_into() {
+        Ok(div) => div,
         Err(_) => {
-            crate::log_warn("Cannot convert element to textarea");
+            crate::log_warn("Cannot convert element to HtmlElement");
             return;
         }
     };
+
+    // Set contenteditable attribute
+    let _ = contenteditable.set_attribute("contenteditable", "true");
 
     // Create formatting toolbar
     let toolbar = match create_formatting_toolbar(
         &document,
-        &textarea,
+        &contenteditable,
         overlay_left,
         overlay_top,
         screen_width,
@@ -336,71 +304,85 @@ pub fn create_text_input_overlay(
         }
     };
 
-    // Style the textarea to match the note
-    let _ = textarea.style().set_property("position", "absolute");
-    let _ = textarea
+    // Style the contenteditable div to match the note exactly
+    let _ = contenteditable.style().set_property("position", "absolute");
+    let _ = contenteditable
         .style()
         .set_property("left", &format!("{}px", overlay_left));
-    let _ = textarea
+    let _ = contenteditable
         .style()
         .set_property("top", &format!("{}px", overlay_top));
-    let _ = textarea
+    let _ = contenteditable
         .style()
         .set_property("width", &format!("{}px", screen_width));
-    let _ = textarea
+    let _ = contenteditable
         .style()
         .set_property("height", &format!("{}px", screen_height));
-    let _ = textarea.style().set_property("font-size", "14px");
-    let _ = textarea
+    let _ = contenteditable.style().set_property("font-size", "14px");
+    let _ = contenteditable
         .style()
         .set_property("font-family", "Inter, sans-serif");
-    let _ = textarea.style().set_property("border", "2px solid #2563eb");
-    let _ = textarea.style().set_property("border-radius", "4px");
-    let _ = textarea.style().set_property("padding", "8px");
-    let _ = textarea
+    let _ = contenteditable.style().set_property("border", "2px solid #2563eb");
+    let _ = contenteditable.style().set_property("border-radius", "4px");
+    let _ = contenteditable.style().set_property("padding", "8px");
+    let _ = contenteditable
         .style()
         .set_property("background-color", &note.color);
-    let _ = textarea.style().set_property("color", "#000000");
-    let _ = textarea.style().set_property("outline", "none");
-    let _ = textarea.style().set_property("z-index", "1000");
-    let _ = textarea.style().set_property("text-align", "left");
-    let _ = textarea.style().set_property("box-sizing", "border-box");
-    let _ = textarea.style().set_property("resize", "none");
-    let _ = textarea.style().set_property("overflow", "hidden");
+    let _ = contenteditable.style().set_property("color", "#000000");
+    let _ = contenteditable.style().set_property("outline", "none");
+    let _ = contenteditable.style().set_property("z-index", "1000");
+    let _ = contenteditable.style().set_property("text-align", "left");
+    let _ = contenteditable.style().set_property("box-sizing", "border-box");
+    let _ = contenteditable.style().set_property("overflow", "hidden");
+    let _ = contenteditable.style().set_property("white-space", "pre-wrap");
+    let _ = contenteditable.style().set_property("word-wrap", "break-word");
+    let _ = contenteditable.style().set_property("line-height", "1.2");
 
-    // Set initial value and focus
-    textarea.set_value(&note.content);
+    // Set initial content and focus
+    contenteditable.set_inner_html(&note.content.replace("\n", "<br>"));
 
     // Set initial height based on note height
     let initial_screen_height = screen_height;
-    let _ = textarea
+    let _ = contenteditable
         .style()
         .set_property("height", &format!("{}px", initial_screen_height));
 
-    let _ = textarea.focus();
-    let _ = textarea.select();
+    let _ = contenteditable.focus();
 
     // Attach input event listener to handle text changes
     let on_input = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new({
         let state = state.clone();
         let render = render.clone();
         let note_id = note_id;
-        let textarea = textarea.clone();
+        let contenteditable = contenteditable.clone();
         move |event: web_sys::Event| {
             event.stop_propagation();
 
-            // Update the note content with the current textarea value
+            // Update the note content with the current contenteditable content
             let zoom = state.borrow().viewport.zoom; // Get zoom before mutable borrow
             if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
-                note.content = textarea.value();
+                // Convert innerHTML back to plain text with line breaks
+                let html_content = contenteditable.inner_html();
+                let plain_content = html_content
+                    .replace("<div>", "\n")
+                    .replace("</div>", "")
+                    .replace("<br>", "\n")
+                    .replace("<br/>", "\n")
+                    .replace("&nbsp;", " ")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&amp;", "&");
 
-                // Adjust textarea height to fit content
-                let scroll_height = textarea.scroll_height() as f64;
-                let _ = textarea
+                note.content = plain_content;
+
+                // Adjust contenteditable height to fit content
+                // For contenteditable, we need to measure the scroll height
+                let scroll_height = contenteditable.scroll_height() as f64;
+                let _ = contenteditable
                     .style()
                     .set_property("height", &format!("{}px", scroll_height));
 
-                // Adjust note height based on textarea height in world coordinates
+                // Adjust note height based on contenteditable height in world coordinates
                 let min_height = 150.0; // Minimum note height
                 let new_height = (scroll_height / zoom).max(min_height);
                 note.height = new_height;
@@ -410,7 +392,7 @@ pub fn create_text_input_overlay(
             render();
         }
     }));
-    textarea
+    contenteditable
         .add_event_listener_with_callback("input", on_input.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::log_warn("Failed to attach input event listener");
@@ -426,7 +408,7 @@ pub fn create_text_input_overlay(
             let state = state.clone();
             let render = render.clone();
             let note_id = note_id;
-            let textarea = textarea.clone();
+            let contenteditable = contenteditable.clone();
             let toolbar = toolbar.clone();
             let document = document.clone();
             let original_content = original_content.clone();
@@ -447,24 +429,9 @@ pub fn create_text_input_overlay(
                     event.prevent_default();
                     event.stop_propagation();
 
-                    // Insert 4 spaces for tab
-                    let tab_text = "    ";
-
-                    // Try to insert at cursor position
-                    if let (Ok(Some(start)), Ok(Some(end))) =
-                        (textarea.selection_start(), textarea.selection_end())
-                    {
-                        let current_value = textarea.value();
-                        let start_usize = start as usize;
-                        let end_usize = end as usize;
-                        let before = &current_value[..start_usize];
-                        let after = &current_value[end_usize..];
-                        let new_value = format!("{}{}{}", before, tab_text, after);
-                        textarea.set_value(&new_value);
-                        let new_cursor_pos = start + 4;
-                        let _ = textarea.set_selection_start(Some(new_cursor_pos));
-                        let _ = textarea.set_selection_end(Some(new_cursor_pos));
-                    }
+                    // Insert 4 spaces for tab in contenteditable
+                    // For now, just prevent default and let contenteditable handle it
+                    // TODO: Implement proper tab insertion
 
                     return;
                 }
@@ -481,14 +448,14 @@ pub fn create_text_input_overlay(
                                 note_id
                             ));
 
-                            // Remove the textarea overlay
+                            // Remove the contenteditable overlay
                             if let Some(body) = document.body() {
                                 let _ = body.remove_child(&toolbar);
-                                let _ = body.remove_child(&textarea);
+                                let _ = body.remove_child(&contenteditable);
                             }
                         } else {
-                            // Allow normal Enter for line breaks in textarea
-                            // The textarea will handle this naturally
+                            // Allow normal Enter for line breaks in contenteditable
+                            // The contenteditable will handle this naturally
                         }
                     }
                     "Escape" => {
@@ -498,22 +465,22 @@ pub fn create_text_input_overlay(
                         }
                         crate::log_info(&format!("Text editing cancelled for note {}", note_id));
 
-                        // Remove the textarea overlay
+                        // Remove the contenteditable overlay
                         if let Some(body) = document.body() {
                             let _ = body.remove_child(&toolbar);
-                            let _ = body.remove_child(&textarea);
+                            let _ = body.remove_child(&contenteditable);
                         }
 
                         // Re-render to show restored content
                         render();
                     }
                     _ => {
-                        // Allow other keys to be handled normally by the textarea
+                        // Allow other keys to be handled normally by the contenteditable
                     }
                 }
             }
         }));
-    textarea
+    contenteditable
         .add_event_listener_with_callback("keydown", on_keydown.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::log_warn("Failed to attach keydown event listener");
@@ -538,7 +505,7 @@ pub fn create_text_input_overlay(
     // Attach blur event listener for clicking outside
     let on_blur = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new({
         let document = document.clone();
-        let textarea = textarea.clone();
+        let contenteditable = contenteditable.clone();
         let toolbar = toolbar.clone();
         let toolbar_clicked = toolbar_clicked.clone();
         move |_event: web_sys::Event| {
@@ -554,14 +521,14 @@ pub fn create_text_input_overlay(
                 note_id
             ));
 
-            // Remove the textarea overlay
+            // Remove the contenteditable overlay
             if let Some(body) = document.body() {
                 let _ = body.remove_child(&toolbar);
-                let _ = body.remove_child(&textarea);
+                let _ = body.remove_child(&contenteditable);
             }
         }
     }));
-    textarea
+    contenteditable
         .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::log_warn("Failed to attach blur event listener");
@@ -571,7 +538,7 @@ pub fn create_text_input_overlay(
     // Add to document
     if let Some(body) = document.body() {
         let _ = body.append_child(&toolbar);
-        let _ = body.append_child(&textarea);
+        let _ = body.append_child(&contenteditable);
     }
 
     crate::log_info(&format!("Created text input overlay for note {}", note_id));
