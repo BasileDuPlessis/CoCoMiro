@@ -5,9 +5,9 @@
 //! positioned HTML input elements that overlay sticky notes for text editing.
 
 #[cfg(target_arch = "wasm32")]
-use std::{cell::RefCell, rc::Rc};
-#[cfg(target_arch = "wasm32")]
 use js_sys;
+#[cfg(target_arch = "wasm32")]
+use std::{cell::RefCell, rc::Rc};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
@@ -48,10 +48,19 @@ pub fn create_text_input_overlay(
     };
 
     // Get note details
-    let note = match state.borrow().sticky_notes.notes.iter().find(|n| n.id == note_id) {
+    let note = match state
+        .borrow()
+        .sticky_notes
+        .notes
+        .iter()
+        .find(|n| n.id == note_id)
+    {
         Some(n) => n.clone(),
         None => {
-            crate::log_warn(&format!("Cannot create input overlay for note {}: note not found", note_id));
+            crate::log_warn(&format!(
+                "Cannot create input overlay for note {}: note not found",
+                note_id
+            ));
             return;
         }
     };
@@ -110,16 +119,28 @@ pub fn create_text_input_overlay(
 
     // Style the textarea to match the note
     let _ = textarea.style().set_property("position", "absolute");
-    let _ = textarea.style().set_property("left", &format!("{}px", overlay_left));
-    let _ = textarea.style().set_property("top", &format!("{}px", overlay_top));
-    let _ = textarea.style().set_property("width", &format!("{}px", screen_width));
-    let _ = textarea.style().set_property("height", &format!("{}px", screen_height));
+    let _ = textarea
+        .style()
+        .set_property("left", &format!("{}px", overlay_left));
+    let _ = textarea
+        .style()
+        .set_property("top", &format!("{}px", overlay_top));
+    let _ = textarea
+        .style()
+        .set_property("width", &format!("{}px", screen_width));
+    let _ = textarea
+        .style()
+        .set_property("height", &format!("{}px", screen_height));
     let _ = textarea.style().set_property("font-size", "14px");
-    let _ = textarea.style().set_property("font-family", "Inter, sans-serif");
+    let _ = textarea
+        .style()
+        .set_property("font-family", "Inter, sans-serif");
     let _ = textarea.style().set_property("border", "2px solid #2563eb");
     let _ = textarea.style().set_property("border-radius", "4px");
     let _ = textarea.style().set_property("padding", "8px");
-    let _ = textarea.style().set_property("background-color", &note.color);
+    let _ = textarea
+        .style()
+        .set_property("background-color", &note.color);
     let _ = textarea.style().set_property("color", "#000000");
     let _ = textarea.style().set_property("outline", "none");
     let _ = textarea.style().set_property("z-index", "1000");
@@ -130,6 +151,11 @@ pub fn create_text_input_overlay(
 
     // Set initial value and focus
     textarea.set_value(&note.content);
+
+    // Set initial height based on note height
+    let initial_screen_height = screen_height;
+    let _ = textarea.style().set_property("height", &format!("{}px", initial_screen_height));
+
     let _ = textarea.focus();
     let _ = textarea.select();
 
@@ -143,15 +169,26 @@ pub fn create_text_input_overlay(
             event.stop_propagation();
 
             // Update the note content with the current textarea value
+            let zoom = state.borrow().viewport.zoom; // Get zoom before mutable borrow
             if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
                 note.content = textarea.value();
+
+                // Adjust textarea height to fit content
+                let scroll_height = textarea.scroll_height() as f64;
+                let _ = textarea.style().set_property("height", &format!("{}px", scroll_height));
+
+                // Adjust note height based on textarea height in world coordinates
+                let min_height = 150.0; // Minimum note height
+                let new_height = (scroll_height / zoom).max(min_height);
+                note.height = new_height;
             }
 
             // Re-render the canvas to show the updated text
             render();
         }
     }));
-    textarea.add_event_listener_with_callback("input", on_input.as_ref().unchecked_ref())
+    textarea
+        .add_event_listener_with_callback("input", on_input.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::log_warn("Failed to attach input event listener");
         });
@@ -161,48 +198,94 @@ pub fn create_text_input_overlay(
     let original_content = note.content.clone();
 
     // Attach keydown event listener for Enter/Escape handling
-    let on_keydown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::KeyboardEvent)>::wrap(Box::new({
-        let state = state.clone();
-        let render = render.clone();
-        let note_id = note_id;
-        let textarea = textarea.clone();
-        let document = document.clone();
-        let original_content = original_content.clone();
-        move |event: web_sys::KeyboardEvent| {
-            event.stop_propagation();
+    let on_keydown =
+        wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::KeyboardEvent)>::wrap(Box::new({
+            let state = state.clone();
+            let render = render.clone();
+            let note_id = note_id;
+            let textarea = textarea.clone();
+            let document = document.clone();
+            let original_content = original_content.clone();
+            move |event: web_sys::KeyboardEvent| {
+                // Check for modifier key combinations that should be allowed to propagate
+                let is_ctrl_or_cmd = event.ctrl_key() || event.meta_key();
+                let key_str = event.key();
+                let key = key_str.as_str();
 
-            match event.key().as_str() {
-                "Enter" => {
-                    // Confirm changes - content already updated via input handler
-                    crate::log_info(&format!("Text editing confirmed for note {}", note_id));
-
-                    // Remove the textarea overlay
-                    if let Some(body) = document.body() {
-                        let _ = body.remove_child(&textarea);
-                    }
+                // Allow common text editing shortcuts to work normally
+                if is_ctrl_or_cmd && matches!(key, "a" | "c" | "v" | "x" | "z" | "y") {
+                    // Don't stop propagation for these shortcuts - let the browser handle them
+                    return;
                 }
-                "Escape" => {
-                    // Cancel editing - restore original content
-                    if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
-                        note.content = original_content.clone();
-                    }
-                    crate::log_info(&format!("Text editing cancelled for note {}", note_id));
 
-                    // Remove the textarea overlay
-                    if let Some(body) = document.body() {
-                        let _ = body.remove_child(&textarea);
+                // Handle Tab key to insert spaces instead of navigating away
+                if key == "Tab" {
+                    event.prevent_default();
+                    event.stop_propagation();
+
+                    // Insert 4 spaces for tab
+                    let tab_text = "    ";
+
+                    // Try to insert at cursor position
+                    if let (Ok(Some(start)), Ok(Some(end))) =
+                        (textarea.selection_start(), textarea.selection_end())
+                    {
+                        let current_value = textarea.value();
+                        let start_usize = start as usize;
+                        let end_usize = end as usize;
+                        let before = &current_value[..start_usize];
+                        let after = &current_value[end_usize..];
+                        let new_value = format!("{}{}{}", before, tab_text, after);
+                        textarea.set_value(&new_value);
+                        let new_cursor_pos = start + 4;
+                        let _ = textarea.set_selection_start(Some(new_cursor_pos));
+                        let _ = textarea.set_selection_end(Some(new_cursor_pos));
                     }
 
-                    // Re-render to show restored content
-                    render();
+                    return;
                 }
-                _ => {
-                    // Allow other keys to be handled normally
+
+                event.stop_propagation();
+
+                match key {
+                    "Enter" => {
+                        // Check if Ctrl or Shift is held for confirmation
+                        if event.ctrl_key() || event.shift_key() {
+                            // Confirm changes - content already updated via input handler
+                            crate::log_info(&format!("Text editing confirmed for note {}", note_id));
+
+                            // Remove the textarea overlay
+                            if let Some(body) = document.body() {
+                                let _ = body.remove_child(&textarea);
+                            }
+                        } else {
+                            // Allow normal Enter for line breaks in textarea
+                            // The textarea will handle this naturally
+                        }
+                    }
+                    "Escape" => {
+                        // Cancel editing - restore original content
+                        if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
+                            note.content = original_content.clone();
+                        }
+                        crate::log_info(&format!("Text editing cancelled for note {}", note_id));
+
+                        // Remove the textarea overlay
+                        if let Some(body) = document.body() {
+                            let _ = body.remove_child(&textarea);
+                        }
+
+                        // Re-render to show restored content
+                        render();
+                    }
+                    _ => {
+                        // Allow other keys to be handled normally by the textarea
+                    }
                 }
             }
-        }
-    }));
-    textarea.add_event_listener_with_callback("keydown", on_keydown.as_ref().unchecked_ref())
+        }));
+    textarea
+        .add_event_listener_with_callback("keydown", on_keydown.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::log_warn("Failed to attach keydown event listener");
         });
@@ -214,7 +297,10 @@ pub fn create_text_input_overlay(
         let textarea = textarea.clone();
         move |_event: web_sys::Event| {
             // Confirm changes when focus is lost
-            crate::log_info(&format!("Text editing confirmed (blur) for note {}", note_id));
+            crate::log_info(&format!(
+                "Text editing confirmed (blur) for note {}",
+                note_id
+            ));
 
             // Remove the textarea overlay
             if let Some(body) = document.body() {
@@ -222,7 +308,8 @@ pub fn create_text_input_overlay(
             }
         }
     }));
-    textarea.add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
+    textarea
+        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::log_warn("Failed to attach blur event listener");
         });

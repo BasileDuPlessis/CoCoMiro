@@ -135,7 +135,9 @@ pub fn handle_mouse_move(
     state.borrow_mut().mouse_y = mouse_y;
 
     // Handle toolbar dragging first
-    let did_toolbar_move = toolbar_state.borrow_mut().drag_to(event.client_x() as f64, event.client_y() as f64);
+    let did_toolbar_move = toolbar_state
+        .borrow_mut()
+        .drag_to(event.client_x() as f64, event.client_y() as f64);
     if did_toolbar_move {
         position_toolbar();
         return Ok(());
@@ -320,12 +322,11 @@ pub fn handle_double_click(
     let viewport_width = f64::from(canvas.client_width().max(1));
     let viewport_height = f64::from(canvas.client_height().max(1));
 
-    let world_pos = state.borrow().viewport.world_point_at(
-        mouse_x,
-        mouse_y,
-        viewport_width,
-        viewport_height,
-    );
+    let world_pos =
+        state
+            .borrow()
+            .viewport
+            .world_point_at(mouse_x, mouse_y, viewport_width, viewport_height);
 
     // Check if double-click is on a sticky note
     if let Some(note_id) = state

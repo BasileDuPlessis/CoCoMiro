@@ -29,9 +29,9 @@
 #[cfg(target_arch = "wasm32")]
 use crate::toolbar::TOOLBAR_EDGE_PADDING;
 #[cfg(target_arch = "wasm32")]
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
-#[cfg(target_arch = "wasm32")]
 use std::cell::RefCell;
+#[cfg(target_arch = "wasm32")]
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
 
 #[cfg(target_arch = "wasm32")]
 /// Performance metrics for monitoring rendering performance
@@ -98,6 +98,58 @@ impl PerformanceMetrics {
     }
 }
 
+/// Wraps text to fit within a specified width using estimated character width.
+///
+/// This function splits text into lines that fit within the given pixel width,
+/// breaking at word boundaries when possible. Uses an estimated average character
+/// width for simplicity.
+///
+/// # Arguments
+/// * `text` - The text to wrap
+/// * `max_width` - Maximum width in pixels for each line
+/// * `font_size` - Font size in pixels (default 14)
+///
+/// # Returns
+/// A vector of strings, each representing a wrapped line
+#[cfg(target_arch = "wasm32")]
+fn wrap_text(text: &str, max_width: f64, font_size: f64) -> Vec<String> {
+    let mut lines = Vec::new();
+    let words: Vec<&str> = text.split_whitespace().collect();
+
+    if words.is_empty() {
+        return lines;
+    }
+
+    // Estimate average character width (rough approximation)
+    let avg_char_width = font_size * 0.6; // Approximate for most fonts
+    let max_chars_per_line = (max_width / avg_char_width) as usize;
+
+    let mut current_line = String::new();
+
+    for word in words {
+        let test_line = if current_line.is_empty() {
+            word.to_string()
+        } else {
+            format!("{} {}", current_line, word)
+        };
+
+        if test_line.len() <= max_chars_per_line {
+            current_line = test_line;
+        } else {
+            if !current_line.is_empty() {
+                lines.push(current_line);
+            }
+            current_line = word.to_string();
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines
+}
+
 #[cfg(target_arch = "wasm32")]
 thread_local! {
     static PERFORMANCE_METRICS: RefCell<PerformanceMetrics> = RefCell::new(PerformanceMetrics::default());
@@ -146,7 +198,8 @@ const STATUS_HELP_TEXT: &str = "Drag to pan, scroll to zoom, or use the arrow ke
 /// * `Ok((width, height))` - CSS dimensions for the canvas
 /// * `Err(AppError)` - Failed to access window or canvas properties
 pub fn canvas_css_size(canvas: &HtmlCanvasElement) -> crate::AppResult<(f64, f64)> {
-    let browser_window = window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let browser_window =
+        window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
     let viewport_width = browser_window
         .inner_width()
         .map_err(|_| crate::AppError::BrowserEnv("failed to get window inner width".to_string()))?
@@ -190,7 +243,8 @@ pub fn resize_canvas(
     canvas: &HtmlCanvasElement,
     ctx: &CanvasRenderingContext2d,
 ) -> crate::AppResult<()> {
-    let browser_window = window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let browser_window =
+        window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
     let (width, height) = canvas_css_size(canvas)?;
     // Keep CSS size stable while allocating a denser backing store for Retina/HiDPI displays.
     let device_pixel_ratio = browser_window.device_pixel_ratio().max(1.0);
@@ -292,7 +346,7 @@ pub fn render_canvas(
         ctx.set_line_width(2.0);
         ctx.stroke_rect(screen_x, screen_y, screen_width, screen_height);
 
-        // Draw note content text (placeholder for now)
+        // Draw note content text with wrapping
         if !note.content.is_empty() {
             ctx.set_fill_style_str("#000000");
             ctx.set_font("14px Inter, sans-serif");
@@ -301,13 +355,26 @@ pub fn render_canvas(
             // Add some padding
             let text_x = screen_x + 8.0;
             let text_y = screen_y + 8.0;
-            // Simple text rendering (no wrapping for now)
-            let mut y_offset = 0.0;
+            let max_text_width = screen_width - 16.0; // Account for padding
+
+            // Process text with line breaks and wrapping
+            let mut all_lines = Vec::new();
             for line in note.content.lines() {
-                if !line.is_empty() {
-                    ctx.fill_text(line, text_x, text_y + y_offset)?;
-                    y_offset += 18.0; // Line height
+                if line.is_empty() {
+                    all_lines.push(String::new());
+                } else {
+                    let wrapped_lines = wrap_text(line, max_text_width, 14.0);
+                    all_lines.extend(wrapped_lines);
                 }
+            }
+
+            // Render all lines
+            let mut y_offset = 0.0;
+            for line in all_lines {
+                if !line.is_empty() {
+                    ctx.fill_text(&line, text_x, text_y + y_offset)?;
+                }
+                y_offset += 18.0; // Line height
             }
         }
     }
@@ -356,8 +423,13 @@ pub fn render_canvas(
 
     status.set_text_content(Some(&format!(
         "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {:.0} FPS · {:.1}ms · {} notes · {}",
-        state.viewport.pan_x, state.viewport.pan_y, state.viewport.zoom, 
-        fps, avg_render_time, state.sticky_notes.notes.len(), STATUS_HELP_TEXT
+        state.viewport.pan_x,
+        state.viewport.pan_y,
+        state.viewport.zoom,
+        fps,
+        avg_render_time,
+        state.sticky_notes.notes.len(),
+        STATUS_HELP_TEXT
     )));
 
     Ok(())

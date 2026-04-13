@@ -59,7 +59,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Remove input element from DOM
 - Trigger canvas re-rendering
 
-#### 1.2 Advanced Text Editing
+#### 1.2 Advanced Text Editing ✅ COMPLETED
 - Implement text selection and cursor positioning
 - Add keyboard shortcuts for text editing
 
@@ -69,7 +69,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Handle arrow keys for cursor movement
 - Support text deletion and insertion at cursor
 
-#### 1.3 Multi-line Text Support
+#### 1.3 Multi-line Text Support ✅ COMPLETED
 - Support multi-line text with proper line breaks
 - Implement text wrapping for long lines
 
@@ -83,11 +83,48 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Add text formatting capabilities (bold, italic, etc.)
 - Implement rich text editing
 
+##### 1.4.1 Add Formatting Toolbar
+- Create a formatting toolbar with bold, italic, underline buttons
+- Position toolbar near text input overlay
+- Style toolbar to match application design
+
 **Implementation Details:**
-- Add formatting toolbar or keyboard shortcuts
-- Support basic formatting (bold, italic, underline)
-- Store formatting information with text content
-- Render formatted text appropriately
+- Add HTML toolbar element with formatting buttons
+- Position toolbar above or below text input area
+- Include icons or text labels for each formatting option
+- Handle button clicks to apply formatting
+
+##### 1.4.2 Implement Rich Text Storage
+- Extend note data structure to store formatting information
+- Support basic formatting metadata (bold, italic, underline ranges)
+- Maintain backward compatibility with plain text
+
+**Implementation Details:**
+- Add formatting data structure to `StickyNote`
+- Store formatting as ranges with style attributes
+- Serialize/deserialize formatting data
+- Handle migration from plain text notes
+
+##### 1.4.3 Implement Rich Text Rendering
+- Render formatted text on canvas with appropriate styles
+- Support bold, italic, underline rendering
+- Handle overlapping formatting ranges
+
+**Implementation Details:**
+- Extend canvas text rendering for rich text
+- Apply font weight, style, and decoration
+- Handle complex formatting combinations
+- Optimize rendering performance
+
+##### 1.4.4 Add Keyboard Shortcuts for Formatting
+- Implement keyboard shortcuts for text formatting
+- Support common shortcuts (Ctrl+B, Ctrl+I, Ctrl+U)
+
+**Implementation Details:**
+- Add keyboard event handling for formatting shortcuts
+- Integrate with text input overlay
+- Provide visual feedback for active formatting
+- Document available shortcuts
 
 #### 1.5 Text Rendering Improvements
 - Improve text rendering quality and font handling

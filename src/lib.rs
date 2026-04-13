@@ -151,7 +151,9 @@ thread_local! {
 /// * `context` - Descriptive context for where the error occurred
 /// * `error` - The error to log (can be AppError or JsValue)
 pub fn log_js_error(context: &str, error: &impl std::fmt::Display) {
-    web_sys::console::error_1(&JsValue::from_str(&format!("CoCoMiro [{context}]: {error}")));
+    web_sys::console::error_1(&JsValue::from_str(&format!(
+        "CoCoMiro [{context}]: {error}"
+    )));
 }
 
 /// Logs raw JavaScript values as errors.
@@ -164,7 +166,10 @@ pub fn log_js_error(context: &str, error: &impl std::fmt::Display) {
 /// * `error` - The JsValue error to log
 #[cfg(target_arch = "wasm32")]
 pub fn log_jsvalue_error(context: &str, error: &JsValue) {
-    web_sys::console::error_1(&JsValue::from_str(&format!("CoCoMiro [{context}]: {:?}", error)));
+    web_sys::console::error_1(&JsValue::from_str(&format!(
+        "CoCoMiro [{context}]: {:?}",
+        error
+    )));
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -178,7 +183,9 @@ pub fn log_jsvalue_error(context: &str, error: &JsValue) {
 /// * `operation` - Description of the operation that failed
 pub fn log_app_error(error: &AppError, operation: &str) {
     let recovery_hint = match error {
-        AppError::BrowserEnv(_) => "Try refreshing the page or checking your browser compatibility.",
+        AppError::BrowserEnv(_) => {
+            "Try refreshing the page or checking your browser compatibility."
+        }
         AppError::Canvas(_) => "Try resizing the window or refreshing the page.",
         AppError::Dom(_) => "The page may have been modified. Try refreshing.",
         AppError::Event(_) => "Interaction may be limited. Try refreshing the page.",
@@ -229,18 +236,22 @@ fn recover_canvas_context(
     _context: &CanvasRenderingContext2d,
 ) -> AppResult<CanvasRenderingContext2d> {
     log_warn("Attempting canvas context recovery...");
-    
+
     // Try to get a new 2D context
     let new_context = canvas
         .get_context("2d")
         .map_err(|_| AppError::Canvas("failed to get 2d context during recovery".to_string()))?
-        .ok_or_else(|| AppError::Canvas("could not access canvas context during recovery".to_string()))?
+        .ok_or_else(|| {
+            AppError::Canvas("could not access canvas context during recovery".to_string())
+        })?
         .dyn_into::<CanvasRenderingContext2d>()
-        .map_err(|_| AppError::Canvas("context is not a 2D rendering context during recovery".to_string()))?;
-    
+        .map_err(|_| {
+            AppError::Canvas("context is not a 2D rendering context during recovery".to_string())
+        })?;
+
     // Resize the canvas to ensure it's properly configured
     canvas::resize_canvas(canvas, &new_context)?;
-    
+
     log_info("Canvas context recovery successful");
     Ok(new_context)
 }
@@ -269,32 +280,30 @@ fn fallback_render(
 ) -> AppResult<()> {
     // Get canvas dimensions
     let (width, height) = canvas::canvas_css_size(canvas)?;
-    
+
     // Clear canvas with error color
     ctx.set_fill_style_str("#fee2e2"); // Light red background
     ctx.fill_rect(0.0, 0.0, width, height);
-    
+
     // Draw error message
     ctx.set_fill_style_str("#dc2626"); // Dark red text
     ctx.set_font("16px Inter, sans-serif");
     ctx.set_text_align("center");
     ctx.set_text_baseline("middle");
-    
+
     let error_msg = "Rendering Error - Please refresh the page";
     ctx.fill_text(error_msg, width / 2.0, height / 2.0)?;
-    
+
     // Update status with error information
-    status.set_text_content(Some(&format!(
-        "Error: {} · Refresh page to recover",
-        error
-    )));
-    
+    status.set_text_content(Some(&format!("Error: {} · Refresh page to recover", error)));
+
     Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
 fn start_impl() -> AppResult<()> {
-    let browser_window = window().ok_or_else(|| AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let browser_window =
+        window().ok_or_else(|| AppError::BrowserEnv("window is unavailable".to_string()))?;
     let document = browser_window
         .document()
         .ok_or_else(|| AppError::BrowserEnv("could not access the browser document".to_string()))?;
@@ -325,11 +334,11 @@ fn start_impl() -> AppResult<()> {
             }
 
             let snapshot = state.borrow().clone();
-            
+
             // Attempt rendering with retry logic
             let mut retry_count = 0;
             const MAX_RETRIES: u32 = 3;
-            
+
             while retry_count < MAX_RETRIES {
                 match canvas::render_canvas(&context, &canvas, &status, &snapshot) {
                     Ok(()) => break, // Success
@@ -337,35 +346,53 @@ fn start_impl() -> AppResult<()> {
                         retry_count += 1;
                         if retry_count >= MAX_RETRIES {
                             log_app_error(&error, "rendering canvas (final attempt failed)");
-                            
+
                             // Attempt canvas context recovery before fallback
                             match recover_canvas_context(&canvas, &context) {
                                 Ok(_new_context) => {
                                     log_info("Context recovery successful, retrying render");
                                     // Since we can't update the closure's context reference directly,
                                     // we'll try one more render with the potentially recovered context
-                                    if let Err(final_error) = canvas::render_canvas(&context, &canvas, &status, &snapshot) {
-                                        log_app_error(&final_error, "rendering after context recovery");
-                                        if let Err(fallback_error) = fallback_render(&context, &canvas, &status, &final_error) {
-                                            log_app_error(&fallback_error, "fallback rendering after recovery");
+                                    if let Err(final_error) =
+                                        canvas::render_canvas(&context, &canvas, &status, &snapshot)
+                                    {
+                                        log_app_error(
+                                            &final_error,
+                                            "rendering after context recovery",
+                                        );
+                                        if let Err(fallback_error) = fallback_render(
+                                            &context,
+                                            &canvas,
+                                            &status,
+                                            &final_error,
+                                        ) {
+                                            log_app_error(
+                                                &fallback_error,
+                                                "fallback rendering after recovery",
+                                            );
                                         }
                                     }
                                 }
                                 Err(recovery_error) => {
                                     log_app_error(&recovery_error, "canvas context recovery");
-                                    if let Err(fallback_error) = fallback_render(&context, &canvas, &status, &error) {
+                                    if let Err(fallback_error) =
+                                        fallback_render(&context, &canvas, &status, &error)
+                                    {
                                         log_app_error(&fallback_error, "fallback rendering");
                                     }
                                 }
                             }
                         } else {
-                            log_warn(&format!("Render attempt {} failed, retrying: {}", retry_count, error));
+                            log_warn(&format!(
+                                "Render attempt {} failed, retrying: {}",
+                                retry_count, error
+                            ));
                             // Small delay before retry (in a real implementation, you'd use setTimeout)
                         }
                     }
                 }
             }
-            
+
             is_rendering.set(false);
         }
     });
@@ -466,7 +493,9 @@ mod integration_tests {
         app_state.viewport = viewport;
 
         // Add a note at viewport center
-        app_state.sticky_notes.add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
+        app_state
+            .sticky_notes
+            .add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
 
         // Verify the note was placed at the correct world coordinates
         assert_eq!(app_state.sticky_notes.notes.len(), 1);
@@ -503,14 +532,19 @@ mod integration_tests {
         let screen_y = 512.5;
 
         // Convert screen to world coordinates
-        let (world_x, world_y) = app_state.viewport.world_point_at(screen_x, screen_y, 800.0, 600.0);
+        let (world_x, world_y) = app_state
+            .viewport
+            .world_point_at(screen_x, screen_y, 800.0, 600.0);
 
         // Should be approximately (50, 75)
         assert!((world_x - 50.0).abs() < 0.1);
         assert!((world_y - 75.0).abs() < 0.1);
 
         // Should find the note at this world position
-        assert_eq!(app_state.sticky_notes.find_note_at(world_x, world_y), Some(note_id));
+        assert_eq!(
+            app_state.sticky_notes.find_note_at(world_x, world_y),
+            Some(note_id)
+        );
     }
 
     #[test]
@@ -596,7 +630,9 @@ mod integration_tests {
         app_state.viewport = viewport;
 
         // Add note at center - should be placed at world center adjusted for pan/zoom
-        app_state.sticky_notes.add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
+        app_state
+            .sticky_notes
+            .add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
 
         // With pan (1000, 800) and zoom 0.5, center calculation:
         // world_x = (400 - 400 - 1000) / 0.5 = (-1000) / 0.5 = -2000
@@ -616,8 +652,9 @@ mod integration_tests {
         let viewport_width = 800.0;
         let viewport_height = 600.0;
 
-        let (world_x, world_y) = viewport.world_point_at(screen_x, screen_y, viewport_width, viewport_height);
-        
+        let (world_x, world_y) =
+            viewport.world_point_at(screen_x, screen_y, viewport_width, viewport_height);
+
         // Convert back to screen coordinates
         let center_x = viewport_width / 2.0;
         let center_y = viewport_height / 2.0;
@@ -668,8 +705,12 @@ mod integration_tests {
         let mut app_state = AppState::default();
 
         // 1. Add multiple notes
-        app_state.sticky_notes.add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
-        app_state.sticky_notes.add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
+        app_state
+            .sticky_notes
+            .add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
+        app_state
+            .sticky_notes
+            .add_note_at_viewport_center(800.0, 600.0, &app_state.viewport);
         assert_eq!(app_state.sticky_notes.notes.len(), 2);
 
         // 2. Select and drag first note

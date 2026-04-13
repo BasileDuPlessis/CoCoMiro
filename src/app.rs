@@ -98,9 +98,13 @@ pub fn install_app(
         .map_err(|_| crate::AppError::Dom("floating-toolbar is not an HTML element".to_string()))?;
     let toolbar_handle = document
         .get_element_by_id("floating-toolbar-handle")
-        .ok_or_else(|| crate::AppError::Dom("floating toolbar handle element not found".to_string()))?
+        .ok_or_else(|| {
+            crate::AppError::Dom("floating toolbar handle element not found".to_string())
+        })?
         .dyn_into::<HtmlElement>()
-        .map_err(|_| crate::AppError::Dom("floating-toolbar-handle is not an HTML element".to_string()))?;
+        .map_err(|_| {
+            crate::AppError::Dom("floating-toolbar-handle is not an HTML element".to_string())
+        })?;
     toolbar.set_attribute("data-handle-id", &toolbar_handle.id())?;
 
     Ok((workspace, canvas, status, toolbar))

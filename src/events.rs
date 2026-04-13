@@ -19,7 +19,9 @@ pub use crate::event_setup::setup_event_listeners;
 
 // Re-export utility functions for backward compatibility
 #[cfg(target_arch = "wasm32")]
-pub use crate::event_setup::{end_drag_if_needed, end_toolbar_drag_if_needed, js_error_to_app_error};
+pub use crate::event_setup::{
+    end_drag_if_needed, end_toolbar_drag_if_needed, js_error_to_app_error,
+};
 
 // Re-export text input functionality
 #[cfg(target_arch = "wasm32")]

@@ -482,7 +482,8 @@ fn get_sticky_note_at_point(tab: &Tab, x: f64, y: f64) -> TestResult<bool> {
     let final_pan_y = attribute_as_f64(&canvas, "data-pan-y")?;
 
     // If pan didn't change, it might mean a note was clicked instead of canvas
-    let pan_changed = (final_pan_x - initial_pan_x).abs() > 1.0 || (final_pan_y - initial_pan_y).abs() > 1.0;
+    let pan_changed =
+        (final_pan_x - initial_pan_x).abs() > 1.0 || (final_pan_y - initial_pan_y).abs() > 1.0;
 
     // If pan didn't change significantly, assume a note was present
     Ok(!pan_changed)
@@ -508,7 +509,8 @@ fn assert_sticky_note_creation_works(tab: &Tab) -> TestResult {
     assert!(
         notes_after >= notes_before,
         "Expected notes to not decrease after clicking add button, got {} before and {} after",
-        notes_before, notes_after
+        notes_before,
+        notes_after
     );
 
     // Verify that there's now a note at the center of the viewport (be more lenient)
@@ -535,7 +537,10 @@ fn assert_sticky_note_dragging_works(tab: &Tab) -> TestResult {
 
     // Verify note exists at center
     let has_note_before = get_sticky_note_at_point(tab, center_x, center_y)?;
-    assert!(has_note_before, "Expected note to exist at center after creation");
+    assert!(
+        has_note_before,
+        "Expected note to exist at center after creation"
+    );
 
     // Try dragging from center to a new position
     let drag_start = Point {
@@ -584,18 +589,27 @@ fn assert_sticky_note_selection_and_deletion_works(tab: &Tab) -> TestResult {
     assert!(notes_before > 0, "Expected at least one note to exist");
 
     // Click on the note to select it
-    tab.move_mouse_to_point(Point { x: center_x, y: center_y })?;
+    tab.move_mouse_to_point(Point {
+        x: center_x,
+        y: center_y,
+    })?;
     dispatch_mouse_event(
         tab,
         Input::DispatchMouseEventTypeOption::MousePressed,
-        Point { x: center_x, y: center_y },
+        Point {
+            x: center_x,
+            y: center_y,
+        },
         Some(Input::MouseButton::Left),
         Some(1),
     )?;
     dispatch_mouse_event(
         tab,
         Input::DispatchMouseEventTypeOption::MouseReleased,
-        Point { x: center_x, y: center_y },
+        Point {
+            x: center_x,
+            y: center_y,
+        },
         Some(Input::MouseButton::Left),
         Some(1),
     )?;
@@ -711,13 +725,18 @@ fn assert_multi_note_scenario(tab: &Tab) -> TestResult {
 
     // Verify multiple notes exist (be more lenient - just check that we have notes)
     let note_count = count_sticky_notes(tab)?;
-    assert!(note_count >= 1, "Expected at least 1 note, got {}", note_count);
+    assert!(
+        note_count >= 1,
+        "Expected at least 1 note, got {}",
+        note_count
+    );
 
     // Test that we can still interact with canvas
     let (initial_pan_x, initial_pan_y) = pan_coordinates(&canvas)?;
     let (start, end) = drag_start_and_end_points(&canvas)?;
     drag_pointer(tab, start, end)?;
-    let (final_pan_x, _final_pan_y) = wait_for_pan_update(tab, initial_pan_x, initial_pan_y, PAN_UPDATE_TIMEOUT)?;
+    let (final_pan_x, _final_pan_y) =
+        wait_for_pan_update(tab, initial_pan_x, initial_pan_y, PAN_UPDATE_TIMEOUT)?;
 
     assert!(
         final_pan_x - initial_pan_x > MIN_EXPECTED_PAN_X_DELTA,
@@ -741,7 +760,10 @@ fn assert_zoom_with_notes(tab: &Tab) -> TestResult {
     let initial_zoom = attribute_as_f64(&canvas, "data-zoom")?;
 
     // Zoom in using mouse wheel
-    tab.move_mouse_to_point(Point { x: center_x, y: center_y })?;
+    tab.move_mouse_to_point(Point {
+        x: center_x,
+        y: center_y,
+    })?;
     tab.call_method(Input::DispatchMouseEvent {
         Type: Input::DispatchMouseEventTypeOption::MouseWheel,
         x: center_x,
@@ -767,7 +789,8 @@ fn assert_zoom_with_notes(tab: &Tab) -> TestResult {
     assert!(
         final_zoom > initial_zoom,
         "Expected zoom to increase, got {} -> {}",
-        initial_zoom, final_zoom
+        initial_zoom,
+        final_zoom
     );
 
     // Verify note still exists after zoom

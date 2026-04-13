@@ -176,7 +176,8 @@ impl StickyNotesState {
     pub fn drag_to(&mut self, mouse_x: f64, mouse_y: f64) {
         if let (true, Some((offset_x, offset_y))) = (self.is_dragging, self.drag_offset)
             && let Some(note_id) = self.selected_note_id
-            && let Some(note) = self.get_note_mut(note_id) {
+            && let Some(note) = self.get_note_mut(note_id)
+        {
             note.x = mouse_x - offset_x;
             note.y = mouse_y - offset_y;
         }

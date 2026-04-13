@@ -38,22 +38,34 @@ pub fn handle_key_down(
     let handled = match event.key().as_str() {
         "ArrowLeft" => {
             viewport.pan_by(-crate::event_constants::KEYBOARD_PAN_STEP, 0.0);
-            crate::log_info(&format!("Panned left by {}", crate::event_constants::KEYBOARD_PAN_STEP));
+            crate::log_info(&format!(
+                "Panned left by {}",
+                crate::event_constants::KEYBOARD_PAN_STEP
+            ));
             true
         }
         "ArrowRight" => {
             viewport.pan_by(crate::event_constants::KEYBOARD_PAN_STEP, 0.0);
-            crate::log_info(&format!("Panned right by {}", crate::event_constants::KEYBOARD_PAN_STEP));
+            crate::log_info(&format!(
+                "Panned right by {}",
+                crate::event_constants::KEYBOARD_PAN_STEP
+            ));
             true
         }
         "ArrowUp" => {
             viewport.pan_by(0.0, -crate::event_constants::KEYBOARD_PAN_STEP);
-            crate::log_info(&format!("Panned up by {}", crate::event_constants::KEYBOARD_PAN_STEP));
+            crate::log_info(&format!(
+                "Panned up by {}",
+                crate::event_constants::KEYBOARD_PAN_STEP
+            ));
             true
         }
         "ArrowDown" => {
             viewport.pan_by(0.0, crate::event_constants::KEYBOARD_PAN_STEP);
-            crate::log_info(&format!("Panned down by {}", crate::event_constants::KEYBOARD_PAN_STEP));
+            crate::log_info(&format!(
+                "Panned down by {}",
+                crate::event_constants::KEYBOARD_PAN_STEP
+            ));
             true
         }
         "+" | "=" => {

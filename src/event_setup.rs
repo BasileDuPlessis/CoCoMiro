@@ -20,7 +20,9 @@ use web_sys::{HtmlCanvasElement, HtmlElement};
 /// An AppError with the provided context
 #[cfg(target_arch = "wasm32")]
 pub fn js_error_to_app_error(js_error: wasm_bindgen::JsValue, context: &str) -> crate::AppError {
-    let message = js_error.as_string().unwrap_or_else(|| format!("{js_error:?}"));
+    let message = js_error
+        .as_string()
+        .unwrap_or_else(|| format!("{js_error:?}"));
     crate::AppError::Event(format!("{context}: {message}"))
 }
 
@@ -109,10 +111,11 @@ pub fn setup_event_listeners(
     render: &Rc<dyn Fn()>,
     position_toolbar: &Rc<dyn Fn()>,
 ) -> crate::AppResult<()> {
-    let browser_window = web_sys::window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
-    let document = browser_window
-        .document()
-        .ok_or_else(|| crate::AppError::BrowserEnv("could not access the browser document".to_string()))?;
+    let browser_window = web_sys::window()
+        .ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let document = browser_window.document().ok_or_else(|| {
+        crate::AppError::BrowserEnv("could not access the browser document".to_string())
+    })?;
 
     // Mouse down on canvas
     let on_mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
@@ -120,12 +123,15 @@ pub fn setup_event_listeners(
         let state = state.clone();
         let render = render.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_down(event, &canvas, &state, &render) {
+            if let Err(error) =
+                crate::mouse_events::handle_mouse_down(event, &canvas, &state, &render)
+            {
                 crate::log_app_error(&error, "handling mouse down");
             }
         }
     }));
-    canvas.add_event_listener_with_callback("mousedown", on_mouse_down.as_ref().unchecked_ref())
+    canvas
+        .add_event_listener_with_callback("mousedown", on_mouse_down.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to canvas"))?;
     on_mouse_down.forget();
 
@@ -135,15 +141,22 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_toolbar_mouse_down(event, &canvas, &toolbar_state, &position_toolbar) {
+            if let Err(error) = crate::mouse_events::handle_toolbar_mouse_down(
+                event,
+                &canvas,
+                &toolbar_state,
+                &position_toolbar,
+            ) {
                 crate::log_app_error(&error, "handling toolbar mouse down");
             }
         }
     }));
-    toolbar.add_event_listener_with_callback(
-        "mousedown",
-        on_toolbar_mouse_down.as_ref().unchecked_ref(),
-    ).map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to toolbar"))?;
+    toolbar
+        .add_event_listener_with_callback(
+            "mousedown",
+            on_toolbar_mouse_down.as_ref().unchecked_ref(),
+        )
+        .map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to toolbar"))?;
     on_toolbar_mouse_down.forget();
 
     // Click on add note button
@@ -173,7 +186,9 @@ pub fn setup_event_listeners(
         .map_err(|_| crate::AppError::Dom("add note button is not an HTML element".to_string()))?;
     add_note_button
         .add_event_listener_with_callback("click", on_add_note_click.as_ref().unchecked_ref())
-        .map_err(|e| js_error_to_app_error(e, "failed to attach click listener to add note button"))?;
+        .map_err(|e| {
+            js_error_to_app_error(e, "failed to attach click listener to add note button")
+        })?;
     on_add_note_click.forget();
 
     // Mouse move
@@ -184,7 +199,14 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_move(event, &canvas, &state, &render, &toolbar_state, &position_toolbar) {
+            if let Err(error) = crate::mouse_events::handle_mouse_move(
+                event,
+                &canvas,
+                &state,
+                &render,
+                &toolbar_state,
+                &position_toolbar,
+            ) {
                 crate::log_app_error(&error, "handling mouse move");
             }
         }
@@ -200,7 +222,13 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_up(event, &state, &render, &toolbar_state, &position_toolbar) {
+            if let Err(error) = crate::mouse_events::handle_mouse_up(
+                event,
+                &state,
+                &render,
+                &toolbar_state,
+                &position_toolbar,
+            ) {
                 crate::log_app_error(&error, "handling mouse up");
             }
         }
@@ -217,14 +245,22 @@ pub fn setup_event_listeners(
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_leave(event, &state, &render, &toolbar_state, &position_toolbar) {
+            if let Err(error) = crate::mouse_events::handle_mouse_leave(
+                event,
+                &state,
+                &render,
+                &toolbar_state,
+                &position_toolbar,
+            ) {
                 crate::log_app_error(&error, "handling mouse leave");
             }
         }
     }));
     document
         .add_event_listener_with_callback("mouseleave", on_mouse_leave.as_ref().unchecked_ref())
-        .map_err(|e| js_error_to_app_error(e, "failed to attach mouseleave listener to document"))?;
+        .map_err(|e| {
+            js_error_to_app_error(e, "failed to attach mouseleave listener to document")
+        })?;
     on_mouse_leave.forget();
 
     // Blur window
@@ -238,7 +274,8 @@ pub fn setup_event_listeners(
             end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
         }
     }));
-    browser_window.add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
+    browser_window
+        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach blur listener to window"))?;
     on_blur.forget();
 
@@ -253,7 +290,8 @@ pub fn setup_event_listeners(
             }
         }
     }));
-    canvas.add_event_listener_with_callback("wheel", on_wheel.as_ref().unchecked_ref())
+    canvas
+        .add_event_listener_with_callback("wheel", on_wheel.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach wheel listener to canvas"))?;
     on_wheel.forget();
 
@@ -263,12 +301,15 @@ pub fn setup_event_listeners(
         let state = state.clone();
         let render = render.clone();
         move |event: web_sys::KeyboardEvent| {
-            if let Err(error) = crate::keyboard_events::handle_key_down(event, &canvas, &state, &render) {
+            if let Err(error) =
+                crate::keyboard_events::handle_key_down(event, &canvas, &state, &render)
+            {
                 crate::log_app_error(&error, "handling key down");
             }
         }
     }));
-    canvas.add_event_listener_with_callback("keydown", on_key_down.as_ref().unchecked_ref())
+    canvas
+        .add_event_listener_with_callback("keydown", on_key_down.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach keydown listener to canvas"))?;
     on_key_down.forget();
 
@@ -278,12 +319,15 @@ pub fn setup_event_listeners(
         let state = state.clone();
         let render = render.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_double_click(event, &canvas, &state, &render) {
+            if let Err(error) =
+                crate::mouse_events::handle_double_click(event, &canvas, &state, &render)
+            {
                 crate::log_app_error(&error, "handling double click");
             }
         }
     }));
-    canvas.add_event_listener_with_callback("dblclick", on_double_click.as_ref().unchecked_ref())
+    canvas
+        .add_event_listener_with_callback("dblclick", on_double_click.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach dblclick listener to canvas"))?;
     on_double_click.forget();
 
