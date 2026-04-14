@@ -731,4 +731,120 @@ mod integration_tests {
         assert_eq!(app_state.sticky_notes.notes[0].y, 50.0);
         assert!(app_state.sticky_notes.selected_note_id.is_none());
     }
+
+    #[test]
+    fn html_text_parsing_and_formatting() {
+        // Test that HTML tags in note content are properly parsed for rendering
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::parse_formatted_text;
+
+            // Test basic HTML parsing
+            let html_content = "Hello <b>world</b> and <i>universe</i>";
+            let segments = parse_formatted_text(html_content);
+
+            assert_eq!(segments.len(), 4);
+
+            // "Hello "
+            assert_eq!(segments[0].text, "Hello ");
+            assert!(!segments[0].bold);
+            assert!(!segments[0].italic);
+            assert!(!segments[0].underline);
+
+            // "world"
+            assert_eq!(segments[1].text, "world");
+            assert!(segments[1].bold);
+            assert!(!segments[1].italic);
+            assert!(!segments[1].underline);
+
+            // " and "
+            assert_eq!(segments[2].text, " and ");
+            assert!(!segments[2].bold);
+            assert!(!segments[2].italic);
+            assert!(!segments[2].underline);
+
+            // "universe"
+            assert_eq!(segments[3].text, "universe");
+            assert!(!segments[3].bold);
+            assert!(segments[3].italic);
+            assert!(!segments[3].underline);
+        }
+
+        // Test nested and overlapping tags
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::parse_formatted_text;
+
+            let complex_html = "Start <b>bold <i>bold-italic</i> still bold</b> end";
+            let segments = parse_formatted_text(complex_html);
+
+            assert_eq!(segments.len(), 4);
+
+            // "Start "
+            assert_eq!(segments[0].text, "Start ");
+            assert!(!segments[0].bold);
+            assert!(!segments[0].italic);
+
+            // "bold "
+            assert_eq!(segments[1].text, "bold ");
+            assert!(segments[1].bold);
+            assert!(!segments[1].italic);
+
+            // "bold-italic"
+            assert_eq!(segments[2].text, "bold-italic");
+            assert!(segments[2].bold);
+            assert!(segments[2].italic);
+
+            // " still bold"
+            assert_eq!(segments[3].text, " still bold");
+            assert!(segments[3].bold);
+            assert!(!segments[3].italic);
+        }
+
+        // Test underline formatting
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::parse_formatted_text;
+
+            let underline_html = "Normal <u>underlined</u> normal again";
+            let segments = parse_formatted_text(underline_html);
+
+            assert_eq!(segments.len(), 3);
+
+            // "Normal "
+            assert_eq!(segments[0].text, "Normal ");
+            assert!(!segments[0].underline);
+
+            // "underlined"
+            assert_eq!(segments[1].text, "underlined");
+            assert!(segments[1].underline);
+
+            // " normal again"
+            assert_eq!(segments[2].text, " normal again");
+            assert!(!segments[2].underline);
+        }
+
+        // Test HTML with <span> tags and style attributes
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::parse_formatted_text;
+
+            let span_bold = r#"Text <span style="font-weight: bold;">bold</span> text"#;
+            let segments = parse_formatted_text(span_bold);
+
+            assert_eq!(segments.len(), 3);
+
+            // "Text "
+            assert_eq!(segments[0].text, "Text ");
+            assert!(!segments[0].bold);
+
+            // "bold"
+            assert_eq!(segments[1].text, "bold");
+            assert!(segments[1].bold);
+
+            // " text"
+            assert_eq!(segments[2].text, " text");
+            assert!(!segments[2].bold);
+        }
+    }
 }

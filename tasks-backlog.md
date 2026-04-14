@@ -147,7 +147,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Maintain keyboard shortcuts and navigation
 - Prevent event propagation to canvas during editing
 
-##### 1.4.6 Implement Toolbar Button Formatting
+##### 1.4.6 Implement Toolbar Button Formatting ✅ COMPLETED
 - Make toolbar buttons apply real HTML formatting using document.execCommand()
 - Replace logging-only handlers with actual formatting functionality
 
@@ -157,25 +157,27 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Maintain cursor position and text selection during formatting operations
 - Test formatting works correctly with contenteditable div
 
-##### 1.4.7 Store HTML Content in Notes
+##### 1.4.7 Store HTML Content in Notes ✅ COMPLETED
 - Modify note storage to handle HTML content instead of plain text
 - Update text input handling to store HTML from contenteditable
 
 **Implementation Details:**
-- Store HTML content directly in StickyNote.content field
-- Update input event handler to preserve HTML formatting
-- Handle conversion between HTML and plain text for backward compatibility
-- Ensure existing plain text notes continue to work
+- Store HTML content directly in StickyNote.content field instead of converting to plain text
+- Update contenteditable initialization to detect HTML vs plain text content for backward compatibility
+- Plain text notes are converted to HTML with `<br>` tags when editing
+- HTML content is preserved as-is during editing and saving
+- Existing plain text notes continue to work with automatic HTML conversion
 
-##### 1.4.8 Implement HTML-to-Markdown Conversion
+##### 1.4.8 Implement HTML-to-Markdown Conversion ✅ COMPLETED
 - Create HTML parsing function to convert HTML to markdown for canvas rendering
 - Update parse_formatted_text() to handle HTML tags instead of markdown
 
 **Implementation Details:**
-- Parse <b>, <i>, <u> tags and convert to markdown equivalents
-- Handle nested formatting and overlapping tags
-- Update canvas rendering to use HTML-based parsing
-- Maintain backward compatibility with existing markdown parsing
+- Updated `parse_formatted_text()` function to parse HTML tags instead of markdown
+- Parse `<b>`, `<i>`, `<u>` opening tags and corresponding `</b>`, `</i>`, `</u>` closing tags
+- Handle nested and overlapping HTML formatting tags
+- Maintain backward compatibility with existing plain text rendering
+- Canvas now properly renders HTML-formatted text with bold, italic, and underline styles
 
 ##### 1.4.9 Handle Rich Text Paste Operations
 - Implement paste event handling to preserve HTML formatting

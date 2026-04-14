@@ -126,39 +126,35 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
     let mut remaining = text;
 
     while !remaining.is_empty() {
-        // Find the next formatting marker
-        let bold_start = remaining.find("**");
-        let italic_start = remaining.find('*').filter(|&pos| {
-            // Make sure it's not part of ** (bold)
-            pos + 1 >= remaining.len() || &remaining[pos..pos + 2] != "**"
-        });
-        let underline_start = remaining.find("__");
+        // Find the next HTML formatting tag (support various formats including spans)
+        let patterns = [
+            ("<b>", "bold", "</b>"),
+            ("<b ", "bold", "</b>"),
+            ("<strong>", "bold", "</strong>"),
+            ("<strong ", "bold", "</strong>"),
+            ("<i>", "italic", "</i>"),
+            ("<i ", "italic", "</i>"),
+            ("<em>", "italic", "</em>"),
+            ("<em ", "italic", "</em>"),
+            ("<u>", "underline", "</u>"),
+            ("<u ", "underline", "</u>"),
+            ("<span ", "span", "</span>"),
+        ];
 
-        // Find the earliest marker
         let mut earliest_pos = None;
-        let mut marker_type = None;
+        let mut tag_info = None;
 
-        if let Some(pos) = bold_start {
-            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
-                earliest_pos = Some(pos);
-                marker_type = Some("bold");
-            }
-        }
-        if let Some(pos) = italic_start {
-            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
-                earliest_pos = Some(pos);
-                marker_type = Some("italic");
-            }
-        }
-        if let Some(pos) = underline_start {
-            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
-                earliest_pos = Some(pos);
-                marker_type = Some("underline");
+        for (pattern, tag_type, closing) in &patterns {
+            if let Some(pos) = remaining.find(pattern) {
+                if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
+                    earliest_pos = Some(pos);
+                    tag_info = Some((pos, *tag_type, *closing));
+                }
             }
         }
 
-        if let (Some(pos), Some(marker)) = (earliest_pos, marker_type) {
-            // Add text before the marker as plain text
+        if let Some((pos, tag_type, closing_tag)) = tag_info {
+            // Add text before the tag as plain text
             if pos > 0 {
                 segments.push(TextSegment {
                     text: remaining[..pos].to_string(),
@@ -168,34 +164,47 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 });
             }
 
-            // Find the closing marker
-            let marker_len = if marker == "bold" || marker == "underline" {
-                2
+            // Find the end of the opening tag
+            let tag_end = if let Some(gt_pos) = remaining[pos..].find('>') {
+                pos + gt_pos + 1
             } else {
-                1
-            };
-            let marker_text = if marker == "bold" {
-                "**"
-            } else if marker == "underline" {
-                "__"
-            } else {
-                "*"
+                // Malformed tag, treat as plain text
+                segments.push(TextSegment {
+                    text: remaining[pos..].to_string(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                });
+                break;
             };
 
-            if let Some(end_pos) = remaining[pos + marker_len..].find(marker_text) {
-                let end_pos = pos + marker_len + end_pos;
-                let formatted_text = &remaining[pos + marker_len..end_pos];
+            // For <span> tags, check if they have formatting styles
+            let (is_bold, is_italic, is_underline) = if tag_type == "span" {
+                let tag_content = &remaining[pos..tag_end];
+                let has_bold = tag_content.contains("font-weight:") && 
+                              (tag_content.contains("bold") || tag_content.contains("700"));
+                let has_italic = tag_content.contains("font-style:") && tag_content.contains("italic");
+                let has_underline = tag_content.contains("text-decoration:") && 
+                                   tag_content.contains("underline");
+                (has_bold, has_italic, has_underline)
+            } else {
+                (tag_type == "bold", tag_type == "italic", tag_type == "underline")
+            };
+
+            if let Some(end_pos) = remaining[tag_end..].find(closing_tag) {
+                let end_pos = tag_end + end_pos;
+                let formatted_text = &remaining[tag_end..end_pos];
 
                 segments.push(TextSegment {
                     text: formatted_text.to_string(),
-                    bold: marker == "bold",
-                    italic: marker == "italic",
-                    underline: marker == "underline",
+                    bold: is_bold,
+                    italic: is_italic,
+                    underline: is_underline,
                 });
 
-                remaining = &remaining[end_pos + marker_len..];
+                remaining = &remaining[end_pos + closing_tag.len()..];
             } else {
-                // No closing marker found, treat as plain text
+                // No closing tag found, treat as plain text
                 segments.push(TextSegment {
                     text: remaining[pos..].to_string(),
                     bold: false,
@@ -205,7 +214,7 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 break;
             }
         } else {
-            // No more markers, add remaining text as plain
+            // No more tags found, add remaining text as plain text
             segments.push(TextSegment {
                 text: remaining.to_string(),
                 bold: false,

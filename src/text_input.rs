@@ -165,12 +165,22 @@ fn add_formatting_handler(
             event.prevent_default();
             event.stop_propagation();
 
-            // For now, just log the formatting action
-            // TODO: Implement actual text formatting logic for contenteditable
-            crate::log_info(&format!(
-                "Applying {} formatting to contenteditable",
-                format_type
-            ));
+            // Get the document to execute formatting commands
+            let document = contenteditable.owner_document().unwrap();
+
+            // Apply formatting using document.execCommand()
+            let document_js = document.as_ref();
+            let command = wasm_bindgen::JsValue::from_str(format_type.as_str());
+            let exec_command_fn = js_sys::Function::from(js_sys::Reflect::get(document_js, &wasm_bindgen::JsValue::from_str("execCommand")).unwrap());
+            let success = exec_command_fn.call1(document_js, &command).ok()
+                .and_then(|val| val.as_bool())
+                .unwrap_or(false);
+
+            if success {
+                crate::log_info(&format!("Successfully applied {} formatting", format_type));
+            } else {
+                crate::log_warn(&format!("Failed to apply {} formatting", format_type));
+            }
 
             // Focus the contenteditable to keep it active
             let _ = contenteditable.focus();
@@ -347,8 +357,15 @@ pub fn create_text_input_overlay(
         .set_property("word-wrap", "break-word");
     let _ = contenteditable.style().set_property("line-height", "1.2");
 
-    // Set initial content and focus
-    contenteditable.set_inner_html(&note.content.replace("\n", "<br>"));
+    // Set initial content and focus - handle both HTML and plain text content
+    let initial_html = if note.content.contains('<') && note.content.contains('>') {
+        // Content appears to be HTML, use as-is
+        note.content.clone()
+    } else {
+        // Content appears to be plain text, convert line breaks to HTML
+        note.content.replace("\n", "<br>")
+    };
+    contenteditable.set_inner_html(&initial_html);
 
     // Set initial height based on note height
     let initial_screen_height = screen_height;
@@ -370,19 +387,9 @@ pub fn create_text_input_overlay(
             // Update the note content with the current contenteditable content
             let zoom = state.borrow().viewport.zoom; // Get zoom before mutable borrow
             if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
-                // Convert innerHTML back to plain text with line breaks
+                // Store HTML content directly instead of converting to plain text
                 let html_content = contenteditable.inner_html();
-                let plain_content = html_content
-                    .replace("<div>", "\n")
-                    .replace("</div>", "")
-                    .replace("<br>", "\n")
-                    .replace("<br/>", "\n")
-                    .replace("&nbsp;", " ")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&amp;", "&");
-
-                note.content = plain_content;
+                note.content = html_content;
 
                 // Adjust contenteditable height to fit content
                 // For contenteditable, we need to measure the scroll height
