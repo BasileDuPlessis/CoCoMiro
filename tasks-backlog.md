@@ -179,15 +179,85 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Maintain backward compatibility with existing plain text rendering
 - Canvas now properly renders HTML-formatted text with bold, italic, and underline styles
 
-##### 1.4.9 Handle Rich Text Paste Operations
-- Implement paste event handling to preserve HTML formatting
-- Clean and sanitize pasted content
+##### 1.4.9.1 Add Paste Event Listener Infrastructure
+- Add paste event listener to contenteditable div
+- Set up basic event handling structure
 
 **Implementation Details:**
-- Add paste event listener to contenteditable div
-- Preserve HTML formatting from clipboard
-- Strip unwanted elements (scripts, styles) for security
-- Handle plain text paste operations
+- Attach paste event listener to contenteditable div
+- Prevent default paste behavior initially
+- Log paste events for debugging
+- Set up event handling framework
+
+##### 1.4.9.2 Implement Clipboard HTML Content Extraction
+- Extract HTML content from clipboard data
+- Handle different clipboard data formats
+
+**Implementation Details:**
+- Access clipboardData from paste event
+- Extract text/html content using getData()
+- Handle browser compatibility issues
+- Log extracted HTML for debugging
+
+##### 1.4.9.3 Implement Clipboard Plain Text Extraction
+- Extract plain text content as fallback
+- Handle cases where HTML is not available
+
+**Implementation Details:**
+- Extract text/plain content using getData()
+- Implement fallback logic when HTML extraction fails
+- Ensure plain text paste still works
+
+##### 1.4.9.4 Create Basic HTML Sanitization Function
+- Implement basic HTML sanitization for security
+- Remove obviously dangerous elements
+
+**Implementation Details:**
+- Create sanitize_pasted_html() function
+- Remove script and style tags completely
+- Strip basic dangerous tags (iframe, object, etc.)
+- Preserve basic HTML structure
+
+##### 1.4.9.5 Implement Comprehensive HTML Sanitization
+- Handle complex HTML structures and attributes
+- Convert block elements to appropriate formats
+
+**Implementation Details:**
+- Strip all attributes from allowed tags for security
+- Convert block elements (p, div) to line breaks
+- Handle nested HTML structures
+- Preserve formatting tags (b, i, u, span)
+
+##### 1.4.9.6 Integrate Sanitization with Paste Handling
+- Connect sanitization function with paste event handling
+- Insert sanitized content into contenteditable div
+
+**Implementation Details:**
+- Apply sanitization to extracted HTML content
+- Use execCommand or modern APIs to insert content
+- Handle both HTML and plain text insertion
+- Maintain cursor position and selection
+
+##### 1.4.9.7 Add Sanitization Tests
+- Create comprehensive tests for HTML sanitization
+- Ensure security and functionality
+
+**Implementation Details:**
+- Add unit tests for sanitize_pasted_html() function
+- Test dangerous tag removal
+- Test allowed tag preservation
+- Test attribute stripping
+- Test block element conversion
+
+##### 1.4.9.8 Test End-to-End Paste Functionality
+- Test complete paste workflow
+- Verify with real clipboard content
+
+**Implementation Details:**
+- Test pasting from various sources (Google Docs, Word, etc.)
+- Verify HTML formatting preservation
+- Test security (script injection prevention)
+- Test plain text fallback
 
 ##### 1.4.10 Add ContentEditable Undo/Redo Support
 - Implement undo/redo functionality within contenteditable context
