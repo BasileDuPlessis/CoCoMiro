@@ -11,7 +11,8 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - ✅ Basic accessibility features (ARIA labels)
 - ✅ Performance monitoring (FPS tracking)
 - ✅ Basic visual polish (box shadows)
-- ✅ Sticky note resizing (basic functionality implemented, zoom consistency pending)
+- ✅ Sticky note resizing (fully implemented with zoom consistency)
+- ✅ Code refactoring (functions broken down, constants extracted, borrow patterns simplified)
 - ❌ No persistence, undo/redo system, or advanced performance optimizations
 - ❌ No mobile support
 
@@ -27,6 +28,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Sticky note resizing with 8 resize handles
 - Resize handle hit detection and visual feedback
 - Minimum size constraints during resize
+- Code refactoring (large functions broken down, magic numbers extracted, borrow patterns simplified)
 
 **Not Yet Implemented:**
 - Persistence (save/load)
@@ -46,152 +48,35 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 **Subtasks:**
 
-#### ✅ 1.1 Verify StickyNote Structure
-- Confirm `StickyNote` struct already has `width` and `height` fields
-- Ensure existing code uses these fields properly
-- Add any missing documentation for size fields
-
-**Implementation Details:**
-- Check `src/sticky_notes.rs` for current `StickyNote` implementation
-- Verify width/height are used in rendering and hit testing
-- Update documentation if needed
-
-**Verification Results:**
-- ✅ `StickyNote` struct has `width: f64` and `height: f64` fields with proper documentation
-- ✅ `contains_point()` method correctly uses `width` and `height` for hit testing
-- ✅ `render_sticky_notes()` in `canvas.rs` uses `note.width * zoom` and `note.height * zoom` for rendering
-- ✅ Tests verify default dimensions (200.0 x 150.0) and hit testing behavior
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-
-#### ✅ 1.2 Define Resize Handle Types and Positions
-- Create `ResizeHandle` enum for 8 handle positions (corners + midpoints)
-- Implement handle position calculation methods
-- Add handle size and visual properties
-
-**Implementation Details:**
-- Define enum: `TopLeft`, `Top`, `TopRight`, `Right`, `BottomRight`, `Bottom`, `BottomLeft`, `Left`
-- Add `handle_positions()` method to `StickyNote` returning screen coordinates
-- Define handle size constants (e.g., 8x8 pixels)
-
-**Implementation Results:**
-- ✅ Created `ResizeHandle` enum with 8 variants for all handle positions
-- ✅ Added `cursor()` method to `ResizeHandle` returning appropriate CSS cursor styles
-- ✅ Added `handle_position()` method to `StickyNote` for individual handle world coordinates
-- ✅ Added `handle_bounds()` method for screen-space bounding boxes (for hit testing)
-- ✅ Added `handle_positions()` method returning all handle screen coordinates for rendering
-- ✅ Defined `RESIZE_HANDLE_SIZE` constant (8.0 pixels)
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-
-#### ✅ 1.3 Add Resizing State to AppState
-- Extend `AppState` with `ResizingState` for tracking resize operations
-- Add fields for active resize handle, original dimensions, drag start position
-- Integrate with existing drag state management
-
-**Implementation Details:**
-- Create `ResizingState` struct with: `is_resizing: bool`, `note_id: Option<u32>`, `handle: Option<ResizeHandle>`, `start_mouse_x/y`, `original_width/height`
-- Add to `AppState` struct
-- Update `AppState::default()` to include default resizing state
-
-**Implementation Results:**
-- ✅ Created `ResizingState` struct in `src/sticky_notes.rs` with all required fields
-- ✅ Added `ResizingState` to `AppState` struct in `src/lib.rs`
-- ✅ Updated `AppState::default()` to include default resizing state
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-- ✅ Full WASM build succeeds
-
-#### ✅ 1.4 Implement Handle Hit Detection
-- Add method to detect which resize handle (if any) is under the mouse cursor
-- Calculate handle bounds in screen coordinates
-- Prioritize handle detection over note content area
-
-**Implementation Details:**
-- Add `find_resize_handle_at()` method to `StickyNotesState`
-- Convert world coordinates to screen coordinates for handle bounds
-- Return `Option<(u32, ResizeHandle)>` for note ID and handle type
-
-**Implementation Results:**
-- ✅ Added `find_resize_handle_at()` method to `StickyNotesState` that checks only selected notes
-- ✅ Method uses existing `handle_bounds()` for accurate screen-space hit testing
-- ✅ Prioritizes handle detection over note content area by checking handles first
-- ✅ Handles coordinate transformation with viewport zoom and pan
-- ✅ Added comprehensive unit tests covering all 8 handles, zoom/pan scenarios, and edge cases
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-- ✅ Full WASM build succeeds
-
-#### ✅ 1.5 Add Handle Rendering
-- Update rendering pipeline to draw resize handles on selected notes
-- Implement visual states (normal, hover, active) for handles
-- Ensure handles scale properly with viewport zoom
-
-**Implementation Details:**
-- Modify `render_sticky_notes()` in `canvas.rs` to draw handles
-- Draw small squares/circles at handle positions
-- Use different colors/styles for different states
-- Handle zoom scaling for consistent handle sizes
-
-**Implementation Results:**
-- ✅ Added `hovered_resize_handle` field to `AppState` to track currently hovered handle
-- ✅ Updated `handle_mouse_move()` to detect resize handle hovering using `find_resize_handle_at()`
-- ✅ Modified `render_sticky_notes()` to draw 8 resize handles on selected notes
-- ✅ Implemented visual states: normal (gray), hover (darker gray), active (blue)
-- ✅ Handles are drawn as 8x8 pixel squares with white borders
-- ✅ Handle positions automatically scale with viewport zoom and pan
-- ✅ Made `RESIZE_HANDLE_SIZE` constant public for use in canvas rendering
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-- ✅ Full WASM build succeeds
-- ✅ Added E2E test `resize_handle_click_and_drag_does_not_panic` to verify clicking and dragging handles doesn't cause panics
-
-#### ✅ 1.6 Implement Basic Resize Logic
-- Add mouse event handling for resize operations
-- Calculate new dimensions based on mouse movement and handle type
-- Update note dimensions during drag operations
-
-**Implementation Details:**
-- Modify `handle_mouse_down()` to detect resize handle clicks
-- Add `start_resize()` and `resize_to()` methods to `StickyNotesState`
-- Implement dimension calculation based on handle type and mouse delta
-- Update mouse move handler to call resize logic
-
-**Implementation Results:**
-- ✅ Added `start_resize()`, `resize_to()`, and `end_resize()` methods to `StickyNotesState`
-- ✅ Implemented handle-specific dimension calculations (corners change both dimensions, edges change one dimension)
-- ✅ Added minimum size constraints (50px width × 40px height) to prevent unusable notes
-- ✅ Modified `handle_mouse_down()` to prioritize resize handle detection over note selection
-- ✅ Updated `handle_mouse_move()` to call resize logic during active resize operations
-- ✅ Modified `handle_mouse_up()` and `end_drag_if_needed()` to properly end resize operations
-- ✅ Added proper coordinate transformation from screen to world space for accurate resizing
-- ✅ Added `get_note()` method to `StickyNotesState` for immutable note access
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-- ✅ Full WASM build succeeds
-- ✅ All E2E tests pass, including resize handle functionality verification
-
-#### ✅ 1.7 Fix Resize Speed Consistency with Zoom
-- Ensure resize speed feels consistent regardless of zoom level
-- Convert screen coordinate deltas to world space deltas using viewport zoom
-- Prevent resize from feeling faster at higher zoom levels
-
-**Implementation Details:**
-- Modify `resize_to()` method to divide screen deltas by `viewport.zoom`
-- Update method signature to use viewport parameter (remove underscore prefix)
-- Test resize behavior at zoom levels 0.5x, 1.0x, and 2.0x
-- Verify visual resize speed matches mouse movement speed
-
-**Current Status:**
-- ✅ Screen deltas are now converted to world deltas using `viewport.zoom`
-- ✅ Resize speed feels consistent across different zoom levels
-- ✅ Added comprehensive unit test `resize_to_with_zoom_consistency` validating zoom behavior
-- ✅ Code compiles for both host and WebAssembly targets
-- ✅ All existing tests pass
-- ✅ Full WASM build succeeds
-- ✅ **FIXED**: Resize logic now uses original dimensions instead of accumulating on current dimensions
-
 #### 1.8 Add Cursor Changes for Handles
+- Implement dynamic cursor changes when hovering over resize handles
+- Use appropriate cursors (nw-resize, n-resize, etc.) for each handle type
+- Update cursor in `update_canvas_attributes()`
+
+**Implementation Details:**
+- Add cursor detection logic in mouse move handler
+- Map `ResizeHandle` variants to CSS cursor values
+- Update canvas style cursor property dynamically
+
+#### 1.9 Support Proportional Resizing (Shift Modifier)
+- Detect Shift key during resize operations
+- Maintain aspect ratio when Shift is held
+- Provide visual feedback for proportional mode
+
+**Implementation Details:**
+- Track Shift key state in resize operations
+- Calculate proportional dimensions using original aspect ratio
+- Add visual indicator (different cursor or handle styling) for proportional mode
+
+#### 1.10 Test Resize with Viewport Zoom and Pan
+- Verify resize handles work correctly at different zoom levels
+- Ensure handle positions update properly during pan operations
+- Test edge cases with extreme zoom levels
+
+**Implementation Details:**
+- Test handle hit detection at various zoom levels
+- Verify cursor changes work with viewport transformations
+- Ensure minimum size constraints scale appropriately with zoom
 - Implement dynamic cursor changes when hovering over resize handles
 - Use appropriate cursors (nw-resize, n-resize, etc.) for each handle type
 - Update cursor in `update_canvas_attributes()`
@@ -407,13 +292,57 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Improve color scheme and typography
 - Add loading states and transitions
 
-### 7. Code Refactoring
-- Improve code maintainability and readability through targeted refactoring
-- Break down large functions, extract constants, and simplify borrow patterns
+## Active Low Priority Tasks
 
-**Subtasks:**
+### 8. Add Mobile Support
+- Implement touch event handling for mobile devices
+- Add gesture recognition for pinch-to-zoom and multi-touch interactions
 
-#### ✅ 7.1 Break Down Large Functions into Smaller Helpers
+**Implementation Details:**
+- Add touch event listeners in `events.rs` for `touchstart`, `touchmove`, `touchend`
+- Implement pinch gesture detection for zoom
+- Add single-touch drag support for canvas and notes
+- Test on mobile browsers and ensure responsive design
+- Handle touch vs mouse event conflicts
+
+## Recently Completed Tasks
+
+### ✅ 7.3 Simplify Complex Borrow Patterns in Event Handlers
+- Analyze event handler closures for borrow checker complexity
+- Refactor to reduce lifetime and borrowing issues
+- Improve code clarity and maintainability
+
+**Implementation Details:**
+- Review closure captures in event_setup.rs and related modules
+- Extract state snapshots or restructure data flow
+- Ensure no functional changes during refactoring
+- Add tests to verify event handling behavior
+
+**Completed Changes:**
+- Created `EventContext` struct to bundle shared state and functions, reducing individual Rc<RefCell<>> clones
+- Refactored all event handler setup functions to use the shared context instead of multiple parameters
+- Simplified closure captures from 4-5 individual clones to single context clone
+- Maintained all existing functionality and error handling
+- All tests pass and builds succeed for both host and WASM targets
+
+### ✅ 7.2 Extract Magic Numbers to Named Constants
+- Find hardcoded numeric values throughout the codebase
+- Define meaningful constant names for configuration values
+- Centralize constants for easier maintenance
+
+**Implementation Details:**
+- Search for numeric literals in source code
+- Define constants in appropriate modules (e.g., viewport limits, handle sizes)
+- Replace all occurrences with named constants
+- Update documentation to reference constants
+
+**Completed Changes:**
+- Added `DEFAULT_NOTE_WIDTH` (200.0) and `DEFAULT_NOTE_HEIGHT` (150.0) to `sticky_notes.rs`
+- Added `FORMATTING_TOOLBAR_VERTICAL_OFFSET` (40.0), `TEXT_INPUT_MAX_WIDTH` (200.0), `TEST_VIEWPORT_WIDTH` (800.0), and `TEST_VIEWPORT_HEIGHT` (600.0) to `styling.rs`
+- Updated all references in `StickyNote::new()`, `mouse_events.rs`, `text_input.rs`, and `styling.rs`
+- All tests pass and builds succeed for both host and WASM targets
+
+### ✅ 7.1 Break Down Large Functions into Smaller Helpers
 - Identify functions exceeding reasonable size limits (e.g., start_impl, render functions)
 - Extract logical units into focused helper functions
 - Maintain error handling and behavior consistency
@@ -434,55 +363,112 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - ✅ Full WASM build succeeds
 - ✅ Improved code readability and maintainability
 
-#### ✅ 7.2 Extract Magic Numbers to Named Constants
-- Find hardcoded numeric values throughout the codebase
-- Define meaningful constant names for configuration values
-- Centralize constants for easier maintenance
+### ✅ 1.7 Fix Resize Speed Consistency with Zoom
+- Ensure resize speed feels consistent regardless of zoom level
+- Convert screen coordinate deltas to world space deltas using viewport zoom
+- Prevent resize from feeling faster at higher zoom levels
 
 **Implementation Details:**
-- Search for numeric literals in source code
-- Define constants in appropriate modules (e.g., viewport limits, handle sizes)
-- Replace all occurrences with named constants
-- Update documentation to reference constants
+- Modify `resize_to()` method to divide screen deltas by `viewport.zoom`
+- Update method signature to use viewport parameter (remove underscore prefix)
+- Test resize behavior at zoom levels 0.5x, 1.0x, and 2.0x
+- Verify visual resize speed matches mouse movement speed
 
-**Completed Changes:**
-- Added `DEFAULT_NOTE_WIDTH` (200.0) and `DEFAULT_NOTE_HEIGHT` (150.0) to `sticky_notes.rs`
-- Added `FORMATTING_TOOLBAR_VERTICAL_OFFSET` (40.0), `TEXT_INPUT_MAX_WIDTH` (200.0), `TEST_VIEWPORT_WIDTH` (800.0), and `TEST_VIEWPORT_HEIGHT` (600.0) to `styling.rs`
-- Updated all references in `StickyNote::new()`, `mouse_events.rs`, `text_input.rs`, and `styling.rs`
-- All tests pass and builds succeed for both host and WASM targets
+**Current Status:**
+- ✅ Screen deltas are now converted to world deltas using `viewport.zoom`
+- ✅ Resize speed feels consistent across different zoom levels
+- ✅ Added comprehensive unit test `resize_to_with_zoom_consistency` validating zoom behavior
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
+- ✅ Full WASM build succeeds
+- ✅ **FIXED**: Resize logic now uses original dimensions instead of accumulating on current dimensions
 
-#### ✅ 7.3 Simplify Complex Borrow Patterns in Event Handlers
-- Analyze event handler closures for borrow checker complexity
-- Refactor to reduce lifetime and borrowing issues
-- Improve code clarity and maintainability
-
-**Implementation Details:**
-- Review closure captures in event_setup.rs and related modules
-- Extract state snapshots or restructure data flow
-- Ensure no functional changes during refactoring
-- Add tests to verify event handling behavior
-
-**Completed Changes:**
-- Created `EventContext` struct to bundle shared state and functions, reducing individual Rc<RefCell<>> clones
-- Refactored all event handler setup functions to use the shared context instead of multiple parameters
-- Simplified closure captures from 4-5 individual clones to single context clone
-- Maintained all existing functionality and error handling
-- All tests pass and builds succeed for both host and WASM targets
-
-## Active Low Priority Tasks
-
-### 8. Add Mobile Support
-- Implement touch event handling for mobile devices
-- Add gesture recognition for pinch-to-zoom and multi-touch interactions
+### ✅ 1.6 Implement Basic Resize Logic
+- Add mouse event handling for resize operations
+- Calculate new dimensions based on mouse movement and handle type
+- Update note dimensions during drag operations
 
 **Implementation Details:**
-- Add touch event listeners in `events.rs` for `touchstart`, `touchmove`, `touchend`
-- Implement pinch gesture detection for zoom
-- Add single-touch drag support for canvas and notes
-- Test on mobile browsers and ensure responsive design
-- Handle touch vs mouse event conflicts
+- Modify `handle_mouse_down()` to detect resize handle clicks
+- Add `start_resize()` and `resize_to()` methods to `StickyNotesState`
+- Implement dimension calculation based on handle type and mouse delta
+- Update mouse move handler to call resize logic
 
-## Recently Completed Tasks
+**Implementation Results:**
+- ✅ Added `start_resize()`, `resize_to()`, and `end_resize()` methods to `StickyNotesState`
+- ✅ Implemented handle-specific dimension calculations (corners change both dimensions, edges change one dimension)
+- ✅ Added minimum size constraints (50px width × 40px height) to prevent unusable notes
+- ✅ Modified `handle_mouse_down()` to prioritize resize handle detection over note selection
+- ✅ Updated `handle_mouse_move()` to call resize logic during active resize operations
+- ✅ Modified `handle_mouse_up()` and `end_drag_if_needed()` to properly end resize operations
+- ✅ Added proper coordinate transformation from screen to world space for accurate resizing
+- ✅ Added `get_note()` method to `StickyNotesState` for immutable note access
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
+- ✅ Full WASM build succeeds
+- ✅ All E2E tests pass, including resize handle functionality verification
+
+### ✅ 1.5 Add Handle Rendering
+- Update rendering pipeline to draw resize handles on selected notes
+- Implement visual states (normal, hover, active) for handles
+- Ensure handles scale properly with viewport zoom
+
+**Implementation Details:**
+- Modify `render_sticky_notes()` in `canvas.rs` to draw handles
+- Draw small squares/circles at handle positions
+- Use different colors/styles for different states
+- Handle zoom scaling for consistent handle sizes
+
+**Implementation Results:**
+- ✅ Added `hovered_resize_handle` field to `AppState` to track currently hovered handle
+- ✅ Updated `handle_mouse_move()` to detect resize handle hovering using `find_resize_handle_at()`
+- ✅ Modified `render_sticky_notes()` to draw 8 resize handles on selected notes
+- ✅ Implemented visual states: normal (gray), hover (darker gray), active (blue)
+- ✅ Handles are drawn as 8x8 pixel squares with white borders
+- ✅ Handle positions automatically scale with viewport zoom and pan
+- ✅ Made `RESIZE_HANDLE_SIZE` constant public for use in canvas rendering
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
+- ✅ Full WASM build succeeds
+- ✅ Added E2E test `resize_handle_click_and_drag_does_not_panic` to verify clicking and dragging handles doesn't cause panics
+
+### ✅ 1.2 Define Resize Handle Types and Positions
+- Create `ResizeHandle` enum for 8 handle positions (corners + midpoints)
+- Implement handle position calculation methods
+- Add handle size and visual properties
+
+**Implementation Details:**
+- Define enum: `TopLeft`, `Top`, `TopRight`, `Right`, `BottomRight`, `Bottom`, `BottomLeft`, `Left`
+- Add `handle_positions()` method to `StickyNote` returning screen coordinates
+- Define handle size constants (e.g., 8x8 pixels)
+
+**Implementation Results:**
+- ✅ Created `ResizeHandle` enum with 8 variants for all handle positions
+- ✅ Added `cursor()` method to `ResizeHandle` returning appropriate CSS cursor styles
+- ✅ Added `handle_position()` method to `StickyNote` for individual handle world coordinates
+- ✅ Added `handle_bounds()` method for screen-space bounding boxes (for hit testing)
+- ✅ Added `handle_positions()` method returning all handle screen coordinates for rendering
+- ✅ Defined `RESIZE_HANDLE_SIZE` constant (8.0 pixels)
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
+
+### ✅ 1.1 Verify StickyNote Structure
+- Confirm `StickyNote` struct already has `width` and `height` fields
+- Ensure existing code uses these fields properly
+- Add any missing documentation for size fields
+
+**Implementation Details:**
+- Check `src/sticky_notes.rs` for current `StickyNote` implementation
+- Verify width/height are used in rendering and hit testing
+- Update documentation if needed
+
+**Verification Results:**
+- ✅ `StickyNote` struct has `width: f64` and `height: f64` fields with proper documentation
+- ✅ `contains_point()` method correctly uses `width` and `height` for hit testing
+- ✅ `render_sticky_notes()` in `canvas.rs` uses `note.width * zoom` and `note.height * zoom` for rendering
+- ✅ Tests verify default dimensions (200.0 x 150.0) and hit testing behavior
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
 
 ### ✅ 1.3 Add Resizing State to AppState
 - Extended `AppState` with `ResizingState` struct for tracking resize operations
