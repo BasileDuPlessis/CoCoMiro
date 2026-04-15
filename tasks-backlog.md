@@ -35,84 +35,134 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 ## Active High Priority Tasks
 
-### ✅ 1. Externalize CSS Styles
-- Move all inline CSS from `index.html` to external `styles.css` file
-- Replace programmatic style setting in Rust code with CSS classes
-- Define CSS custom properties for colors and reusable values
-- Maintain all existing visual styling and behavior
+### 1. Implement Sticky Note Resizing
+- Add resize handles to sticky notes for drag-and-drop resizing
+- Support corner and edge handles with appropriate cursors
+- Maintain minimum size constraints and smooth interactions
+
+**Subtasks:**
+
+#### ✅ 1.1 Verify StickyNote Structure
+- Confirm `StickyNote` struct already has `width` and `height` fields
+- Ensure existing code uses these fields properly
+- Add any missing documentation for size fields
 
 **Implementation Details:**
-- Create `styles.css` with all current styles from HTML `<style>` block
-- Define CSS variables for colors (--color-primary, --color-bg, etc.)
-- Create CSS classes for dynamic elements (.text-input-toolbar, .contenteditable-overlay, etc.)
-- Replace `set_property` calls in Rust with `class_list().add()`
-- Keep only truly dynamic properties (positions, dimensions) in Rust code
-- Test visual appearance after each component migration
-- Ensure compilation for both host and WASM targets
-- Run full test suite to verify no regressions
+- Check `src/sticky_notes.rs` for current `StickyNote` implementation
+- Verify width/height are used in rendering and hit testing
+- Update documentation if needed
 
-**Style Regression Prevention:**
-- Create visual baseline screenshots before starting
-- Test each component individually (toolbar, buttons, contenteditable, canvas cursor)
-- Use browser dev tools to audit computed styles
-- Add automated visual regression tests if possible
-- Manual testing of all UI states (hover, focus, active, editing modes)
-- Cross-browser testing (Chrome, Firefox, Safari)
+**Verification Results:**
+- ✅ `StickyNote` struct has `width: f64` and `height: f64` fields with proper documentation
+- ✅ `contains_point()` method correctly uses `width` and `height` for hit testing
+- ✅ `render_sticky_notes()` in `canvas.rs` uses `note.width * zoom` and `note.height * zoom` for rendering
+- ✅ Tests verify default dimensions (200.0 x 150.0) and hit testing behavior
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
 
-### ✅ 1.1 Create Visual Regression Test Suite
-- Set up automated screenshot comparison for key UI components
-- Capture baseline images of toolbar, text input overlay, canvas states
-- Implement pixel-perfect comparison or perceptual diff testing
-- Add to CI/CD pipeline for future changes
+#### ✅ 1.2 Define Resize Handle Types and Positions
+- Create `ResizeHandle` enum for 8 handle positions (corners + midpoints)
+- Implement handle position calculation methods
+- Add handle size and visual properties
 
 **Implementation Details:**
-- Use headless_chrome for screenshot capture in browser automation tests
-- Store baseline images in `tests/baselines/` directory (committed to version control)
-- Implement pixel-by-pixel image comparison with configurable threshold (1% difference allowed)
-- Created `tests/visual_regression.rs` with automated test suite
-- Tests for: toolbar initial state, canvas initial state, text input overlay
-- Utility test to update baselines when UI changes are intentional
-- Failing screenshots saved with `_fail.png` suffix for debugging (not committed)
-- All tests pass and WASM build succeeds
+- Define enum: `TopLeft`, `Top`, `TopRight`, `Right`, `BottomRight`, `Bottom`, `BottomLeft`, `Left`
+- Add `handle_positions()` method to `StickyNote` returning screen coordinates
+- Define handle size constants (e.g., 8x8 pixels)
 
-### Code Refactoring Tasks
+**Implementation Results:**
+- ✅ Created `ResizeHandle` enum with 8 variants for all handle positions
+- ✅ Added `cursor()` method to `ResizeHandle` returning appropriate CSS cursor styles
+- ✅ Added `handle_position()` method to `StickyNote` for individual handle world coordinates
+- ✅ Added `handle_bounds()` method for screen-space bounding boxes (for hit testing)
+- ✅ Added `handle_positions()` method returning all handle screen coordinates for rendering
+- ✅ Defined `RESIZE_HANDLE_SIZE` constant (8.0 pixels)
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
 
-#### ✅ 2. Split render_canvas Function
-- Break down the ~290-line `render_canvas` function in `canvas.rs` into smaller, focused functions
-- Extract `render_grid_background()`, `render_sticky_notes()`, `render_text_content()`, `update_status_display()`
-- Maintain the same external API and behavior
-
-**Implementation Details:**
-- Identify logical boundaries within `render_canvas`
-- Create private helper functions with clear responsibilities
-- Preserve performance characteristics and error handling
-- Test that rendering still works correctly after split
-
-#### ✅ 3. Move Integration Tests
-- Create new `tests/integration_tests.rs` file
-- Move all integration tests from `lib.rs` to the new file
-- Update test module structure and imports
-- Ensure all tests still pass
+#### 1.3 Add Resizing State to AppState
+- Extend `AppState` with `ResizingState` for tracking resize operations
+- Add fields for active resize handle, original dimensions, drag start position
+- Integrate with existing drag state management
 
 **Implementation Details:**
-- Create `tests/` directory if it doesn't exist
-- Move the 9 integration test functions from `lib.rs`
-- Update `#[cfg(test)]` module declarations
-- Made AppState, ViewportState, and related methods available for host compilation to support integration tests
-- Run full test suite to verify no regressions
+- Create `ResizingState` struct with: `is_resizing: bool`, `note_id: Option<u32>`, `handle: Option<ResizeHandle>`, `start_mouse_x/y`, `original_width/height`
+- Add to `AppState` struct
+- Update `AppState::default()` to include default resizing state
 
-#### ✅ 4. Break Down start_impl Function
-- Split the ~150-line `start_impl` function in `lib.rs` into smaller initialization phases
-- Extract `setup_canvas_and_context()`, `create_render_and_position_functions()`, `setup_event_system()`, `setup_window_resize_handler()`
-- Improve readability and maintainability
+#### 1.4 Implement Handle Hit Detection
+- Add method to detect which resize handle (if any) is under the mouse cursor
+- Calculate handle bounds in screen coordinates
+- Prioritize handle detection over note content area
 
 **Implementation Details:**
-- Identify initialization phases within `start_impl`
-- Create private helper functions for each phase
-- Preserve error handling and resource management
-- Test that application startup still works correctly
+- Add `find_resize_handle_at()` method to `StickyNotesState`
+- Convert world coordinates to screen coordinates for handle bounds
+- Return `Option<(u32, ResizeHandle)>` for note ID and handle type
 
-### 6. Add Persistence
+#### 1.5 Add Handle Rendering
+- Update rendering pipeline to draw resize handles on selected notes
+- Implement visual states (normal, hover, active) for handles
+- Ensure handles scale properly with viewport zoom
+
+**Implementation Details:**
+- Modify `render_sticky_notes()` in `canvas.rs` to draw handles
+- Draw small squares/circles at handle positions
+- Use different colors/styles for different states
+- Handle zoom scaling for consistent handle sizes
+
+#### 1.6 Implement Basic Resize Logic
+- Add mouse event handling for resize operations
+- Calculate new dimensions based on mouse movement and handle type
+- Update note dimensions during drag operations
+
+**Implementation Details:**
+- Modify `handle_mouse_down()` to detect resize handle clicks
+- Add `start_resize()` and `resize_to()` methods to `StickyNotesState`
+- Implement dimension calculation based on handle type and mouse delta
+- Update mouse move handler to call resize logic
+
+#### 1.7 Add Cursor Changes for Handles
+- Implement dynamic cursor changes when hovering over resize handles
+- Use appropriate cursors (nw-resize, n-resize, etc.) for each handle type
+- Update cursor in `update_canvas_attributes()`
+
+**Implementation Details:**
+- Add cursor detection logic in mouse move handler
+- Map `ResizeHandle` variants to CSS cursor values
+- Update canvas style cursor property dynamically
+
+#### 1.8 Support Proportional Resizing (Shift Modifier)
+- Detect Shift key during resize operations
+- Maintain aspect ratio when Shift is held
+- Provide visual feedback for proportional mode
+
+**Implementation Details:**
+- Track Shift key state in resize operations
+- Calculate proportional dimensions using original aspect ratio
+- Add visual indicator (different cursor or handle styling) for proportional mode
+
+#### 1.9 Add Minimum Size Constraints
+- Implement minimum width/height limits for sticky notes
+- Prevent notes from becoming too small during resize
+- Provide smooth constraint enforcement
+
+**Implementation Details:**
+- Define `MIN_NOTE_WIDTH` and `MIN_NOTE_HEIGHT` constants (e.g., 50.0, 40.0)
+- Clamp dimensions in resize logic to minimum values
+- Ensure constraints work with proportional resizing
+
+#### 1.10 Test Resize with Viewport Zoom and Pan
+- Verify resize handles work correctly at different zoom levels
+- Ensure handle positions update properly during pan operations
+- Test edge cases with extreme zoom levels
+
+**Implementation Details:**
+- Test handle hit detection at various zoom levels
+- Verify cursor changes work with viewport transformations
+- Ensure minimum size constraints scale appropriately with zoom
+
+### 2. Add Persistence
 - Implement save/load functionality for sticky notes
 - Add data serialization and local storage
 
@@ -124,7 +174,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Add autosave functionality
 - Handle data migration for future versions
 
-### 2. Implement Undo/Redo System
+### 3. Implement Undo/Redo System
 - Add command pattern for reversible actions
 - Implement undo/redo functionality for all user actions
 
@@ -136,11 +186,11 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Handle complex operations (bulk actions, etc.)
 - Add visual feedback for undo/redo state
 
-### 3. Performance Optimizations
+### 4. Performance Optimizations
 
-#### 3.1 Spatial Partitioning for Note Hit Testing
+#### 4.1 Spatial Partitioning for Note Hit Testing
 
-##### 3.1.1 Performance Analysis
+##### 4.1.1 Performance Analysis
 - Profile current O(n) hit testing with benchmark tests
 - Identify performance bottlenecks with 50+ notes
 - Establish baseline metrics for improvement measurement
@@ -150,7 +200,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Measure average hit test time per note
 - Document current performance characteristics
 
-##### 3.1.2 Design Spatial Data Structure
+##### 4.1.2 Design Spatial Data Structure
 - Research quadtree vs R-tree vs simple grid partitioning
 - Design API for spatial queries (point-in-rect, rect intersection)
 - Define bounds calculation for sticky notes
@@ -160,7 +210,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Consider note size variations and movement patterns
 - Design for dynamic updates (add/remove/move notes)
 
-##### 3.1.3 Implement Spatial Index Core
+##### 4.1.3 Implement Spatial Index Core
 - Implement chosen spatial data structure (likely quadtree)
 - Add insert/remove/update operations for notes
 - Implement point-in-bounds queries for hit testing
@@ -170,7 +220,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Handle note bounding box calculations
 - Support efficient bulk operations
 
-##### 3.1.4 Integrate with Note Management
+##### 4.1.4 Integrate with Note Management
 - Update `StickyNotes` struct to maintain spatial index
 - Modify `add_note`, `remove_note`, `move_note` to update index
 - Replace linear search in `find_note_at_point` with spatial query
@@ -180,7 +230,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Update all note mutation methods
 - Ensure index consistency during operations
 
-##### 3.1.5 Performance Validation
+##### 4.1.5 Performance Validation
 - Benchmark hit testing performance improvement
 - Test correctness with existing test suite
 - Measure memory overhead of spatial index
@@ -190,9 +240,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Ensure no regressions in functionality
 - Document performance gains
 
-#### 3.2 Viewport Culling for Large Note Counts
+#### 4.2 Viewport Culling for Large Note Counts
 
-##### 3.2.1 Viewport Bounds Calculation
+##### 4.2.1 Viewport Bounds Calculation
 - Implement viewport-to-world bounds conversion
 - Add viewport change detection for culling updates
 - Calculate expanded bounds for smooth panning
@@ -202,7 +252,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Handle zoom-dependent culling margins
 - Support different culling strategies (conservative vs tight)
 
-##### 3.2.2 Culling Logic Implementation
+##### 4.2.2 Culling Logic Implementation
 - Implement note filtering based on viewport bounds
 - Add culling state management (culled vs visible notes)
 - Update culling on viewport changes (pan/zoom)
@@ -212,7 +262,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Add culling cache to avoid redundant calculations
 - Handle note size in visibility calculations
 
-##### 3.2.3 Rendering Pipeline Integration
+##### 4.2.3 Rendering Pipeline Integration
 - Modify canvas rendering to use culled note list
 - Update rendering loop to filter notes before drawing
 - Optimize render order for better performance
@@ -222,7 +272,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Maintain render order for proper layering
 - Add debug visualization for culling bounds
 
-##### 3.2.4 Culling Performance Testing
+##### 4.2.4 Culling Performance Testing
 - Benchmark rendering performance with 200+ notes
 - Test culling accuracy and smoothness
 - Measure frame rate improvements
@@ -232,9 +282,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Verify no visual artifacts from culling
 - Document rendering performance gains
 
-#### 3.3 Combined Spatial + Culling Optimization
+#### 4.3 Combined Spatial + Culling Optimization
 
-##### 3.3.1 Integration Testing
+##### 4.3.1 Integration Testing
 - Test spatial index + culling working together
 - Verify hit testing works on culled notes
 - Performance benchmark of combined optimizations
@@ -244,7 +294,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Ensure spatial queries work with viewport bounds
 - Measure overall performance improvement
 
-##### 3.3.2 Memory and Maintenance Optimization
+##### 4.3.2 Memory and Maintenance Optimization
 - Optimize spatial index memory usage
 - Add index rebuilding for extreme cases
 - Implement lazy culling updates
@@ -254,7 +304,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Add maintenance operations for index health
 - Balance performance vs memory trade-offs
 
-#### 3.3 Grid Rendering Optimization
+#### 4.3 Grid Rendering Optimization
 - Optimize background grid rendering for large zoom levels
 - Implement adaptive grid density
 
@@ -264,7 +314,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Reduce grid density at high zoom levels
 - Optimize grid line calculation and drawing
 
-#### 3.4 WebGL Acceleration (Future)
+#### 4.4 WebGL Acceleration (Future)
 - Consider WebGL acceleration for complex rendering
 - Evaluate WebGL vs Canvas 2D performance trade-offs
 
@@ -276,7 +326,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 ## Active Medium Priority Tasks
 
-### 4. Enhanced Accessibility
+### 5. Enhanced Accessibility
 - Complete WCAG compliance and screen reader support
 - Improve keyboard navigation
 
@@ -287,7 +337,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Add high contrast mode support
 - Test with screen readers
 
-### 5. Advanced Visual Polish
+### 6. Advanced Visual Polish
 - Add animations and visual effects
 - Improve overall UI/UX design
 
@@ -300,7 +350,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 ## Active Low Priority Tasks
 
-### 6. Add Mobile Support
+### 7. Add Mobile Support
 - Implement touch event handling for mobile devices
 - Add gesture recognition for pinch-to-zoom and multi-touch interactions
 
@@ -321,6 +371,22 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Created CSS classes for dynamic elements (.text-input-toolbar, .contenteditable-overlay, .formatting-button variants)
 - Kept only truly dynamic properties (positions, dimensions, background-color) in Rust code
 - Ensured trunk build includes the external CSS file
+- All tests pass and WASM build succeeds
+
+### ✅ Create Visual Regression Test Suite
+- Set up automated screenshot comparison for key UI components
+- Capture baseline images of toolbar, text input overlay, canvas states
+- Implement pixel-perfect comparison or perceptual diff testing
+- Add to CI/CD pipeline for future changes
+
+**Implementation Details:**
+- Use headless_chrome for screenshot capture in browser automation tests
+- Store baseline images in `tests/baselines/` directory (committed to version control)
+- Implement pixel-by-pixel image comparison with configurable threshold (1% difference allowed)
+- Created `tests/visual_regression.rs` with automated test suite
+- Tests for: toolbar initial state, canvas initial state, text input overlay
+- Utility test to update baselines when UI changes are intentional
+- Failing screenshots saved with `_fail.png` suffix for debugging (not committed)
 - All tests pass and WASM build succeeds
 
 ### ✅ Split render_canvas Function
@@ -345,6 +411,19 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Preserved WebAssembly conditional compilation for all functions
 - Verified compilation for both host and WASM targets
 - All tests pass and full WASM build succeeds
+
+### ✅ Move Integration Tests
+- Create new `tests/integration_tests.rs` file
+- Move all integration tests from `lib.rs` to the new file
+- Update test module structure and imports
+- Ensure all tests still pass
+
+**Implementation Details:**
+- Create `tests/` directory if it doesn't exist
+- Move the 9 integration test functions from `lib.rs`
+- Update `#[cfg(test)]` module declarations
+- Made AppState, ViewportState, and related methods available for host compilation to support integration tests
+- Run full test suite to verify no regressions
 
 ### ✅ Break Down start_impl Function
 - Split the ~150-line `start_impl` function in `lib.rs` into smaller initialization phases
