@@ -666,14 +666,11 @@ pub fn create_text_input_overlay(
                                                 let document = contenteditable.owner_document().unwrap();
                                                 if let Ok(temp_div) = document.create_element("div") {
                                                     let _ = temp_div.set_inner_html(&sanitized_html);
-                                                    if let Ok(fragment) = document.create_document_fragment() {
-                                                        while let Some(child) = temp_div.first_child() {
-                                                            let _ = fragment.append_child(&child);
-                                                        }
-                                                        let _ = range.insert_node(&fragment);
-                                                        crate::log_info("Pasted HTML content (sanitized)");
-                                                        return;
+                                                    let fragment = document.create_document_fragment();
+                                                    while let Some(child) = temp_div.first_child() {
+                                                        let _ = fragment.append_child(&child);
                                                     }
+                                                    let _ = range.insert_node(&fragment);
                                                 }
                                             }
                                         }
