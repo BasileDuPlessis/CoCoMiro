@@ -143,6 +143,21 @@ fn spawn_trunk() -> TestResult<(ChildGuard, String)> {
     for attempt in 1..=TRUNK_START_ATTEMPTS {
         let port = reserve_port()?;
         let address = format!("{HOST}:{port}");
+
+        // Build the project first to ensure CSS is processed, but only if not already built
+        let dist_dir = std::env::current_dir()?.join("dist");
+        if !dist_dir.exists() || !dist_dir.join("index.html").exists() {
+            let build_result = Command::new("trunk")
+                .args(["build", "--release"])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+
+            if !build_result.success() {
+                return Err(format!("trunk build failed with exit code {}", build_result.code().unwrap_or(-1)).into());
+            }
+        }
+
         let mut trunk = Command::new("trunk")
             .args([
                 "serve",
@@ -291,7 +306,7 @@ fn assert_toolbar_is_visible(tab: &Tab) -> TestResult {
     let toolbar = ready_toolbar(tab)?;
     let bounds = toolbar.get_box_model()?.margin_viewport();
 
-    assert!(bounds.height > bounds.width, "expected a vertical toolbar");
+    assert!(bounds.height > bounds.width, "expected a vertical toolbar (height={:.1} > width={:.1})", bounds.height, bounds.width);
     assert!(
         attribute_as_f64(&toolbar, "data-x")? >= 0.0,
         "toolbar x position should be exposed"

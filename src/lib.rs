@@ -48,6 +48,7 @@ pub mod keyboard_events;
 pub mod logging;
 pub mod mouse_events;
 pub mod sticky_notes;
+pub mod styling;
 pub mod text_input;
 pub mod toolbar;
 pub mod viewport;

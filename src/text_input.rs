@@ -9,7 +9,7 @@ use js_sys;
 #[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 
@@ -36,32 +36,28 @@ fn create_formatting_toolbar(
     overlay_left: f64,
     overlay_top: f64,
     screen_width: f64,
-) -> Result<web_sys::HtmlElement, String> {
+) -> Result<web_sys::HtmlElement, JsValue> {
     // Create toolbar container
     let toolbar = document
         .create_element("div")
-        .map_err(|_| "Cannot create toolbar element")?;
+        .map_err(|_| JsValue::from_str("Cannot create toolbar element"))?;
 
     let toolbar: web_sys::HtmlElement = toolbar
         .dyn_into()
-        .map_err(|_| "Cannot convert toolbar to HtmlElement")?;
+        .map_err(|_| JsValue::from_str("Cannot convert toolbar to HtmlElement"))?;
 
-    // Style the toolbar
-    let _ = toolbar.set_attribute("class", "text-input-toolbar");
-    let _ = toolbar
-        .style()
-        .set_property("left", &format!("{}px", overlay_left));
-    let _ = toolbar
-        .style()
-        .set_property("top", &format!("{}px", overlay_top - 40.0)); // Position above contenteditable
-    let _ = toolbar
-        .style()
-        .set_property("width", &format!("{}px", screen_width.min(200.0))); // Limit max width
+    // Style the toolbar with centralized styling function
+    crate::styling::components::style_text_input_toolbar(
+        &toolbar,
+        overlay_left,
+        overlay_top,
+        screen_width,
+    )?;
 
     // Create bold button
     let bold_button = document
         .create_element("button")
-        .map_err(|_| "Cannot create bold button")?;
+        .map_err(|_| JsValue::from_str("Cannot create bold button"))?;
     bold_button.set_text_content(Some("B"));
     let _ = bold_button.set_attribute("title", "Bold");
     let _ = bold_button.set_attribute("aria-label", "Make text bold");
@@ -70,7 +66,7 @@ fn create_formatting_toolbar(
     // Create italic button
     let italic_button = document
         .create_element("button")
-        .map_err(|_| "Cannot create italic button")?;
+        .map_err(|_| JsValue::from_str("Cannot create italic button"))?;
     italic_button.set_text_content(Some("I"));
     let _ = italic_button.set_attribute("title", "Italic");
     let _ = italic_button.set_attribute("aria-label", "Make text italic");
@@ -79,7 +75,7 @@ fn create_formatting_toolbar(
     // Create underline button
     let underline_button = document
         .create_element("button")
-        .map_err(|_| "Cannot create underline button")?;
+        .map_err(|_| JsValue::from_str("Cannot create underline button"))?;
     underline_button.set_text_content(Some("U"));
     let _ = underline_button.set_attribute("title", "Underline");
     let _ = underline_button.set_attribute("aria-label", "Underline text");
@@ -110,7 +106,7 @@ fn add_formatting_handler(
     button: &web_sys::Element,
     format_type: &str,
     contenteditable: &web_sys::HtmlElement,
-) -> Result<(), String> {
+) -> Result<(), JsValue> {
     let contenteditable = contenteditable.clone();
     let format_type = format_type.to_string();
 
@@ -151,7 +147,7 @@ fn add_formatting_handler(
 
     button
         .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
-        .map_err(|_| "Failed to add click event listener")?;
+        .map_err(|_| JsValue::from_str("Failed to add click event listener"))?;
 
     closure.forget();
     Ok(())
@@ -200,12 +196,12 @@ pub fn create_text_input_overlay(
     state: &Rc<RefCell<crate::AppState>>,
     note_id: u32,
     render: &Rc<dyn Fn()>,
-) {
+) -> Result<(), JsValue> {
     let browser_window = match web_sys::window() {
         Some(w) => w,
         None => {
             crate::logging::log_warn("Cannot create text input overlay: window unavailable");
-            return;
+            return Err(JsValue::from_str("Window unavailable"));
         }
     };
 
@@ -213,7 +209,7 @@ pub fn create_text_input_overlay(
         Some(d) => d,
         None => {
             crate::logging::log_warn("Cannot create text input overlay: document unavailable");
-            return;
+            return Err(JsValue::from_str("Document unavailable"));
         }
     };
 
@@ -231,7 +227,7 @@ pub fn create_text_input_overlay(
                 "Cannot create input overlay for note {}: note not found",
                 note_id
             ));
-            return;
+            return Err(JsValue::from_str("Note not found"));
         }
     };
 
@@ -275,7 +271,7 @@ pub fn create_text_input_overlay(
         Ok(el) => el,
         Err(_) => {
             crate::logging::log_warn("Cannot create contenteditable div element");
-            return;
+            return Err(JsValue::from_str("Cannot create contenteditable element"));
         }
     };
 
@@ -283,7 +279,7 @@ pub fn create_text_input_overlay(
         Ok(div) => div,
         Err(_) => {
             crate::logging::log_warn("Cannot convert element to HtmlElement");
-            return;
+            return Err(JsValue::from_str("Cannot convert to HtmlElement"));
         }
     };
 
@@ -300,28 +296,20 @@ pub fn create_text_input_overlay(
     ) {
         Ok(tb) => tb,
         Err(e) => {
-            crate::logging::log_warn(&format!("Cannot create formatting toolbar: {}", e));
-            return;
+            crate::logging::log_warn(&format!("Cannot create formatting toolbar: {:?}", e));
+            return Err(e);
         }
     };
 
-    // Style the contenteditable div to match the note exactly
-    let _ = contenteditable.set_attribute("class", "contenteditable-overlay");
-    let _ = contenteditable
-        .style()
-        .set_property("left", &format!("{}px", overlay_left));
-    let _ = contenteditable
-        .style()
-        .set_property("top", &format!("{}px", overlay_top));
-    let _ = contenteditable
-        .style()
-        .set_property("width", &format!("{}px", screen_width));
-    let _ = contenteditable
-        .style()
-        .set_property("height", &format!("{}px", screen_height));
-    let _ = contenteditable
-        .style()
-        .set_property("background-color", &note.color);
+    // Style the contenteditable div with centralized styling function
+    crate::styling::components::style_contenteditable_overlay(
+        &contenteditable,
+        overlay_left,
+        overlay_top,
+        screen_width,
+        screen_height,
+        &note.color,
+    )?;
 
     // Set initial content and focus - handle both HTML and plain text content
     let initial_html = if note.content.contains('<') && note.content.contains('>') {
@@ -334,10 +322,11 @@ pub fn create_text_input_overlay(
     contenteditable.set_inner_html(&initial_html);
 
     // Set initial height based on note height
-    let initial_screen_height = screen_height;
-    let _ = contenteditable
-        .style()
-        .set_property("height", &format!("{}px", initial_screen_height));
+    crate::styling::sizing::update_contenteditable_height(
+        &contenteditable,
+        screen_height,
+        screen_height,
+    )?;
 
     let _ = contenteditable.focus();
 
@@ -360,9 +349,11 @@ pub fn create_text_input_overlay(
                 // Adjust contenteditable height to fit content
                 // For contenteditable, we need to measure the scroll height
                 let scroll_height = contenteditable.scroll_height() as f64;
-                let _ = contenteditable
-                    .style()
-                    .set_property("height", &format!("{}px", scroll_height));
+                let _ = crate::styling::sizing::update_contenteditable_height(
+                    &contenteditable,
+                    scroll_height,
+                    screen_height,
+                );
 
                 // Adjust note height based on contenteditable height in world coordinates
                 let min_height = 150.0; // Minimum note height
@@ -613,4 +604,5 @@ pub fn create_text_input_overlay(
     }
 
     crate::logging::log_info(&format!("Created text input overlay for note {}", note_id));
+    Ok(())
 }

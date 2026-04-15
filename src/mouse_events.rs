@@ -340,7 +340,9 @@ pub fn handle_double_click(
         ));
 
         // Create text input overlay for the selected note
-        create_text_input_overlay(&canvas, &state, note_id, &render);
+        if let Err(e) = create_text_input_overlay(&canvas, &state, note_id, &render) {
+            crate::logging::log_warn(&format!("Failed to create text input overlay: {:?}", e));
+        }
     } else {
         crate::logging::log_info(&format!(
             "Double-click detected on canvas at world position ({:.1}, {:.1}) - no note selected",

@@ -562,8 +562,8 @@ fn render_sticky_notes(
 fn update_canvas_attributes(
     canvas: &HtmlCanvasElement,
     state: &crate::AppState,
-    width: f64,
-    height: f64,
+    _width: f64,
+    _height: f64,
 ) -> crate::error::AppResult<()> {
     canvas.set_attribute("data-ready", "true")?;
     canvas.set_attribute("data-pan-x", &format!("{:.2}", state.viewport.pan_x))?;
@@ -571,27 +571,9 @@ fn update_canvas_attributes(
     canvas.set_attribute("data-zoom", &format!("{:.2}", state.viewport.zoom))?;
 
     // Determine cursor based on interaction state
-    let cursor = if state.sticky_notes.is_dragging {
-        "grabbing"
-    } else {
-        // Check if hovering over a sticky note
-        let world_pos = state
-            .viewport
-            .world_point_at(state.mouse_x, state.mouse_y, width, height);
-        if state
-            .sticky_notes
-            .find_note_at(world_pos.0, world_pos.1)
-            .is_some()
-        {
-            "grab"
-        } else if state.viewport.is_dragging {
-            "grabbing"
-        } else {
-            "grab"
-        }
-    };
+    // Note: Cursor is set by the centralized styling function below
 
-    canvas.style().set_property("cursor", cursor)?;
+    crate::styling::components::update_canvas_cursor(canvas, state)?;
 
     Ok(())
 }
@@ -706,12 +688,7 @@ pub fn resize_canvas(
     // Keep CSS size stable while allocating a denser backing store for Retina/HiDPI displays.
     let device_pixel_ratio = browser_window.device_pixel_ratio().max(1.0);
 
-    canvas
-        .style()
-        .set_property("width", &format!("{}px", width.round()))?;
-    canvas
-        .style()
-        .set_property("height", &format!("{}px", height.round()))?;
+    crate::styling::sizing::set_dimensions(canvas, width, height)?;
     canvas.set_width((width * device_pixel_ratio).round() as u32);
     canvas.set_height((height * device_pixel_ratio).round() as u32);
 
@@ -810,21 +787,7 @@ pub fn sync_toolbar_position(
         - TOOLBAR_EDGE_PADDING)
         .max(TOOLBAR_EDGE_PADDING);
 
-    state.clamp_within(max_x, max_y);
-    toolbar.set_attribute("data-x", &format!("{:.2}", state.x))?;
-    toolbar.set_attribute("data-y", &format!("{:.2}", state.y))?;
-    toolbar.style().set_property(
-        "transform",
-        &format!("translate({:.2}px, {:.2}px)", state.x, state.y),
-    )?;
-    toolbar.style().set_property(
-        "cursor",
-        if state.is_dragging {
-            "grabbing"
-        } else {
-            "grab"
-        },
-    )?;
+    crate::styling::components::update_toolbar_position(toolbar, state, max_x, max_y)?;
 
     Ok(())
 }
