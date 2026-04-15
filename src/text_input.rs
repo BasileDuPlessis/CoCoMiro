@@ -4,6 +4,8 @@
 //! for editing sticky note content. It provides functionality to create
 //! positioned HTML input elements that overlay sticky notes for text editing.
 
+use regex::Regex;
+
 #[cfg(target_arch = "wasm32")]
 use js_sys;
 #[cfg(target_arch = "wasm32")]
@@ -171,8 +173,13 @@ fn add_formatting_handler(
             // Apply formatting using document.execCommand()
             let document_js = document.as_ref();
             let command = wasm_bindgen::JsValue::from_str(format_type.as_str());
-            let exec_command_fn = js_sys::Function::from(js_sys::Reflect::get(document_js, &wasm_bindgen::JsValue::from_str("execCommand")).unwrap());
-            let success = exec_command_fn.call1(document_js, &command).ok()
+            let exec_command_fn = js_sys::Function::from(
+                js_sys::Reflect::get(document_js, &wasm_bindgen::JsValue::from_str("execCommand"))
+                    .unwrap(),
+            );
+            let success = exec_command_fn
+                .call1(document_js, &command)
+                .ok()
                 .and_then(|val| val.as_bool())
                 .unwrap_or(false);
 
@@ -195,17 +202,81 @@ fn add_formatting_handler(
     Ok(())
 }
 
-/// Creates a text input overlay positioned over a sticky note for editing.
+/// Sanitizes HTML content for safe pasting, allowing only formatting tags.
 ///
-/// This function creates an HTML contenteditable div that overlays the specified sticky note,
-/// allowing the user to edit the note's text content. The contenteditable div is styled to match the
-/// note's appearance exactly, providing seamless editing without visible overlay distinction.
+/// This function removes potentially dangerous elements like scripts, styles,
+/// and other non-formatting tags, while preserving basic text formatting
+/// (bold, italic, underline) that the application supports.
 ///
 /// # Arguments
-/// * `canvas` - The canvas element for coordinate calculations
-/// * `state` - Reference to application state containing the note
-/// * `note_id` - ID of the note to create input overlay for
-/// * `render` - Closure to trigger canvas re-rendering when content changes
+/// * `html` - The raw HTML content from clipboard
+///
+/// # Returns
+/// Sanitized HTML content safe for insertion
+fn sanitize_pasted_html(html: &str) -> String {
+    let mut result = html.to_string();
+
+    // Remove script and style tags completely (including their content)
+    let script_re = Regex::new(r"<script[^>]*>.*?</script>").unwrap();
+    result = script_re.replace_all(&result, "").to_string();
+
+    let style_re = Regex::new(r"<style[^>]*>.*?</style>").unwrap();
+    result = style_re.replace_all(&result, "").to_string();
+
+    // Remove other dangerous tags
+    let dangerous_tags = [
+        "link", "meta", "iframe", "object", "embed", "form", "input", "button", "select",
+        "textarea", "canvas", "svg",
+    ];
+    for tag in &dangerous_tags {
+        let re = Regex::new(&format!(r"<{tag}[^>]*>.*?</{tag}>")).unwrap();
+        result = re.replace_all(&result, "").to_string();
+        // Self-closing
+        let re_self = Regex::new(&format!(r"<{tag}[^>]*/>")).unwrap();
+        result = re_self.replace_all(&result, "").to_string();
+    }
+
+    // Strip attributes from allowed inline tags
+    let allowed_inline = ["b", "i", "u", "span", "strong", "em", "mark"];
+    for tag in &allowed_inline {
+        let re = Regex::new(&format!(r"<{tag}[^>]*>")).unwrap();
+        result = re.replace_all(&result, &format!("<{tag}>")).to_string();
+    }
+
+    // Convert block elements to br
+    let block_tags = [
+        "p",
+        "div",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "li",
+        "ul",
+        "ol",
+        "blockquote",
+    ];
+    for tag in &block_tags {
+        let re_open = Regex::new(&format!(r"<{tag}[^>]*>")).unwrap();
+        result = re_open.replace_all(&result, "<br>").to_string();
+        let re_close = Regex::new(&format!(r"</{tag}>")).unwrap();
+        result = re_close.replace_all(&result, "<br>").to_string();
+    }
+
+    // Normalize br
+    let br_re = Regex::new(r"<br[^>]*>").unwrap();
+    result = br_re.replace_all(&result, "<br>").to_string();
+
+    // Trim trailing <br>
+    if result.ends_with("<br>") {
+        result = result[..result.len() - 4].to_string();
+    }
+
+    result
+}
+
 #[cfg(target_arch = "wasm32")]
 pub fn create_text_input_overlay(
     canvas: &HtmlCanvasElement,
@@ -551,6 +622,115 @@ pub fn create_text_input_overlay(
         });
     on_blur.forget();
 
+    // Attach paste event listener for rich text paste handling
+    let on_paste = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new({
+        let contenteditable = contenteditable.clone();
+        move |event: web_sys::Event| {
+            crate::log_info("Paste event triggered");
+            event.prevent_default();
+            event.stop_propagation();
+
+            // Try to get clipboard data using JavaScript interop
+            let event_js = event.as_ref();
+            let clipboard_data_js = js_sys::Reflect::get(event_js, &"clipboardData".into());
+
+            if !clipboard_data_js.is_err() {
+                let clipboard_data = clipboard_data_js.unwrap();
+
+                // Try to get HTML content first
+                let html_result = js_sys::Reflect::get(&clipboard_data, &"getData".into());
+                if !html_result.is_err() {
+                    let get_data_fn = html_result.unwrap();
+                    if get_data_fn.is_function() {
+                        let get_data_fn = js_sys::Function::from(get_data_fn);
+                        let html_content = get_data_fn.call1(&clipboard_data, &"text/html".into());
+
+                        if !html_content.is_err() {
+                            let html_content = html_content.unwrap();
+                            if html_content.is_string() {
+                                let html_str = html_content.as_string().unwrap();
+                                if !html_str.is_empty() {
+                                    crate::log_info(&format!(
+                                        "Raw HTML from clipboard: {}",
+                                        html_str
+                                    ));
+                                    let sanitized_html = sanitize_pasted_html(&html_str);
+                                    crate::log_info(&format!("Sanitized HTML: {}", sanitized_html));
+
+                                    // Use execCommand to insert HTML
+                                    let document = contenteditable.owner_document().unwrap();
+                                    let document_js = document.as_ref();
+
+                                    let exec_command_fn = js_sys::Function::from(
+                                        js_sys::Reflect::get(document_js, &"execCommand".into())
+                                            .unwrap(),
+                                    );
+                                    let _ = exec_command_fn.call3(
+                                        document_js,
+                                        &"insertHTML".into(),
+                                        &false.into(),
+                                        &sanitized_html.into(),
+                                    );
+
+                                    crate::log_info("Pasted HTML content (sanitized)");
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Fall back to plain text
+                let text_result = js_sys::Reflect::get(&clipboard_data, &"getData".into());
+                if !text_result.is_err() {
+                    let get_data_fn = text_result.unwrap();
+                    if get_data_fn.is_function() {
+                        let get_data_fn = js_sys::Function::from(get_data_fn);
+                        let text_content = get_data_fn.call1(&clipboard_data, &"text/plain".into());
+
+                        if !text_content.is_err() {
+                            let text_content = text_content.unwrap();
+                            if text_content.is_string() {
+                                let text_str = text_content.as_string().unwrap();
+                                if !text_str.is_empty() {
+                                    crate::log_info(&format!(
+                                        "Plain text from clipboard: {}",
+                                        text_str
+                                    ));
+                                    // Use execCommand to insert text
+                                    let document = contenteditable.owner_document().unwrap();
+                                    let document_js = document.as_ref();
+
+                                    let exec_command_fn = js_sys::Function::from(
+                                        js_sys::Reflect::get(document_js, &"execCommand".into())
+                                            .unwrap(),
+                                    );
+                                    let _ = exec_command_fn.call3(
+                                        document_js,
+                                        &"insertText".into(),
+                                        &false.into(),
+                                        &text_str.into(),
+                                    );
+
+                                    crate::log_info("Pasted plain text content");
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            crate::log_warn("Failed to access clipboard data during paste");
+        }
+    }));
+    contenteditable
+        .add_event_listener_with_callback("paste", on_paste.as_ref().unchecked_ref())
+        .unwrap_or_else(|_| {
+            crate::log_warn("Failed to attach paste event listener");
+        });
+    on_paste.forget();
+
     // Add to document
     if let Some(body) = document.body() {
         let _ = body.append_child(&toolbar);
@@ -558,4 +738,113 @@ pub fn create_text_input_overlay(
     }
 
     crate::log_info(&format!("Created text input overlay for note {}", note_id));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_pasted_html_simple_text() {
+        // Test that simple text is preserved
+        let input = "Hello world";
+        let result = sanitize_pasted_html(input);
+        assert_eq!(result, "Hello world");
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_simple_formatted() {
+        // Test simple formatted text
+        let input = "Hello <b>world</b>";
+        let result = sanitize_pasted_html(input);
+        assert_eq!(result, "Hello <b>world</b>");
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_removes_dangerous_tags() {
+        // Test that dangerous tags are removed
+        let input = r#"<p>Hello <script>alert('xss')</script> world</p>"#;
+        let result = sanitize_pasted_html(input);
+        assert_eq!(result, "<br>Hello  world");
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_converts_block_elements() {
+        // Test that block elements are converted to line breaks
+        let input = r#"<p>First paragraph</p><p>Second paragraph</p>"#;
+        let result = sanitize_pasted_html(input);
+        assert_eq!(result, "<br>First paragraph<br><br>Second paragraph");
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_google_slides_like() {
+        // Test with Google Slides-like HTML (simplified)
+        let input = r#"<p style="line-height: 1.2; margin: 0;"><span style="font-weight: 700;">Bold text</span> and normal text</p>"#;
+        let result = sanitize_pasted_html(input);
+        // Should convert p to br and keep span (though span attributes will be stripped)
+        assert!(result.contains("<br>"));
+        assert!(result.contains("<span>"));
+        assert!(!result.contains("style="));
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_strips_attributes() {
+        // Test that attributes are stripped from allowed tags
+        let input = r#"<b style="color: red;">Bold</b><i class="italic">Italic</i>"#;
+        let result = sanitize_pasted_html(input);
+        assert_eq!(result, "<b>Bold</b><i>Italic</i>");
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_plain_text() {
+        // Test that plain text is preserved
+        let input = "Just plain text";
+        let result = sanitize_pasted_html(input);
+        assert_eq!(result, "Just plain text");
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_mixed_content() {
+        // Test mixed content with allowed and disallowed elements
+        let input = r#"<p>Hello <b>world</b></p><script>bad</script><i>good</i>"#;
+        let result = sanitize_pasted_html(input);
+        assert!(result.contains("<br>Hello <b>world</b><br>"));
+        assert!(result.contains("<i>good</i>"));
+        assert!(!result.contains("<script>"));
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_google_slides_realistic() {
+        // Test with realistic Google Slides HTML
+        let input = r#"<p style="line-height: 1.15; margin-top: 0pt; margin-bottom: 0pt;"><span style="font-size: 11pt; font-family: Arial; color: #000000; background-color: transparent; font-weight: 400; font-style: normal; font-variant: normal; text-decoration: none; vertical-align: baseline; white-space: pre-wrap;">This is </span><span style="font-size: 11pt; font-family: Arial; color: #000000; background-color: transparent; font-weight: 700; font-style: normal; font-variant: normal; text-decoration: none; vertical-align: baseline; white-space: pre-wrap;">bold</span><span style="font-size: 11pt; font-family: Arial; color: #000000; background-color: transparent; font-weight: 400; font-style: normal; font-variant: normal; text-decoration: none; vertical-align: baseline; white-space: pre-wrap;"> text</span></p>"#;
+        let result = sanitize_pasted_html(input);
+        // Should convert p to br and keep spans (though attributes will be stripped)
+        assert!(result.contains("<br>"));
+        assert!(result.contains("<span>"));
+        assert!(!result.contains("style="));
+        assert!(!result.contains("font-size"));
+        assert!(!result.contains("font-family"));
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_complex_nested() {
+        // Test with complex nested HTML
+        let input = r#"<div><p>Hello <b>world</b></p><p>Second <i>paragraph</i></p></div>"#;
+        let result = sanitize_pasted_html(input);
+        // Should convert div and p to br, keep b and i
+        assert!(result.contains("<br>Hello <b>world</b><br>"));
+        assert!(result.contains("<br>Second <i>paragraph</i>"));
+        assert!(!result.contains("<div>"));
+        assert!(!result.contains("</div>"));
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_empty_and_whitespace() {
+        // Test with empty tags and whitespace
+        let input = r#"<p>   </p><p>Hello</p><br><br>"#;
+        let result = sanitize_pasted_html(input);
+        // Should clean up empty paragraphs and multiple br tags
+        assert!(result.contains("<br>Hello"));
+        assert!(!result.contains("<p>   </p>"));
+    }
 }

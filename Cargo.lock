@@ -98,6 +98,7 @@ version = "0.1.0"
 dependencies = [
  "headless_chrome",
  "js-sys",
+ "regex",
  "wasm-bindgen",
  "web-sys",
 ]

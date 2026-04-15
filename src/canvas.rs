@@ -181,14 +181,19 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
             // For <span> tags, check if they have formatting styles
             let (is_bold, is_italic, is_underline) = if tag_type == "span" {
                 let tag_content = &remaining[pos..tag_end];
-                let has_bold = tag_content.contains("font-weight:") && 
-                              (tag_content.contains("bold") || tag_content.contains("700"));
-                let has_italic = tag_content.contains("font-style:") && tag_content.contains("italic");
-                let has_underline = tag_content.contains("text-decoration:") && 
-                                   tag_content.contains("underline");
+                let has_bold = tag_content.contains("font-weight:")
+                    && (tag_content.contains("bold") || tag_content.contains("700"));
+                let has_italic =
+                    tag_content.contains("font-style:") && tag_content.contains("italic");
+                let has_underline =
+                    tag_content.contains("text-decoration:") && tag_content.contains("underline");
                 (has_bold, has_italic, has_underline)
             } else {
-                (tag_type == "bold", tag_type == "italic", tag_type == "underline")
+                (
+                    tag_type == "bold",
+                    tag_type == "italic",
+                    tag_type == "underline",
+                )
             };
 
             if let Some(end_pos) = remaining[tag_end..].find(closing_tag) {
