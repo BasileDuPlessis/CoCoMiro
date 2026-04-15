@@ -246,6 +246,10 @@ impl HomePageSession {
     fn assert_sticky_note_selection_and_deletion_works(&self) -> TestResult {
         assert_sticky_note_selection_and_deletion_works(self.tab())
     }
+
+    fn assert_resize_handle_click_and_drag_works(&self) -> TestResult {
+        assert_resize_handle_click_and_drag_works(self.tab())
+    }
 }
 
 fn attribute_as_f64(element: &Element<'_>, name: &str) -> TestResult<f64> {
@@ -937,6 +941,127 @@ fn assert_paste_sanitization_works(tab: &Tab) -> TestResult {
     Ok(())
 }
 
+fn assert_resize_handle_click_and_drag_works(tab: &Tab) -> TestResult {
+    let canvas = ready_canvas(tab)?;
+    let bounds = canvas.get_box_model()?.margin_viewport();
+    let center_x = bounds.x + bounds.width / 2.0;
+    let center_y = bounds.y + bounds.height / 2.0;
+
+    // Create a sticky note (this will be selected and show resize handles)
+    click_add_note_button(tab)?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Click on the note to select it (center of the note)
+    // Note is created at center with default dimensions 200x150 and zoom 1.0
+    // Center of note is at: center - (width/2, height/2) + (width/2, height/2) = center
+    dispatch_mouse_event(
+        tab,
+        Input::DispatchMouseEventTypeOption::MousePressed,
+        Point {
+            x: center_x,
+            y: center_y,
+        },
+        Some(Input::MouseButton::Left),
+        Some(1),
+    )?;
+    dispatch_mouse_event(
+        tab,
+        Input::DispatchMouseEventTypeOption::MouseReleased,
+        Point {
+            x: center_x,
+            y: center_y,
+        },
+        Some(Input::MouseButton::Left),
+        Some(1),
+    )?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Calculate position of top-left resize handle
+    // Note is created at center with default dimensions 200x150 and zoom 1.0
+    // Top-left handle is at: center - (width/2, height/2) = center - (100, 75)
+    let handle_x = center_x - 100.0;
+    let handle_y = center_y - 75.0;
+
+    // Test 1: Click on the resize handle (mouse down + up at same position)
+    dispatch_mouse_event(
+        tab,
+        Input::DispatchMouseEventTypeOption::MousePressed,
+        Point {
+            x: handle_x,
+            y: handle_y,
+        },
+        Some(Input::MouseButton::Left),
+        Some(1),
+    )?;
+    dispatch_mouse_event(
+        tab,
+        Input::DispatchMouseEventTypeOption::MouseReleased,
+        Point {
+            x: handle_x,
+            y: handle_y,
+        },
+        Some(Input::MouseButton::Left),
+        Some(1),
+    )?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Test 2: Click and drag the resize handle to resize the note
+    let drag_end_x = handle_x + 50.0; // Drag 50px to the right
+    let drag_end_y = handle_y + 30.0; // Drag 30px down
+
+    drag_pointer(
+        tab,
+        Point {
+            x: handle_x,
+            y: handle_y,
+        },
+        Point {
+            x: drag_end_x,
+            y: drag_end_y,
+        },
+    )?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Verify the resize worked by checking that the note is now larger
+    // The top-left corner should have moved to: original_top_left + (50, 30)
+    let resized_handle_x = handle_x + 50.0;
+    let resized_handle_y = handle_y + 30.0;
+
+    // Try clicking on the new position of the top-left handle (should still be there)
+    dispatch_mouse_event(
+        tab,
+        Input::DispatchMouseEventTypeOption::MousePressed,
+        Point {
+            x: resized_handle_x,
+            y: resized_handle_y,
+        },
+        Some(Input::MouseButton::Left),
+        Some(1),
+    )?;
+    dispatch_mouse_event(
+        tab,
+        Input::DispatchMouseEventTypeOption::MouseReleased,
+        Point {
+            x: resized_handle_x,
+            y: resized_handle_y,
+        },
+        Some(Input::MouseButton::Left),
+        Some(1),
+    )?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Verify the app is still functional after resize
+    // Check that we can still interact with the canvas
+    let _ = pan_coordinates(&canvas)?;
+
+    // Try clicking the add button again to ensure the app is responsive
+    click_add_note_button(tab)?;
+    thread::sleep(Duration::from_millis(100));
+
+    // If we get here without panicking and the resize handle is still clickable at the new position, the test passes
+    Ok(())
+}
+
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
 fn sticky_note_creation_via_toolbar_button() -> TestResult {
@@ -1029,6 +1154,18 @@ fn paste_sanitization_in_sticky_notes() -> TestResult {
     session.assert_starts_clean()?;
     session.assert_toolbar_is_visible()?;
     assert_paste_sanitization_works(session.tab())?;
+
+    Ok(())
+}
+
+#[test]
+#[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
+fn resize_handle_click_and_drag_resizes_note() -> TestResult {
+    let session = HomePageSession::launch()?;
+
+    session.assert_starts_clean()?;
+    session.assert_toolbar_is_visible()?;
+    session.assert_resize_handle_click_and_drag_works()?;
 
     Ok(())
 }

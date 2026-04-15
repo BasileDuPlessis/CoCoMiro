@@ -377,6 +377,49 @@ fn render_sticky_notes(
         ctx.set_line_width(2.0);
         ctx.stroke_rect(screen_x, screen_y, screen_width, screen_height);
 
+        // Draw resize handles for selected notes
+        if Some(note.id) == state.sticky_notes.selected_note_id {
+            let handle_positions = note.handle_positions(&state.viewport, width, height);
+            for (_handle, hx, hy) in handle_positions {
+                // Determine handle color based on state
+                let fill_color = if false {
+                    // if state.resizing.is_resizing
+                    //     && state.resizing.note_id == Some(note.id)
+                    //     && state.resizing.handle == Some(handle)
+                    // {
+                    // Active handle (being resized)
+                    "#2563eb"
+                } else {
+                    // } else if state.hovered_resize_handle == Some((note.id, handle)) {
+                    // Hovered handle
+                    // "#6b7280"
+                    // } else {
+                    // Normal handle
+                    "#9ca3af"
+                };
+
+                // Draw handle as a filled square
+                ctx.set_fill_style_str(fill_color);
+                let handle_size = crate::sticky_notes::RESIZE_HANDLE_SIZE;
+                ctx.fill_rect(
+                    hx - handle_size / 2.0,
+                    hy - handle_size / 2.0,
+                    handle_size,
+                    handle_size,
+                );
+
+                // Draw handle border
+                ctx.set_stroke_style_str("#ffffff");
+                ctx.set_line_width(1.0);
+                ctx.stroke_rect(
+                    hx - handle_size / 2.0,
+                    hy - handle_size / 2.0,
+                    handle_size,
+                    handle_size,
+                );
+            }
+        }
+
         // Draw note content text with rich formatting and wrapping
         if !note.content.is_empty() {
             ctx.set_text_align("left");

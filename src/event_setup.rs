@@ -52,6 +52,11 @@ pub fn end_drag_if_needed(state: &Rc<RefCell<crate::AppState>>, render: &Rc<dyn 
             app_state.sticky_notes.end_drag();
             should_render = true;
         }
+        if app_state.resizing.is_resizing {
+            app_state.sticky_notes.end_resize();
+            app_state.resizing = crate::sticky_notes::ResizingState::default();
+            should_render = true;
+        }
     }
     if should_render {
         render();

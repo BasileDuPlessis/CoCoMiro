@@ -68,6 +68,10 @@ pub struct AppState {
     pub mouse_x: f64,
     /// Current mouse position in screen coordinates
     pub mouse_y: f64,
+    // /// Current resizing operation state
+    pub resizing: sticky_notes::ResizingState,
+    // /// Currently hovered resize handle (note_id, handle)
+    // pub hovered_resize_handle: Option<(u32, sticky_notes::ResizeHandle)>,
 }
 
 impl Default for AppState {
@@ -77,6 +81,8 @@ impl Default for AppState {
             sticky_notes: sticky_notes::StickyNotesState::default(),
             mouse_x: 0.0,
             mouse_y: 0.0,
+            resizing: sticky_notes::ResizingState::default(),
+            // hovered_resize_handle: None,
         }
     }
 }

@@ -92,6 +92,29 @@ impl ResizeHandle {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+/// Tracks the state of an ongoing resize operation for sticky notes.
+///
+/// This struct maintains information about which note is being resized,
+/// which handle is being used, the original dimensions, and the starting
+/// mouse position for the resize operation.
+pub struct ResizingState {
+    /// Whether a resize operation is currently active
+    pub is_resizing: bool,
+    /// ID of the note being resized (None if not resizing)
+    pub note_id: Option<u32>,
+    /// The handle being used for resizing (None if not resizing)
+    pub handle: Option<ResizeHandle>,
+    /// Mouse X position when resize started (screen coordinates)
+    pub start_mouse_x: f64,
+    /// Mouse Y position when resize started (screen coordinates)
+    pub start_mouse_y: f64,
+    /// Original width of the note before resizing started
+    pub original_width: f64,
+    /// Original height of the note before resizing started
+    pub original_height: f64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 /// Represents a single sticky note on the infinite canvas.
 ///
@@ -257,7 +280,7 @@ impl StickyNote {
 }
 
 /// Size of resize handles in screen pixels (width and height)
-const RESIZE_HANDLE_SIZE: f64 = 8.0;
+pub const RESIZE_HANDLE_SIZE: f64 = 8.0;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 /// Manages the collection of sticky notes and their interaction state.
@@ -311,6 +334,10 @@ impl StickyNotesState {
 
     pub fn get_note_mut(&mut self, id: u32) -> Option<&mut StickyNote> {
         self.notes.iter_mut().find(|n| n.id == id)
+    }
+
+    pub fn get_note(&self, id: u32) -> Option<&StickyNote> {
+        self.notes.iter().find(|n| n.id == id)
     }
 
     /// Initiates a drag operation for the specified note.
@@ -433,6 +460,157 @@ impl StickyNotesState {
             self.notes.retain(|n| n.id != id);
             self.selected_note_id = None;
         }
+    }
+
+    /// Finds which resize handle (if any) is under the given screen coordinates.
+    ///
+    /// This method checks only the currently selected note for resize handles.
+    /// Handle detection takes priority over note content area selection.
+    /// The method converts screen coordinates to handle bounds for accurate hit testing.
+    ///
+    /// # Arguments
+    /// * `screen_x` - X-coordinate in screen space (pixels)
+    /// * `screen_y` - Y-coordinate in screen space (pixels)
+    /// * `viewport` - Current viewport state for coordinate transformation
+    /// * `canvas_width` - Canvas width in pixels
+    /// * `canvas_height` - Canvas height in pixels
+    ///
+    /// # Returns
+    /// A tuple of (note_id, handle) if a handle is found, or `None` if no handle is under the cursor
+    pub fn find_resize_handle_at(
+        &self,
+        screen_x: f64,
+        screen_y: f64,
+        viewport: &crate::viewport::ViewportState,
+        canvas_width: f64,
+        canvas_height: f64,
+    ) -> Option<(u32, ResizeHandle)> {
+        // Only check handles for the selected note
+        if let Some(selected_id) = self.selected_note_id {
+            if let Some(selected_note) = self.notes.iter().find(|n| n.id == selected_id) {
+                // Check each handle position
+                for &handle in &[
+                    ResizeHandle::TopLeft,
+                    ResizeHandle::Top,
+                    ResizeHandle::TopRight,
+                    ResizeHandle::Right,
+                    ResizeHandle::BottomRight,
+                    ResizeHandle::Bottom,
+                    ResizeHandle::BottomLeft,
+                    ResizeHandle::Left,
+                ] {
+                    let (left, top, right, bottom) =
+                        selected_note.handle_bounds(handle, viewport, canvas_width, canvas_height);
+
+                    // Check if screen point is within handle bounds
+                    if screen_x >= left
+                        && screen_x <= right
+                        && screen_y >= top
+                        && screen_y <= bottom
+                    {
+                        return Some((selected_id, handle));
+                    }
+                }
+            }
+        }
+        None
+    }
+    ///
+    /// This method initializes the resize state with the original note dimensions
+    /// and the handle being used for resizing. The resize operation will continue
+    /// until `end_resize()` is called.
+    ///
+    /// # Arguments
+    /// * `note_id` - ID of the note to resize
+    /// * `handle` - The resize handle being used
+    pub fn start_resize(&mut self, note_id: u32, _handle: ResizeHandle) {
+        if let Some(_note) = self.notes.iter().find(|n| n.id == note_id) {
+            // Store original dimensions for resize calculations
+            self.selected_note_id = Some(note_id);
+            // Note: We'll use the ResizingState in AppState to track resize state
+        }
+    }
+
+    /// Updates the dimensions of the note being resized based on mouse movement.
+    ///
+    /// This method calculates the new width and height based on the mouse delta
+    /// from the resize start position and the type of handle being used.
+    /// The resize uses screen coordinates to ensure consistent behavior regardless of zoom level.
+    ///
+    /// # Arguments
+    /// * `handle` - The resize handle being used
+    /// * `start_mouse_x` - Mouse X position when resize started (screen coordinates)
+    /// * `start_mouse_y` - Mouse Y position when resize started (screen coordinates)
+    /// * `current_mouse_x` - Current mouse X position (screen coordinates)
+    /// * `current_mouse_y` - Current mouse Y position (screen coordinates)
+    /// * `viewport` - Current viewport state (unused, kept for API compatibility)
+    /// * `viewport_width` - Viewport width (unused, kept for API compatibility)
+    /// * `viewport_height` - Viewport height (unused, kept for API compatibility)
+    pub fn resize_to(
+        &mut self,
+        handle: ResizeHandle,
+        start_mouse_x: f64,
+        start_mouse_y: f64,
+        current_mouse_x: f64,
+        current_mouse_y: f64,
+        _viewport: &crate::viewport::ViewportState,
+        _viewport_width: f64,
+        _viewport_height: f64,
+    ) {
+        if let Some(note_id) = self.selected_note_id {
+            if let Some(note) = self.get_note_mut(note_id) {
+                // Use screen coordinate deltas for resize (not world coordinates)
+                // This ensures resize speed matches mouse movement regardless of zoom
+                let delta_x = current_mouse_x - start_mouse_x;
+                let delta_y = current_mouse_y - start_mouse_y;
+
+                // Calculate new dimensions based on handle type
+                match handle {
+                    ResizeHandle::TopLeft => {
+                        note.width = (note.width - delta_x).max(50.0); // Min width
+                        note.height = (note.height - delta_y).max(40.0); // Min height
+                        note.x += delta_x; // Move note to maintain bottom-right position
+                        note.y += delta_y;
+                    }
+                    ResizeHandle::Top => {
+                        note.height = (note.height - delta_y).max(40.0);
+                        note.y += delta_y;
+                    }
+                    ResizeHandle::TopRight => {
+                        note.width = (note.width + delta_x).max(50.0);
+                        note.height = (note.height - delta_y).max(40.0);
+                        note.y += delta_y;
+                    }
+                    ResizeHandle::Right => {
+                        note.width = (note.width + delta_x).max(50.0);
+                    }
+                    ResizeHandle::BottomRight => {
+                        note.width = (note.width + delta_x).max(50.0);
+                        note.height = (note.height + delta_y).max(40.0);
+                    }
+                    ResizeHandle::Bottom => {
+                        note.height = (note.height + delta_y).max(40.0);
+                    }
+                    ResizeHandle::BottomLeft => {
+                        note.width = (note.width - delta_x).max(50.0);
+                        note.height = (note.height + delta_y).max(40.0);
+                        note.x += delta_x;
+                    }
+                    ResizeHandle::Left => {
+                        note.width = (note.width - delta_x).max(50.0);
+                        note.x += delta_x;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Terminates the current resize operation.
+    ///
+    /// This method should be called when the mouse is released to end
+    /// the resize operation.
+    pub fn end_resize(&mut self) {
+        // Currently no special cleanup needed, but method provided for consistency
     }
 }
 
@@ -640,5 +818,185 @@ mod tests {
         assert!(note1.id > 0);
         assert!(note2.id > 0);
         assert!(note3.id > 0);
+    }
+
+    #[test]
+    fn find_resize_handle_at_selected_note() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(0.0, 0.0); // Note at world (0,0) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default(); // zoom=1, pan_x=0, pan_y=0
+        let canvas_width = 800.0;
+        let canvas_height = 600.0;
+
+        // Center of canvas is at world (0,0), so note top-left is at screen (400, 300)
+        // Note extends 200px right and 150px down, so:
+        // Top-left: screen (400, 300)
+        // Top: screen (500, 300)
+        // Top-right: screen (600, 300)
+        // Right: screen (600, 375)
+        // Bottom-right: screen (600, 450)
+        // Bottom: screen (500, 450)
+        // Bottom-left: screen (400, 450)
+        // Left: screen (400, 375)
+
+        // Test top-left handle
+        let result =
+            state.find_resize_handle_at(400.0, 300.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, Some((note_id, ResizeHandle::TopLeft)));
+
+        // Test top handle
+        let result =
+            state.find_resize_handle_at(500.0, 300.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, Some((note_id, ResizeHandle::Top)));
+
+        // Test right handle
+        let result =
+            state.find_resize_handle_at(600.0, 375.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, Some((note_id, ResizeHandle::Right)));
+
+        // Test bottom-right handle
+        let result =
+            state.find_resize_handle_at(600.0, 450.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, Some((note_id, ResizeHandle::BottomRight)));
+    }
+
+    #[test]
+    fn find_resize_handle_at_outside_bounds() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(0.0, 0.0);
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+        let canvas_width = 800.0;
+        let canvas_height = 600.0;
+
+        // Test points far outside handle bounds
+        let result =
+            state.find_resize_handle_at(100.0, 100.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, None);
+
+        let result =
+            state.find_resize_handle_at(600.0, 400.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn find_resize_handle_at_no_selected_note() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(0.0, 0.0);
+        state.add_note(note);
+        // No note selected
+        state.selected_note_id = None;
+
+        let viewport = ViewportState::default();
+        let canvas_width = 800.0;
+        let canvas_height = 600.0;
+
+        // Should not find any handles when no note is selected
+        let result =
+            state.find_resize_handle_at(300.0, 225.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn find_resize_handle_at_with_zoom_and_pan() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100)
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let mut viewport = ViewportState::default();
+        viewport.zoom = 2.0; // Zoomed in
+        viewport.pan_x = 50.0; // Panned right
+        viewport.pan_y = 25.0; // Panned down
+
+        let canvas_width = 800.0;
+        let canvas_height = 600.0;
+
+        // With zoom=2, pan_x=50, pan_y=25:
+        // World (100,100) -> screen (100*2 + 400 + 50, 100*2 + 300 + 25) = (650, 525)
+        // Top-left handle is at the note's top-left corner: screen (650, 525)
+
+        let result =
+            state.find_resize_handle_at(650.0, 525.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, Some((note_id, ResizeHandle::TopLeft)));
+    }
+
+    #[test]
+    fn find_resize_handle_at_all_handles() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(0.0, 0.0);
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+        let canvas_width = 800.0;
+        let canvas_height = 600.0;
+
+        // Test all 8 handles
+        let test_cases = vec![
+            (400.0, 300.0, ResizeHandle::TopLeft),     // Top-left
+            (500.0, 300.0, ResizeHandle::Top),         // Top
+            (600.0, 300.0, ResizeHandle::TopRight),    // Top-right
+            (600.0, 375.0, ResizeHandle::Right),       // Right
+            (600.0, 450.0, ResizeHandle::BottomRight), // Bottom-right
+            (500.0, 450.0, ResizeHandle::Bottom),      // Bottom
+            (400.0, 450.0, ResizeHandle::BottomLeft),  // Bottom-left
+            (400.0, 375.0, ResizeHandle::Left),        // Left
+        ];
+
+        for (screen_x, screen_y, expected_handle) in test_cases {
+            let result = state.find_resize_handle_at(
+                screen_x,
+                screen_y,
+                &viewport,
+                canvas_width,
+                canvas_height,
+            );
+            assert_eq!(
+                result,
+                Some((note_id, expected_handle)),
+                "Failed to find handle {:?} at ({}, {})",
+                expected_handle,
+                screen_x,
+                screen_y
+            );
+        }
+    }
+
+    #[test]
+    fn find_resize_handle_at_multiple_notes_only_selected() {
+        let mut state = StickyNotesState::default();
+        let note1 = StickyNote::new(0.0, 0.0);
+        let note2 = StickyNote::new(400.0, 0.0); // Far away
+        let note1_id = note1.id;
+        state.add_note(note1);
+        state.add_note(note2);
+
+        // Select only note1
+        state.selected_note_id = Some(note1_id);
+
+        let viewport = ViewportState::default();
+        let canvas_width = 800.0;
+        let canvas_height = 600.0;
+
+        // Should find handle for note1 at its top-left position
+        let result =
+            state.find_resize_handle_at(400.0, 300.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, Some((note1_id, ResizeHandle::TopLeft)));
+
+        // Should not find handle for note2 (even though it's at a valid position relative to note2)
+        // Note2's top-left would be at screen (400*1 + 400 + 0, 0*1 + 300 + 0) = (800, 300)
+        let result =
+            state.find_resize_handle_at(800.0, 300.0, &viewport, canvas_width, canvas_height);
+        assert_eq!(result, None);
     }
 }

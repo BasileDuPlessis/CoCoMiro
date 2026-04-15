@@ -52,7 +52,54 @@ pub fn handle_mouse_down(
     let mouse_x = event.offset_x() as f64;
     let mouse_y = event.offset_y() as f64;
 
-    // Check for sticky note first
+    // Check for resize handle first (highest priority)
+    let viewport_width = f64::from(canvas.client_width().max(1));
+    let viewport_height = f64::from(canvas.client_height().max(1));
+    let resize_handle_hit = {
+        let viewport = &state.borrow().viewport;
+        let sticky_notes = &state.borrow().sticky_notes;
+        sticky_notes.find_resize_handle_at(
+            mouse_x,
+            mouse_y,
+            viewport,
+            viewport_width,
+            viewport_height,
+        )
+    };
+
+    if let Some((note_id, handle)) = resize_handle_hit {
+        // Get note dimensions before mutable borrow
+        let (original_width, original_height) = {
+            let sticky_notes = &state.borrow().sticky_notes;
+            let note = sticky_notes.get_note(note_id);
+            (
+                note.map(|n| n.width).unwrap_or(200.0),
+                note.map(|n| n.height).unwrap_or(150.0),
+            )
+        };
+
+        // Start resizing the sticky note
+        state
+            .borrow_mut()
+            .sticky_notes
+            .start_resize(note_id, handle);
+        state.borrow_mut().resizing = crate::sticky_notes::ResizingState {
+            is_resizing: true,
+            note_id: Some(note_id),
+            handle: Some(handle),
+            start_mouse_x: mouse_x,
+            start_mouse_y: mouse_y,
+            original_width,
+            original_height,
+        };
+        crate::logging::log_info(&format!(
+            "Resize started for note {} with handle {:?}",
+            note_id, handle
+        ));
+        render();
+        return Ok(());
+    }
+    // Check for sticky note next
     let note_hit = {
         let viewport_width = f64::from(canvas.client_width().max(1));
         let viewport_height = f64::from(canvas.client_height().max(1));
@@ -167,11 +214,71 @@ pub fn handle_mouse_move(
         return Ok(());
     }
 
+    // Handle sticky note resizing
+    let did_resize = {
+        let viewport_width = f64::from(canvas.client_width().max(1));
+        let viewport_height = f64::from(canvas.client_height().max(1));
+        
+        // Extract resizing state before mutable borrow
+        let (is_resizing, note_id, handle, start_mouse_x, start_mouse_y) = {
+            let resizing = &state.borrow().resizing;
+            (
+                resizing.is_resizing,
+                resizing.note_id,
+                resizing.handle,
+                resizing.start_mouse_x,
+                resizing.start_mouse_y,
+            )
+        };
+        
+        if is_resizing {
+            if let (Some(_note_id), Some(handle)) = (note_id, handle) {
+                // Extract viewport before mutable borrow
+                let viewport = state.borrow().viewport.clone();
+                state.borrow_mut().sticky_notes.resize_to(
+                    handle,
+                    start_mouse_x,
+                    start_mouse_y,
+                    mouse_x,
+                    mouse_y,
+                    &viewport,
+                    viewport_width,
+                    viewport_height,
+                );
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    };
+
+    if did_resize {
+        render();
+        return Ok(());
+    }
+
     // Handle canvas dragging
     let did_move = { state.borrow_mut().viewport.drag_to(mouse_x, mouse_y) };
 
     if did_move {
         render();
+    }
+
+    // Update hovered resize handle (after all dragging logic)
+    {
+        let viewport_width = f64::from(canvas.client_width().max(1));
+        let viewport_height = f64::from(canvas.client_height().max(1));
+        let viewport = &state.borrow().viewport;
+        let _hovered_handle = state.borrow().sticky_notes.find_resize_handle_at(
+            mouse_x,
+            mouse_y,
+            viewport,
+            viewport_width,
+            viewport_height,
+        );
+        // state.borrow_mut().hovered_resize_handle = hovered_handle;
     }
 
     Ok(())
@@ -201,6 +308,7 @@ pub fn handle_mouse_up(
     let was_dragging = state.borrow().viewport.is_dragging;
     let toolbar_was_dragging = toolbar_state.borrow().is_dragging;
     let sticky_note_was_dragging = state.borrow().sticky_notes.is_dragging;
+    let sticky_note_was_resizing = state.borrow().resizing.is_resizing;
     end_drag_if_needed(&state, &render);
     end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
     if was_dragging {
@@ -211,6 +319,9 @@ pub fn handle_mouse_up(
     }
     if sticky_note_was_dragging {
         crate::logging::log_info("Sticky note drag ended");
+    }
+    if sticky_note_was_resizing {
+        crate::logging::log_info("Sticky note resize ended");
     }
     Ok(())
 }
