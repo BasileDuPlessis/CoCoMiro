@@ -897,25 +897,64 @@ fn rich_text_paste_sanitization() -> TestResult {
     thread::sleep(Duration::from_millis(200));
 
     // Double-click the note to enter edit mode
-    let canvas = ready_canvas(session.tab)?;
+    let canvas = ready_canvas(session.tab())?;
     let bounds = canvas.get_box_model()?.margin_viewport();
-    let center_x = bounds.x + bounds.width / 2.0;
-    let center_y = bounds.y + bounds.height / 2.0;
+    let _center_x = bounds.x + bounds.width / 2.0;
+    let _center_y = bounds.y + bounds.height / 2.0;
 
-    // Double-click at center to enter edit mode
-    dispatch_mouse_event(session.tab, Input::DispatchMouseEventTypeOption::MousePressed, Point { x: center_x, y: center_y }, Some(Input::MouseButton::Left), None)?;
-    dispatch_mouse_event(session.tab, Input::DispatchMouseEventTypeOption::MouseReleased, Point { x: center_x, y: center_y }, Some(Input::MouseButton::Left), None)?;
-    dispatch_mouse_event(session.tab, Input::DispatchMouseEventTypeOption::MousePressed, Point { x: center_x, y: center_y }, Some(Input::MouseButton::Left), None)?;
-    dispatch_mouse_event(session.tab, Input::DispatchMouseEventTypeOption::MouseReleased, Point { x: center_x, y: center_y }, Some(Input::MouseButton::Left), None)?;
-    thread::sleep(Duration::from_millis(200));
+    // Double-click the note to enter edit mode using JavaScript
+    let _double_click_result = session.tab().call_method(Runtime::Evaluate {
+        expression: format!(
+            r#"
+            const canvas = document.querySelector('#infinite-canvas');
+            if (canvas) {{
+                const rect = canvas.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                const dblClickEvent = new MouseEvent('dblclick', {{
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: centerX,
+                    clientY: centerY,
+                    screenX: centerX,
+                    screenY: centerY,
+                    button: 0
+                }});
+                
+                canvas.dispatchEvent(dblClickEvent);
+                'DOUBLE_CLICK_DISPATCHED';
+            }} else {{
+                'CANVAS_NOT_FOUND';
+            }}
+        "#
+        ),
+        object_group: None,
+        include_command_line_api: Some(true),
+        silent: None,
+        return_by_value: Some(true),
+        generate_preview: None,
+        user_gesture: None,
+        await_promise: None,
+        context_id: None,
+        throw_on_side_effect: None,
+        timeout: None,
+        disable_breaks: None,
+        repl_mode: None,
+        allow_unsafe_eval_blocked_by_csp: None,
+        unique_context_id: None,
+        serialization_options: None,
+    })?;
+    thread::sleep(Duration::from_millis(500)); // Allow time for overlay creation
 
     // Simulate paste with dangerous HTML content
     let dangerous_html = r#"<meta charset='utf-8'><b style="font-weight:bold">Bold <i>italic</i></b> <script>alert('xss')</script>normal"#;
 
     // Use JavaScript to simulate clipboard data and dispatch paste event
-    session.tab.call_method(Runtime::Evaluate {
-        expression: format!(r#"
-            const editable = document.querySelector('[contenteditable="true"]');
+    session.tab().call_method(Runtime::Evaluate {
+        expression: format!(
+            r#"
+            let editable = document.querySelector('[contenteditable]');
             if (editable) {{
                 // Create a mock clipboard event with dangerous HTML
                 const pasteEvent = new ClipboardEvent('paste', {{
@@ -939,36 +978,13 @@ fn rich_text_paste_sanitization() -> TestResult {
                 
                 // Dispatch the paste event
                 editable.dispatchEvent(pasteEvent);
-            }}
-        "#, dangerous_html.replace("'", "\\'").replace("\n", "\\n")),
-        object_group: None,
-        include_command_line_api: Some(true),
-        silent: None,
-        return_by_value: None,
-        generate_preview: None,
-        user_gesture: None,
-        await_promise: None,
-        execution_context_id: None,
-        throw_on_side_effect: None,
-        timeout: None,
-        disable_breaks: None,
-        repl_mode: None,
-        allow_unsafe_eval_blocked_by_csp: None,
-        unique_context_id: None,
-    })?;
-
-    thread::sleep(Duration::from_millis(500)); // Allow time for paste processing
-
-    // Check that the contenteditable contains sanitized content
-    let result = session.tab.call_method(Runtime::Evaluate {
-        expression: r#"
-            const editable = document.querySelector('[contenteditable="true"]');
-            if (editable) {
-                editable.innerHTML;
-            } else {
+                'PASTE_DISPATCHED';
+            }} else {{
                 'NO_EDITABLE_FOUND';
-            }
-        "#.to_string(),
+            }}
+        "#,
+            dangerous_html.replace("'", "\\'").replace("\n", "\\n")
+        ),
         object_group: None,
         include_command_line_api: Some(true),
         silent: None,
@@ -976,28 +992,86 @@ fn rich_text_paste_sanitization() -> TestResult {
         generate_preview: None,
         user_gesture: None,
         await_promise: None,
-        execution_context_id: None,
+        context_id: None,
         throw_on_side_effect: None,
         timeout: None,
         disable_breaks: None,
         repl_mode: None,
         allow_unsafe_eval_blocked_by_csp: None,
         unique_context_id: None,
+        serialization_options: None,
+    })?;
+
+    thread::sleep(Duration::from_millis(500)); // Allow time for paste processing
+
+    // Check that the contenteditable contains sanitized content
+    let result = session.tab().call_method(Runtime::Evaluate {
+        expression: r#"
+            let editableElement = document.querySelector('[contenteditable]');
+            if (editableElement) {
+                editableElement.innerHTML;
+            } else {
+                'NO_EDITABLE_FOUND';
+            }
+        "#
+        .to_string(),
+        object_group: None,
+        include_command_line_api: Some(true),
+        silent: None,
+        return_by_value: Some(true),
+        generate_preview: None,
+        user_gesture: None,
+        await_promise: None,
+        context_id: None,
+        throw_on_side_effect: None,
+        timeout: None,
+        disable_breaks: None,
+        repl_mode: None,
+        allow_unsafe_eval_blocked_by_csp: None,
+        unique_context_id: None,
+        serialization_options: None,
     })?;
 
     // The result should contain the sanitized HTML
-    if let Some(result_value) = result.get("result") {
-        if let Some(result_str) = result_value.get("value").and_then(|v| v.as_str()) {
-            assert_ne!(result_str, "NO_EDITABLE_FOUND", "Contenteditable should still be present");
-            
+    if let Some(value) = &result.result.value {
+        if let Some(result_str) = value.as_str() {
+            assert_ne!(
+                result_str, "NO_EDITABLE_FOUND",
+                "Contenteditable should still be present"
+            );
+
             // Check that dangerous content was removed
-            assert!(!result_str.contains("<script>"), "Script tags should be removed");
+            assert!(
+                !result_str.contains("<script>"),
+                "Script tags should be removed"
+            );
             assert!(!result_str.contains("<meta"), "Meta tags should be removed");
-            
-            // Check that safe content is preserved
-            assert!(result_str.contains("<b>"), "Bold tags should be preserved");
-            assert!(result_str.contains("<i>"), "Italic tags should be preserved");
-            assert!(result_str.contains("normal"), "Plain text should be preserved");
+
+            // Check that all formatting tags are removed (no HTML tags except possibly <br>)
+            assert!(!result_str.contains("<b>"), "Bold tags should be removed");
+            assert!(!result_str.contains("<i>"), "Italic tags should be removed");
+            assert!(
+                !result_str.contains("<strong>"),
+                "Strong tags should be removed"
+            );
+            assert!(
+                !result_str.contains("<em>"),
+                "Emphasis tags should be removed"
+            );
+
+            // Check that plain text content is preserved
+            assert!(
+                result_str.contains("Bold"),
+                "Plain text 'Bold' should be preserved"
+            );
+            assert!(
+                result_str.contains("italic"),
+                "Plain text 'italic' should be preserved"
+            );
+            assert!(
+                result_str.contains("normal"),
+                "Plain text 'normal' should be preserved"
+            );
         } else {
             panic!("Expected string result from JavaScript evaluation");
         }

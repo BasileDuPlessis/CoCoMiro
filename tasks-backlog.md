@@ -1,239 +1,41 @@
 # Tasks Backlog
 
 ## Overview
-This backlog contains tasks to improve the CoCoMiro infinite canvas application based on code review findings.
+This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
-## High Priority Tasks
+**Current Status (April 2026):**
+- ✅ Basic text editing with contenteditable overlay
+- ✅ HTML sanitization (strips all formatting on paste)
+- ✅ Rich text toolbar with formatting buttons
+- ✅ Paste handling with content sanitization
+- ✅ Basic accessibility features (ARIA labels)
+- ✅ Performance monitoring (FPS tracking)
+- ✅ Basic visual polish (box shadows)
+- ❌ No persistence, undo/redo system, or advanced performance optimizations
+- ❌ No mobile support
 
-### 1. Enhance Text Editing
+**Implemented Features:**
+- Double-click to edit sticky notes
+- ContentEditable text input with toolbar
+- HTML formatting during editing (bold, italic, underline)
+- Paste sanitization (strips all HTML to plain text)
+- Basic accessibility (ARIA labels)
+- Performance metrics collection
+- Multi-line text support
+- Text selection and cursor positioning
 
-#### 1.1 Basic Text Input Mode
-- Implement double-click to edit sticky notes
-- Add simple text input functionality
+**Not Yet Implemented:**
+- Persistence (save/load)
+- Undo/Redo system
+- Spatial indexing for performance
+- View culling
+- Mobile/touch support
+- Advanced accessibility
+- Visual animations and effects
 
-##### 1.1.1 Double-Click Detection ✅ COMPLETED
-- Add double-click event handler on canvas
-- Detect which sticky note was double-clicked
-- Prevent default double-click behavior
+## Active High Priority Tasks
 
-**Implementation Details:**
-- Attach `dblclick` event listener to canvas element
-- Calculate world coordinates from mouse position
-- Find which sticky note contains the click point
-- Log the double-click event for debugging
-
-##### 1.1.2 Text Input Overlay Creation ✅ COMPLETED
-- Create HTML input element overlay
-- Position input element over the selected sticky note
-- Style input to match note appearance
-- Focus and select text in input
-
-**Implementation Details:**
-- Create `HtmlInputElement` programmatically with proper styling
-- Calculate screen position from world coordinates and zoom level
-- Apply note-matching styles (background color, border, font, padding)
-- Position overlay with absolute positioning and high z-index
-- Focus input and select all text for immediate editing
-
-##### 1.1.3 Basic Text Editing ✅ COMPLETED
-- Handle text input and basic editing operations
-- Support typing, backspace, and basic navigation
-- Update input value as user types
-
-**Implementation Details:**
-- Attach `input` event listener to handle text changes
-- Allow standard text editing operations
-- Prevent event propagation to avoid canvas interactions
-- Maintain input focus during editing
-
-##### 1.1.4 Input Confirmation and Cleanup ✅ COMPLETED
-- Handle Enter key to confirm changes
-- Handle Escape key to cancel editing
-- Update note content and re-render canvas
-- Remove input overlay and restore normal interaction
-
-**Implementation Details:**
-- Attach `keydown` event listener for Enter/Escape handling
-- Attach `blur` event listener for clicking outside
-- Update `StickyNote.content` with new text
-- Remove input element from DOM
-- Trigger canvas re-rendering
-
-#### 1.2 Advanced Text Editing ✅ COMPLETED
-- Implement text selection and cursor positioning
-- Add keyboard shortcuts for text editing
-
-**Implementation Details:**
-- Add cursor positioning and text selection
-- Implement keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V, etc.)
-- Handle arrow keys for cursor movement
-- Support text deletion and insertion at cursor
-
-#### 1.3 Multi-line Text Support ✅ COMPLETED
-- Support multi-line text with proper line breaks
-- Implement text wrapping for long lines
-
-**Implementation Details:**
-- Handle Enter key for line breaks
-- Implement text wrapping algorithm
-- Update text rendering for multi-line display
-- Adjust note height based on content
-
-#### 1.4 Text Formatting Options
-- Add text formatting capabilities (bold, italic, etc.)
-- Implement rich text editing
-
-##### 1.4.1 Add Formatting Toolbar ✅ COMPLETED
-- Create a formatting toolbar with bold, italic, underline buttons
-- Position toolbar near text input overlay
-- Style toolbar to match application design
-
-**Implementation Details:**
-- Add HTML toolbar element with formatting buttons
-- Position toolbar above or below text input area
-- Include icons or text labels for each formatting option
-- Handle button clicks to apply formatting
-
-##### 1.4.2 Implement Rich Text Storage ✅ COMPLETED
-- Extend note data structure to store HTML formatting
-- Support HTML content in note text field
-- Maintain backward compatibility with plain text
-
-**Implementation Details:**
-- Store HTML content directly in `StickyNote.content` field
-- Plain text notes remain as plain text, rich text notes contain HTML
-- HTML content gets converted to markdown for canvas rendering
-- Update module documentation to describe HTML-based rich text architecture
-
-##### 1.4.3 Implement Rich Text Rendering ✅ COMPLETED
-- Render formatted text on canvas with appropriate styles
-- Support bold, italic, underline rendering
-- Handle overlapping formatting ranges
-
-**Implementation Details:**
-- Extended canvas text rendering for rich text with HTML parsing
-- Added `TextSegment` struct to represent formatted text segments
-- Implemented `parse_formatted_text()` to parse HTML tags (<b>, <i>, <u>)
-- Added `format_font()` to create CSS font strings with appropriate styles
-- Modified rendering to handle text wrapping while preserving formatting
-- Underline implemented with canvas stroke operations
-- Maintains backward compatibility with plain text
-
-##### 1.4.4 Replace Textarea with ContentEditable Div ✅ COMPLETED
-- Replace textarea overlay with contenteditable div for seamless editing
-- Style contenteditable div to match sticky note appearance exactly
-- Ensure no visible overlay distinction between edit and view modes
-
-**Implementation Details:**
-- Created contenteditable div instead of textarea element with `contenteditable="true"`
-- Applied identical CSS styling (background, border, font, padding) to match note exactly
-- Positioned contenteditable div precisely over the sticky note using absolute positioning
-- Updated event handlers for contenteditable behavior (input, blur, keydown)
-- Maintained existing toolbar integration and formatting functionality
-- Added proper HTML content handling (innerHTML with <br> tags for line breaks)
-- Implemented toolbar click prevention to avoid premature overlay removal
-- Removed border and border-radius for perfect visual blending with rendered note
-- Simplified formatting buttons to maintain focus (full formatting implementation deferred)
-
-##### 1.4.5 Update ContentEditable Event Handling ✅ COMPLETED
-- Adapt event handlers for contenteditable div behavior
-- Handle input, blur, and keyboard events appropriately
-- Prevent canvas interactions during editing
-
-**Implementation Details:**
-- Replace textarea-specific event listeners with contenteditable equivalents
-- Handle contenteditable input events for real-time updates
-- Implement blur handling to confirm/cancel edits
-- Maintain keyboard shortcuts and navigation
-- Prevent event propagation to canvas during editing
-
-##### 1.4.6 Implement Toolbar Button Formatting ✅ COMPLETED
-- Make toolbar buttons apply real HTML formatting using document.execCommand()
-- Replace logging-only handlers with actual formatting functionality
-
-**Implementation Details:**
-- Use document.execCommand('bold'), document.execCommand('italic'), document.execCommand('underline')
-- Handle button clicks to apply formatting to selected text or at cursor position
-- Maintain cursor position and text selection during formatting operations
-- Test formatting works correctly with contenteditable div
-
-##### 1.4.7 Store HTML Content in Notes ✅ COMPLETED
-- Modify note storage to handle HTML content instead of plain text
-- Update text input handling to store HTML from contenteditable
-
-**Implementation Details:**
-- Store HTML content directly in StickyNote.content field instead of converting to plain text
-- Update contenteditable initialization to detect HTML vs plain text content for backward compatibility
-- Plain text notes are converted to HTML with `<br>` tags when editing
-- HTML content is preserved as-is during editing and saving
-- Existing plain text notes continue to work with automatic HTML conversion
-
-##### 1.4.8 Implement HTML-to-Markdown Conversion ✅ COMPLETED
-- Create HTML parsing function to convert HTML to markdown for canvas rendering
-- Update parse_formatted_text() to handle HTML tags instead of markdown
-
-**Implementation Details:**
-- Updated `parse_formatted_text()` function to parse HTML tags instead of markdown
-- Parse `<b>`, `<i>`, `<u>` opening tags and corresponding `</b>`, `</i>`, `</u>` closing tags
-- Handle nested and overlapping HTML formatting tags
-- Maintain backward compatibility with existing plain text rendering
-- Canvas now properly renders HTML-formatted text with bold, italic, and underline styles
-
-##### 1.4.9 Handle Rich Text Paste Operations
-- Implement paste event handling to preserve HTML formatting
-- Clean and sanitize pasted content
-
-**Implementation Details:**
-- Add paste event listener to contenteditable div
-- Preserve HTML formatting from clipboard
-- Strip unwanted elements (scripts, styles) for security
-- Handle plain text paste operations
-
-##### 1.4.10 Add ContentEditable Undo/Redo Support
-- Implement undo/redo functionality within contenteditable context
-- Handle browser's native undo/redo behavior
-
-**Implementation Details:**
-- Support Ctrl+Z/Ctrl+Y keyboard shortcuts
-- Handle undo/redo state management
-- Preserve formatting during undo/redo operations
-- Integrate with browser's native contenteditable undo/redo
-
-##### 1.4.11 Add ContentEditable Accessibility
-- Ensure contenteditable div is accessible to screen readers
-- Add proper ARIA labels and keyboard navigation
-- Handle focus management between canvas and editing mode
-
-**Implementation Details:**
-- Add ARIA attributes for screen reader support
-- Implement proper focus indicators and keyboard navigation
-- Handle tab order and focus trapping during editing
-- Add visual focus indicators that match application design
-- Test with screen readers and accessibility tools
-
-##### 1.4.12 Add Keyboard Shortcuts for Formatting
-- Implement keyboard shortcuts for text formatting
-- Support common shortcuts (Ctrl+B, Ctrl+I, Ctrl+U)
-
-**Implementation Details:**
-- Add keyboard event handling for formatting shortcuts
-- Integrate with toolbar button functionality
-- Handle shortcuts within contenteditable context
-- Integrate with contenteditable div
-- Provide visual feedback for active formatting
-- Document available shortcuts
-
-#### 1.5 Text Rendering Improvements
-- Improve text rendering quality and font handling
-- Optimize text display performance
-
-**Implementation Details:**
-- Upgrade font rendering quality
-- Add better font choices and sizing
-- Optimize text rendering performance
-- Handle different text sizes and styles
-
-### 2. Add Persistence
+### 1. Add Persistence
 - Implement save/load functionality for sticky notes
 - Add data serialization and local storage
 
@@ -245,7 +47,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Add autosave functionality
 - Handle data migration for future versions
 
-### 3. Implement Undo/Redo System
+### 2. Implement Undo/Redo System
 - Add command pattern for reversible actions
 - Implement undo/redo functionality for all user actions
 
@@ -257,29 +59,125 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Handle complex operations (bulk actions, etc.)
 - Add visual feedback for undo/redo state
 
-### 4. Performance Optimizations
+### 3. Performance Optimizations
 
-#### 4.1 Spatial Indexing for Hit Testing
-- Implement efficient data structure for note hit testing
-- Replace linear search with spatial indexing (quadtree or similar)
+#### 3.1 Spatial Partitioning for Note Hit Testing
 
-**Implementation Details:**
-- Analyze current O(n) hit testing performance
-- Implement quadtree or R-tree data structure
-- Update note addition/removal to maintain spatial index
-- Benchmark performance improvement with many notes
-
-#### 4.2 View Culling for Rendering
-- Only render sticky notes visible in the current viewport
-- Implement frustum culling for canvas elements
+##### 3.1.1 Performance Analysis
+- Profile current O(n) hit testing with benchmark tests
+- Identify performance bottlenecks with 50+ notes
+- Establish baseline metrics for improvement measurement
 
 **Implementation Details:**
-- Calculate viewport bounds in world coordinates
-- Filter notes before rendering based on visibility
-- Update culling when viewport changes (pan/zoom)
-- Measure rendering performance with 100+ notes
+- Create benchmark test with 100 notes for hit testing
+- Measure average hit test time per note
+- Document current performance characteristics
 
-#### 4.3 Grid Rendering Optimization
+##### 3.1.2 Design Spatial Data Structure
+- Research quadtree vs R-tree vs simple grid partitioning
+- Design API for spatial queries (point-in-rect, rect intersection)
+- Define bounds calculation for sticky notes
+
+**Implementation Details:**
+- Evaluate data structures for 2D spatial indexing
+- Consider note size variations and movement patterns
+- Design for dynamic updates (add/remove/move notes)
+
+##### 3.1.3 Implement Spatial Index Core
+- Implement chosen spatial data structure (likely quadtree)
+- Add insert/remove/update operations for notes
+- Implement point-in-bounds queries for hit testing
+
+**Implementation Details:**
+- Create `SpatialIndex` trait and implementation
+- Handle note bounding box calculations
+- Support efficient bulk operations
+
+##### 3.1.4 Integrate with Note Management
+- Update `StickyNotes` struct to maintain spatial index
+- Modify `add_note`, `remove_note`, `move_note` to update index
+- Replace linear search in `find_note_at_point` with spatial query
+
+**Implementation Details:**
+- Add spatial index field to `StickyNotes`
+- Update all note mutation methods
+- Ensure index consistency during operations
+
+##### 3.1.5 Performance Validation
+- Benchmark hit testing performance improvement
+- Test correctness with existing test suite
+- Measure memory overhead of spatial index
+
+**Implementation Details:**
+- Compare before/after performance metrics
+- Ensure no regressions in functionality
+- Document performance gains
+
+#### 3.2 Viewport Culling for Large Note Counts
+
+##### 3.2.1 Viewport Bounds Calculation
+- Implement viewport-to-world bounds conversion
+- Add viewport change detection for culling updates
+- Calculate expanded bounds for smooth panning
+
+**Implementation Details:**
+- Add `viewport_bounds()` method to `ViewportState`
+- Handle zoom-dependent culling margins
+- Support different culling strategies (conservative vs tight)
+
+##### 3.2.2 Culling Logic Implementation
+- Implement note filtering based on viewport bounds
+- Add culling state management (culled vs visible notes)
+- Update culling on viewport changes (pan/zoom)
+
+**Implementation Details:**
+- Create `is_note_visible(viewport_bounds, note_bounds)` function
+- Add culling cache to avoid redundant calculations
+- Handle note size in visibility calculations
+
+##### 3.2.3 Rendering Pipeline Integration
+- Modify canvas rendering to use culled note list
+- Update rendering loop to filter notes before drawing
+- Optimize render order for better performance
+
+**Implementation Details:**
+- Update `render` function to accept filtered note list
+- Maintain render order for proper layering
+- Add debug visualization for culling bounds
+
+##### 3.2.4 Culling Performance Testing
+- Benchmark rendering performance with 200+ notes
+- Test culling accuracy and smoothness
+- Measure frame rate improvements
+
+**Implementation Details:**
+- Create performance test with high note counts
+- Verify no visual artifacts from culling
+- Document rendering performance gains
+
+#### 3.3 Combined Spatial + Culling Optimization
+
+##### 3.3.1 Integration Testing
+- Test spatial index + culling working together
+- Verify hit testing works on culled notes
+- Performance benchmark of combined optimizations
+
+**Implementation Details:**
+- End-to-end testing with large note sets
+- Ensure spatial queries work with viewport bounds
+- Measure overall performance improvement
+
+##### 3.3.2 Memory and Maintenance Optimization
+- Optimize spatial index memory usage
+- Add index rebuilding for extreme cases
+- Implement lazy culling updates
+
+**Implementation Details:**
+- Profile memory usage of spatial structures
+- Add maintenance operations for index health
+- Balance performance vs memory trade-offs
+
+#### 3.3 Grid Rendering Optimization
 - Optimize background grid rendering for large zoom levels
 - Implement adaptive grid density
 
@@ -289,17 +187,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Reduce grid density at high zoom levels
 - Optimize grid line calculation and drawing
 
-#### 4.4 Performance Monitoring
-- Add frame rate monitoring and performance profiling
-- Implement performance metrics collection
-
-**Implementation Details:**
-- Add FPS counter to status display
-- Track rendering time per frame
-- Monitor memory usage and note count
-- Add performance logging for debugging
-
-#### 4.5 WebGL Acceleration (Future)
+#### 3.4 WebGL Acceleration (Future)
 - Consider WebGL acceleration for complex rendering
 - Evaluate WebGL vs Canvas 2D performance trade-offs
 
@@ -309,33 +197,33 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Compare performance with Canvas 2D
 - Consider implementation if significant benefits found
 
-## Medium Priority Tasks
+## Active Medium Priority Tasks
 
-### 5. Visual Polish
-- Add visual enhancements like shadows, rounded corners, and animations
-- Improve overall UI aesthetics
+### 4. Enhanced Accessibility
+- Complete WCAG compliance and screen reader support
+- Improve keyboard navigation
 
 **Implementation Details:**
-- Add CSS-like styling to canvas rendering (shadows, gradients)
-- Implement smooth animations for toolbar and note interactions
-- Add visual feedback for all interactions
-- Improve color scheme and visual hierarchy
+- Conduct full accessibility audit
+- Add screen reader announcements for actions
+- Improve keyboard navigation (tab order, focus management)
+- Add high contrast mode support
+- Test with screen readers
+
+### 5. Advanced Visual Polish
+- Add animations and visual effects
+- Improve overall UI/UX design
+
+**Implementation Details:**
+- Add smooth animations for note creation/deletion
+- Implement visual feedback for interactions
+- Add gradients, shadows, and modern styling
+- Improve color scheme and typography
 - Add loading states and transitions
 
-### 6. Accessibility Improvements
-- Enhance ARIA labels and keyboard navigation
-- Ensure WCAG compliance
+## Active Low Priority Tasks
 
-**Implementation Details:**
-- Add comprehensive ARIA labels to all interactive elements
-- Implement full keyboard navigation (tab order, focus management)
-- Add screen reader support for canvas content
-- Ensure sufficient color contrast
-- Add keyboard shortcuts documentation
-
-## Low Priority Tasks
-
-### 7. Add Mobile Support
+### 6. Add Mobile Support
 - Implement touch event handling for mobile devices
 - Add gesture recognition for pinch-to-zoom and multi-touch interactions
 
@@ -346,8 +234,36 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application 
 - Test on mobile browsers and ensure responsive design
 - Handle touch vs mouse event conflicts
 
+## Recently Completed Tasks
+
+### ✅ Text Editing Features (All Completed)
+- Double-click to edit sticky notes
+- ContentEditable text input with toolbar
+- HTML formatting during editing (bold, italic, underline)
+- Paste sanitization (strips all HTML to plain text)
+- Multi-line text support
+- Text selection and cursor positioning
+- Rich text storage and rendering
+- Toolbar button formatting
+- HTML-to-text conversion for display
+
+### ✅ Basic Accessibility Features
+- ARIA labels for toolbar buttons
+- Canvas accessibility attributes
+- Basic keyboard navigation support
+
+### ✅ Performance Monitoring
+- FPS counter and performance metrics
+- Frame rate tracking
+- Rendering performance monitoring
+
+### ✅ Basic Visual Polish
+- Box shadows for text input overlay
+- Consistent styling for toolbar and inputs
+
 ## Implementation Notes
 - All changes must maintain compatibility with both host and WebAssembly targets
-- Run full test suite after each change
+- Run full test suite after each change (12 unit tests + 8 E2E tests currently passing)
 - Update documentation as features are implemented
 - Consider backward compatibility for any breaking changes
+- HTML sanitization strips all formatting on paste for simplicity

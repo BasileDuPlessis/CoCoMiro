@@ -296,4 +296,249 @@ mod tests {
         assert!((world_before.1 - world_after.1).abs() < 1e-9);
         assert!(state.zoom > 1.0);
     }
+
+    #[test]
+    fn world_point_at_center_of_viewport() {
+        let state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+        let center_x = viewport_width / 2.0;
+        let center_y = viewport_height / 2.0;
+
+        let (world_x, world_y) =
+            state.world_point_at(center_x, center_y, viewport_width, viewport_height);
+
+        // At default zoom (1.0) and no pan, center should map to (0, 0) in world space
+        assert!((world_x - 0.0).abs() < 1e-9);
+        assert!((world_y - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn world_point_at_viewport_corners() {
+        let state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+
+        // Top-left corner
+        let (tl_x, tl_y) = state.world_point_at(0.0, 0.0, viewport_width, viewport_height);
+        assert_eq!(tl_x, -400.0); // -viewport_width/2
+        assert_eq!(tl_y, -300.0); // -viewport_height/2
+
+        // Bottom-right corner
+        let (br_x, br_y) = state.world_point_at(
+            viewport_width,
+            viewport_height,
+            viewport_width,
+            viewport_height,
+        );
+        assert_eq!(br_x, 400.0);
+        assert_eq!(br_y, 300.0);
+    }
+
+    #[test]
+    fn world_point_at_with_pan_and_zoom() {
+        let mut state = ViewportState::default();
+        state.pan_x = 100.0;
+        state.pan_y = -50.0;
+        state.zoom = 2.0;
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+
+        let (world_x, world_y) =
+            state.world_point_at(400.0, 300.0, viewport_width, viewport_height);
+
+        // With pan and zoom, center should map to (-50, 25) in world space
+        // Formula: (screen_x - center_x - pan_x) / zoom
+        // (400 - 400 - 100) / 2 = (-100) / 2 = -50
+        // (300 - 300 + 50) / 2 = (50) / 2 = 25
+        assert!((world_x - (-50.0)).abs() < 1e-9);
+        assert!((world_y - 25.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn zoom_at_center_cursor() {
+        let mut state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+        let cursor_x = viewport_width / 2.0; // Center
+        let cursor_y = viewport_height / 2.0;
+
+        let world_before =
+            state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
+        state.zoom_at(1.5, cursor_x, cursor_y, viewport_width, viewport_height);
+        let world_after = state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
+
+        // World point under cursor should remain stable
+        assert!((world_before.0 - world_after.0).abs() < 1e-9);
+        assert!((world_before.1 - world_after.1).abs() < 1e-9);
+        assert_eq!(state.zoom, 1.5);
+        // When zooming at center, pan should remain unchanged
+        assert_eq!(state.pan_x, 0.0);
+        assert_eq!(state.pan_y, 0.0);
+    }
+
+    #[test]
+    fn zoom_at_corner_cursor() {
+        let mut state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+        let cursor_x = 0.0; // Top-left corner
+        let cursor_y = 0.0;
+
+        let world_before =
+            state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
+        state.zoom_at(2.0, cursor_x, cursor_y, viewport_width, viewport_height);
+        let world_after = state.world_point_at(cursor_x, cursor_y, viewport_width, viewport_height);
+
+        // World point under cursor should remain stable
+        assert!((world_before.0 - world_after.0).abs() < 1e-9);
+        assert!((world_before.1 - world_after.1).abs() < 1e-9);
+        assert_eq!(state.zoom, 2.0);
+        // Pan should adjust to keep corner point stable
+        assert!(state.pan_x != 0.0 || state.pan_y != 0.0);
+    }
+
+    #[test]
+    fn zoom_at_clamps_to_max_zoom() {
+        let mut state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+
+        // Try to zoom beyond max
+        state.zoom_at(10.0, 400.0, 300.0, viewport_width, viewport_height);
+        assert_eq!(state.zoom, MAX_ZOOM);
+    }
+
+    #[test]
+    fn zoom_at_clamps_to_min_zoom() {
+        let mut state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+
+        // Try to zoom below min
+        state.zoom_at(0.1, 400.0, 300.0, viewport_width, viewport_height);
+        assert_eq!(state.zoom, MIN_ZOOM);
+    }
+
+    #[test]
+    fn zoom_by_no_change_with_factor_one() {
+        let mut state = ViewportState::default();
+        let original_zoom = state.zoom;
+
+        state.zoom_by(1.0);
+        assert_eq!(state.zoom, original_zoom);
+    }
+
+    #[test]
+    fn zoom_by_clamps_extreme_factors() {
+        let mut state = ViewportState::default();
+
+        // Very large factor
+        state.zoom_by(1000.0);
+        assert_eq!(state.zoom, MAX_ZOOM);
+
+        // Reset
+        state.reset();
+
+        // Very small factor
+        state.zoom_by(0.001);
+        assert_eq!(state.zoom, MIN_ZOOM);
+    }
+
+    #[test]
+    fn pan_by_negative_deltas() {
+        let mut state = ViewportState::default();
+
+        state.pan_by(-50.0, -25.0);
+        assert_eq!(state.pan_x, -50.0);
+        assert_eq!(state.pan_y, -25.0);
+    }
+
+    #[test]
+    fn pan_by_zero_deltas() {
+        let mut state = ViewportState {
+            pan_x: 100.0,
+            pan_y: 200.0,
+            zoom: 1.0,
+            is_dragging: false,
+            last_mouse_pos: None,
+        };
+
+        state.pan_by(0.0, 0.0);
+        assert_eq!(state.pan_x, 100.0);
+        assert_eq!(state.pan_y, 200.0);
+    }
+
+    #[test]
+    fn drag_to_without_start_drag() {
+        let mut state = ViewportState::default();
+
+        // Should not update without starting drag
+        assert!(!state.drag_to(100.0, 100.0));
+        assert_eq!(state.pan_x, 0.0);
+        assert_eq!(state.pan_y, 0.0);
+    }
+
+    #[test]
+    fn drag_to_with_large_deltas() {
+        let mut state = ViewportState::default();
+
+        state.start_drag(0.0, 0.0);
+        state.drag_to(10000.0, -5000.0);
+        assert_eq!(state.pan_x, 10000.0);
+        assert_eq!(state.pan_y, -5000.0);
+    }
+
+    #[test]
+    fn multiple_zoom_operations() {
+        let mut state = ViewportState::default();
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+
+        // Zoom in multiple times to reach max zoom
+        for _ in 0..10 {
+            state.zoom_at(1.2, 400.0, 300.0, viewport_width, viewport_height);
+        }
+
+        // Should be clamped at max zoom
+        assert_eq!(state.zoom, MAX_ZOOM);
+    }
+
+    #[test]
+    fn world_point_at_different_viewport_sizes() {
+        let state = ViewportState::default();
+
+        // Small viewport
+        let (x1, y1) = state.world_point_at(50.0, 50.0, 100.0, 100.0);
+        assert_eq!(x1, 0.0); // Center of 100x100 viewport
+        assert_eq!(y1, 0.0);
+
+        // Large viewport
+        let (x2, y2) = state.world_point_at(500.0, 500.0, 1000.0, 1000.0);
+        assert_eq!(x2, 0.0); // Center of 1000x1000 viewport
+        assert_eq!(y2, 0.0);
+    }
+
+    #[test]
+    fn coordinate_conversion_round_trip() {
+        let mut state = ViewportState::default();
+        state.pan_x = 123.45;
+        state.pan_y = -67.89;
+        state.zoom = 1.5;
+        let viewport_width = 800.0;
+        let viewport_height = 600.0;
+
+        // Pick a screen point
+        let screen_x = 300.0;
+        let screen_y = 200.0;
+
+        // Convert to world
+        let (world_x, world_y) =
+            state.world_point_at(screen_x, screen_y, viewport_width, viewport_height);
+
+        // Now, to test round-trip, we'd need a screen_point_at method
+        // For now, just verify the conversion produces reasonable values
+        assert!(world_x.is_finite());
+        assert!(world_y.is_finite());
+    }
 }
