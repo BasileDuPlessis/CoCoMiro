@@ -657,10 +657,31 @@ pub fn create_text_input_overlay(
                                     let sanitized_html = sanitize_pasted_html(&html_str);
                                     crate::log_info(&format!("Sanitized HTML: {}", sanitized_html));
 
-                                    // Use execCommand to insert HTML
+                                    // Try to insert HTML using Range API for better compatibility
+                                    let window = web_sys::window().unwrap();
+                                    if let Ok(Some(selection)) = window.get_selection() {
+                                        if selection.range_count() > 0 {
+                                            if let Ok(range) = selection.get_range_at(0) {
+                                                let _ = range.delete_contents();
+                                                let document = contenteditable.owner_document().unwrap();
+                                                if let Ok(temp_div) = document.create_element("div") {
+                                                    let _ = temp_div.set_inner_html(&sanitized_html);
+                                                    if let Ok(fragment) = document.create_document_fragment() {
+                                                        while let Some(child) = temp_div.first_child() {
+                                                            let _ = fragment.append_child(&child);
+                                                        }
+                                                        let _ = range.insert_node(&fragment);
+                                                        crate::log_info("Pasted HTML content (sanitized)");
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Fallback to execCommand
                                     let document = contenteditable.owner_document().unwrap();
                                     let document_js = document.as_ref();
-
                                     let exec_command_fn = js_sys::Function::from(
                                         js_sys::Reflect::get(document_js, &"execCommand".into())
                                             .unwrap(),
