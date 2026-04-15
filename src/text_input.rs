@@ -231,15 +231,15 @@ fn sanitize_pasted_html(html: &str) -> String {
     for tag in &dangerous_tags {
         let re = Regex::new(&format!(r"<{tag}[^>]*>.*?</{tag}>")).unwrap();
         result = re.replace_all(&result, "").to_string();
-        // Self-closing
-        let re_self = Regex::new(&format!(r"<{tag}[^>]*/>")).unwrap();
-        result = re_self.replace_all(&result, "").to_string();
+        // Any occurrence of the tag
+        let re_any = Regex::new(&format!(r"<{tag}[^>]*>")).unwrap();
+        result = re_any.replace_all(&result, "").to_string();
     }
 
     // Strip attributes from allowed inline tags
     let allowed_inline = ["b", "i", "u", "span", "strong", "em", "mark"];
     for tag in &allowed_inline {
-        let re = Regex::new(&format!(r"<{tag}[^>]*>")).unwrap();
+        let re = Regex::new(&format!(r"<{tag}(\s[^>]*)?>")).unwrap();
         result = re.replace_all(&result, &format!("<{tag}>")).to_string();
     }
 
@@ -827,15 +827,12 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_pasted_html_complex_nested() {
-        // Test with complex nested HTML
-        let input = r#"<div><p>Hello <b>world</b></p><p>Second <i>paragraph</i></p></div>"#;
+    fn test_sanitize_pasted_html_removes_meta_tags() {
+        // Test that meta tags are removed
+        let input = r#"<meta charset="utf-8"><p>Hello</p>"#;
         let result = sanitize_pasted_html(input);
-        // Should convert div and p to br, keep b and i
-        assert!(result.contains("<br>Hello <b>world</b><br>"));
-        assert!(result.contains("<br>Second <i>paragraph</i>"));
-        assert!(!result.contains("<div>"));
-        assert!(!result.contains("</div>"));
+        assert_eq!(result, "<br>Hello");
+        assert!(!result.contains("<meta>"));
     }
 
     #[test]
@@ -846,5 +843,15 @@ mod tests {
         // Should clean up empty paragraphs and multiple br tags
         assert!(result.contains("<br>Hello"));
         assert!(!result.contains("<p>   </p>"));
+    }
+
+    #[test]
+    fn test_sanitize_pasted_html_does_not_replace_ul_with_u() {
+        // Test that <ul> is not replaced with <u> by the strip regex
+        let input = r#"<b><ul style="margin:0"><li>item</li></ul></b>"#;
+        let result = sanitize_pasted_html(input);
+        // <ul> should be converted to <br>, not <u>
+        assert!(result.contains("<br>"));
+        assert!(!result.contains("<u>"));
     }
 }
