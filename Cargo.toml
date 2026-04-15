@@ -36,3 +36,5 @@ web-sys = { version = "0.3", features = [
 
 [dev-dependencies]
 headless_chrome = "1.0"
+image = "0.24"
+base64 = "0.21"

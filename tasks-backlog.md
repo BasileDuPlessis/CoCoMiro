@@ -35,6 +35,46 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 ## Active High Priority Tasks
 
+### ✅ 1. Externalize CSS Styles
+- Move all inline CSS from `index.html` to external `styles.css` file
+- Replace programmatic style setting in Rust code with CSS classes
+- Define CSS custom properties for colors and reusable values
+- Maintain all existing visual styling and behavior
+
+**Implementation Details:**
+- Create `styles.css` with all current styles from HTML `<style>` block
+- Define CSS variables for colors (--color-primary, --color-bg, etc.)
+- Create CSS classes for dynamic elements (.text-input-toolbar, .contenteditable-overlay, etc.)
+- Replace `set_property` calls in Rust with `class_list().add()`
+- Keep only truly dynamic properties (positions, dimensions) in Rust code
+- Test visual appearance after each component migration
+- Ensure compilation for both host and WASM targets
+- Run full test suite to verify no regressions
+
+**Style Regression Prevention:**
+- Create visual baseline screenshots before starting
+- Test each component individually (toolbar, buttons, contenteditable, canvas cursor)
+- Use browser dev tools to audit computed styles
+- Add automated visual regression tests if possible
+- Manual testing of all UI states (hover, focus, active, editing modes)
+- Cross-browser testing (Chrome, Firefox, Safari)
+
+### ✅ 1.1 Create Visual Regression Test Suite
+- Set up automated screenshot comparison for key UI components
+- Capture baseline images of toolbar, text input overlay, canvas states
+- Implement pixel-perfect comparison or perceptual diff testing
+- Add to CI/CD pipeline for future changes
+
+**Implementation Details:**
+- Use headless_chrome for screenshot capture in browser automation tests
+- Store baseline images in `tests/baselines/` directory (committed to version control)
+- Implement pixel-by-pixel image comparison with configurable threshold (1% difference allowed)
+- Created `tests/visual_regression.rs` with automated test suite
+- Tests for: toolbar initial state, canvas initial state, text input overlay
+- Utility test to update baselines when UI changes are intentional
+- Failing screenshots saved with `_fail.png` suffix for debugging (not committed)
+- All tests pass and WASM build succeeds
+
 ### Code Refactoring Tasks
 
 #### ✅ 2. Split render_canvas Function
@@ -271,6 +311,16 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Handle touch vs mouse event conflicts
 
 ## Recently Completed Tasks
+
+### ✅ Externalize CSS Styles
+- Moved all inline CSS from `index.html` to external `styles.css` file
+- Replaced programmatic style setting in Rust code with CSS classes for static styles
+- Defined CSS custom properties for colors and reusable values
+- Maintained all existing visual styling and behavior
+- Created CSS classes for dynamic elements (.text-input-toolbar, .contenteditable-overlay, .formatting-button variants)
+- Kept only truly dynamic properties (positions, dimensions, background-color) in Rust code
+- Ensured trunk build includes the external CSS file
+- All tests pass and WASM build succeeds
 
 ### ✅ Split render_canvas Function
 - Broke down the ~290-line `render_canvas` function in `canvas.rs` into smaller, focused functions

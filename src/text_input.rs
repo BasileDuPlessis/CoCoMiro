@@ -47,7 +47,7 @@ fn create_formatting_toolbar(
         .map_err(|_| "Cannot convert toolbar to HtmlElement")?;
 
     // Style the toolbar
-    let _ = toolbar.style().set_property("position", "absolute");
+    let _ = toolbar.set_attribute("class", "text-input-toolbar");
     let _ = toolbar
         .style()
         .set_property("left", &format!("{}px", overlay_left));
@@ -57,19 +57,6 @@ fn create_formatting_toolbar(
     let _ = toolbar
         .style()
         .set_property("width", &format!("{}px", screen_width.min(200.0))); // Limit max width
-    let _ = toolbar.style().set_property("height", "32px");
-    let _ = toolbar.style().set_property("background-color", "#ffffff");
-    let _ = toolbar.style().set_property("border", "1px solid #e5e7eb");
-    let _ = toolbar.style().set_property("border-radius", "4px");
-    let _ = toolbar
-        .style()
-        .set_property("box-shadow", "0 1px 3px rgba(0, 0, 0, 0.1)");
-    let _ = toolbar.style().set_property("display", "flex");
-    let _ = toolbar.style().set_property("align-items", "center");
-    let _ = toolbar.style().set_property("padding", "4px");
-    let _ = toolbar.style().set_property("gap", "2px");
-    let _ = toolbar.style().set_property("z-index", "1001"); // Higher than contenteditable
-    let _ = toolbar.style().set_property("font-size", "12px");
 
     // Create bold button
     let bold_button = document
@@ -78,7 +65,7 @@ fn create_formatting_toolbar(
     bold_button.set_text_content(Some("B"));
     let _ = bold_button.set_attribute("title", "Bold");
     let _ = bold_button.set_attribute("aria-label", "Make text bold");
-    style_formatting_button(&bold_button, "font-weight: bold;")?;
+    let _ = bold_button.set_attribute("class", "formatting-button formatting-button--bold");
 
     // Create italic button
     let italic_button = document
@@ -87,7 +74,7 @@ fn create_formatting_toolbar(
     italic_button.set_text_content(Some("I"));
     let _ = italic_button.set_attribute("title", "Italic");
     let _ = italic_button.set_attribute("aria-label", "Make text italic");
-    style_formatting_button(&italic_button, "font-style: italic;")?;
+    let _ = italic_button.set_attribute("class", "formatting-button formatting-button--italic");
 
     // Create underline button
     let underline_button = document
@@ -96,7 +83,8 @@ fn create_formatting_toolbar(
     underline_button.set_text_content(Some("U"));
     let _ = underline_button.set_attribute("title", "Underline");
     let _ = underline_button.set_attribute("aria-label", "Underline text");
-    style_formatting_button(&underline_button, "text-decoration: underline;")?;
+    let _ =
+        underline_button.set_attribute("class", "formatting-button formatting-button--underline");
 
     // Add buttons to toolbar
     let _ = toolbar.append_child(&bold_button);
@@ -109,40 +97,6 @@ fn create_formatting_toolbar(
     add_formatting_handler(&underline_button, "underline", &contenteditable)?;
 
     Ok(toolbar)
-}
-
-/// Styles a formatting button with consistent appearance.
-///
-/// # Arguments
-/// * `button` - The button element to style
-/// * `font_style` - CSS font styling to apply to the button text
-#[cfg(target_arch = "wasm32")]
-fn style_formatting_button(button: &web_sys::Element, font_style: &str) -> Result<(), String> {
-    let style = button
-        .dyn_ref::<web_sys::HtmlElement>()
-        .ok_or("Button is not an HtmlElement")?
-        .style();
-
-    let _ = style.set_property("width", "24px");
-    let _ = style.set_property("height", "24px");
-    let _ = style.set_property("border", "1px solid #d1d5db");
-    let _ = style.set_property("border-radius", "3px");
-    let _ = style.set_property("background-color", "#ffffff");
-    let _ = style.set_property("color", "#374151");
-    let _ = style.set_property("cursor", "pointer");
-    let _ = style.set_property("display", "flex");
-    let _ = style.set_property("align-items", "center");
-    let _ = style.set_property("justify-content", "center");
-    let _ = style.set_property("font-size", "12px");
-    let _ = style.set_property("font-family", "Inter, sans-serif");
-    let _ = style.set_property(
-        &font_style.split(':').next().unwrap_or(""),
-        &font_style.split(':').nth(1).unwrap_or("").trim(),
-    );
-    let _ = style.set_property("user-select", "none");
-    let _ = style.set_property("transition", "background-color 0.1s");
-
-    Ok(())
 }
 
 /// Adds a click handler to a formatting button.
@@ -352,7 +306,7 @@ pub fn create_text_input_overlay(
     };
 
     // Style the contenteditable div to match the note exactly
-    let _ = contenteditable.style().set_property("position", "absolute");
+    let _ = contenteditable.set_attribute("class", "contenteditable-overlay");
     let _ = contenteditable
         .style()
         .set_property("left", &format!("{}px", overlay_left));
@@ -365,31 +319,9 @@ pub fn create_text_input_overlay(
     let _ = contenteditable
         .style()
         .set_property("height", &format!("{}px", screen_height));
-    let _ = contenteditable.style().set_property("font-size", "14px");
-    let _ = contenteditable
-        .style()
-        .set_property("font-family", "Inter, sans-serif");
-    let _ = contenteditable.style().set_property("border", "none");
-    let _ = contenteditable.style().set_property("border-radius", "0px");
-    let _ = contenteditable.style().set_property("padding", "8px");
     let _ = contenteditable
         .style()
         .set_property("background-color", &note.color);
-    let _ = contenteditable.style().set_property("color", "#000000");
-    let _ = contenteditable.style().set_property("outline", "none");
-    let _ = contenteditable.style().set_property("z-index", "1000");
-    let _ = contenteditable.style().set_property("text-align", "left");
-    let _ = contenteditable
-        .style()
-        .set_property("box-sizing", "border-box");
-    let _ = contenteditable.style().set_property("overflow", "hidden");
-    let _ = contenteditable
-        .style()
-        .set_property("white-space", "pre-wrap");
-    let _ = contenteditable
-        .style()
-        .set_property("word-wrap", "break-word");
-    let _ = contenteditable.style().set_property("line-height", "1.2");
 
     // Set initial content and focus - handle both HTML and plain text content
     let initial_html = if note.content.contains('<') && note.content.contains('>') {
