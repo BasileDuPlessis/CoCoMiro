@@ -39,14 +39,14 @@ pub fn handle_mouse_down(
     canvas: &HtmlCanvasElement,
     state: &Rc<RefCell<crate::AppState>>,
     render: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     if event.button() != 0 {
         return Ok(());
     }
 
     event.prevent_default();
     if let Err(error) = canvas.focus() {
-        crate::log_jsvalue_error("canvas focus failed", &error);
+        crate::logging::log_jsvalue_error("canvas focus failed", &error);
     }
 
     let mouse_x = event.offset_x() as f64;
@@ -84,14 +84,14 @@ pub fn handle_mouse_down(
             .borrow_mut()
             .sticky_notes
             .start_drag(note_id, world_pos.0, world_pos.1);
-        crate::log_info(&format!("Sticky note {} drag started", note_id));
+        crate::logging::log_info(&format!("Sticky note {} drag started", note_id));
         render();
         return Ok(());
     }
 
     // If no sticky note hit, start canvas drag
     state.borrow_mut().viewport.start_drag(mouse_x, mouse_y);
-    crate::log_info(&format!(
+    crate::logging::log_info(&format!(
         "Canvas drag started at ({}, {})",
         mouse_x, mouse_y
     ));
@@ -126,7 +126,7 @@ pub fn handle_mouse_move(
     render: &Rc<dyn Fn()>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     position_toolbar: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     let mouse_x = event.offset_x() as f64;
     let mouse_y = event.offset_y() as f64;
 
@@ -197,20 +197,20 @@ pub fn handle_mouse_up(
     render: &Rc<dyn Fn()>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     position_toolbar: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     let was_dragging = state.borrow().viewport.is_dragging;
     let toolbar_was_dragging = toolbar_state.borrow().is_dragging;
     let sticky_note_was_dragging = state.borrow().sticky_notes.is_dragging;
     end_drag_if_needed(&state, &render);
     end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
     if was_dragging {
-        crate::log_info("Canvas drag ended");
+        crate::logging::log_info("Canvas drag ended");
     }
     if toolbar_was_dragging {
-        crate::log_info("Toolbar drag ended");
+        crate::logging::log_info("Toolbar drag ended");
     }
     if sticky_note_was_dragging {
-        crate::log_info("Sticky note drag ended");
+        crate::logging::log_info("Sticky note drag ended");
     }
     Ok(())
 }
@@ -234,7 +234,7 @@ pub fn handle_mouse_leave(
     render: &Rc<dyn Fn()>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     position_toolbar: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     end_drag_if_needed(&state, &render);
     end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
     Ok(())
@@ -264,7 +264,7 @@ pub fn handle_wheel(
     canvas: &HtmlCanvasElement,
     state: &Rc<RefCell<crate::AppState>>,
     render: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     event.prevent_default();
     let factor = if event.delta_y() < 0.0 {
         crate::event_constants::ZOOM_STEP_FACTOR
@@ -283,7 +283,7 @@ pub fn handle_wheel(
         viewport_height,
     );
     let new_zoom = state.borrow().viewport.zoom;
-    crate::log_info(&format!(
+    crate::logging::log_info(&format!(
         "Zoom changed from {:.2} to {:.2} at ({}, {})",
         old_zoom,
         new_zoom,
@@ -312,7 +312,7 @@ pub fn handle_double_click(
     canvas: &HtmlCanvasElement,
     state: &Rc<RefCell<crate::AppState>>,
     render: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     event.prevent_default();
 
     let mouse_x = event.offset_x() as f64;
@@ -334,7 +334,7 @@ pub fn handle_double_click(
         .sticky_notes
         .find_note_at(world_pos.0, world_pos.1)
     {
-        crate::log_info(&format!(
+        crate::logging::log_info(&format!(
             "Double-click detected on sticky note {} at world position ({:.1}, {:.1}) - creating input overlay",
             note_id, world_pos.0, world_pos.1
         ));
@@ -342,7 +342,7 @@ pub fn handle_double_click(
         // Create text input overlay for the selected note
         create_text_input_overlay(&canvas, &state, note_id, &render);
     } else {
-        crate::log_info(&format!(
+        crate::logging::log_info(&format!(
             "Double-click detected on canvas at world position ({:.1}, {:.1}) - no note selected",
             world_pos.0, world_pos.1
         ));
@@ -370,7 +370,7 @@ pub fn handle_toolbar_mouse_down(
     canvas: &HtmlCanvasElement,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     position_toolbar: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     if event.button() != 0 {
         return Ok(());
     }
@@ -388,7 +388,7 @@ pub fn handle_toolbar_mouse_down(
     event.prevent_default();
     event.stop_propagation();
     if let Err(error) = canvas.focus() {
-        crate::log_jsvalue_error("canvas focus failed", &error);
+        crate::logging::log_jsvalue_error("canvas focus failed", &error);
     }
     toolbar_state
         .borrow_mut()

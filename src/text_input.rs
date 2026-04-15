@@ -182,9 +182,12 @@ fn add_formatting_handler(
                 .unwrap_or(false);
 
             if success {
-                crate::log_info(&format!("Successfully applied {} formatting", format_type));
+                crate::logging::log_info(&format!(
+                    "Successfully applied {} formatting",
+                    format_type
+                ));
             } else {
-                crate::log_warn(&format!("Failed to apply {} formatting", format_type));
+                crate::logging::log_warn(&format!("Failed to apply {} formatting", format_type));
             }
 
             // Focus the contenteditable to keep it active
@@ -198,6 +201,38 @@ fn add_formatting_handler(
 
     closure.forget();
     Ok(())
+}
+
+/// Sanitizes HTML content by extracting only plain text content.
+///
+/// This function creates a temporary DOM element, sets its innerHTML to the
+/// provided HTML string, and then returns the textContent, which strips all
+/// HTML tags and provides only the plain text content.
+///
+/// # Arguments
+/// * `html` - The HTML string to sanitize
+///
+/// # Returns
+/// The plain text content with all HTML tags removed
+#[cfg(target_arch = "wasm32")]
+fn sanitize_html_to_text(html: &str) -> String {
+    // Get the document
+    let document = match web_sys::window().and_then(|w| w.document()) {
+        Some(doc) => doc,
+        None => return html.to_string(), // Fallback to original if no document
+    };
+
+    // Create a temporary div element
+    let temp_div = match document.create_element("div") {
+        Ok(div) => div,
+        Err(_) => return html.to_string(), // Fallback
+    };
+
+    // Set the HTML content
+    temp_div.set_inner_html(html);
+
+    // Get the text content (this strips all HTML tags)
+    temp_div.text_content().unwrap_or_else(|| html.to_string())
 }
 
 /// Sanitizes HTML content for safe pasting, allowing only formatting tags.
@@ -215,7 +250,7 @@ pub fn create_text_input_overlay(
     let browser_window = match web_sys::window() {
         Some(w) => w,
         None => {
-            crate::log_warn("Cannot create text input overlay: window unavailable");
+            crate::logging::log_warn("Cannot create text input overlay: window unavailable");
             return;
         }
     };
@@ -223,7 +258,7 @@ pub fn create_text_input_overlay(
     let document = match browser_window.document() {
         Some(d) => d,
         None => {
-            crate::log_warn("Cannot create text input overlay: document unavailable");
+            crate::logging::log_warn("Cannot create text input overlay: document unavailable");
             return;
         }
     };
@@ -238,7 +273,7 @@ pub fn create_text_input_overlay(
     {
         Some(n) => n.clone(),
         None => {
-            crate::log_warn(&format!(
+            crate::logging::log_warn(&format!(
                 "Cannot create input overlay for note {}: note not found",
                 note_id
             ));
@@ -285,7 +320,7 @@ pub fn create_text_input_overlay(
     let contenteditable = match document.create_element("div") {
         Ok(el) => el,
         Err(_) => {
-            crate::log_warn("Cannot create contenteditable div element");
+            crate::logging::log_warn("Cannot create contenteditable div element");
             return;
         }
     };
@@ -293,7 +328,7 @@ pub fn create_text_input_overlay(
     let contenteditable: web_sys::HtmlElement = match contenteditable.dyn_into() {
         Ok(div) => div,
         Err(_) => {
-            crate::log_warn("Cannot convert element to HtmlElement");
+            crate::logging::log_warn("Cannot convert element to HtmlElement");
             return;
         }
     };
@@ -311,7 +346,7 @@ pub fn create_text_input_overlay(
     ) {
         Ok(tb) => tb,
         Err(e) => {
-            crate::log_warn(&format!("Cannot create formatting toolbar: {}", e));
+            crate::logging::log_warn(&format!("Cannot create formatting toolbar: {}", e));
             return;
         }
     };
@@ -410,7 +445,7 @@ pub fn create_text_input_overlay(
     contenteditable
         .add_event_listener_with_callback("input", on_input.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
-            crate::log_warn("Failed to attach input event listener");
+            crate::logging::log_warn("Failed to attach input event listener");
         });
     on_input.forget();
 
@@ -458,7 +493,7 @@ pub fn create_text_input_overlay(
                         // Check if Ctrl or Shift is held for confirmation
                         if event.ctrl_key() || event.shift_key() {
                             // Confirm changes - content already updated via input handler
-                            crate::log_info(&format!(
+                            crate::logging::log_info(&format!(
                                 "Text editing confirmed for note {}",
                                 note_id
                             ));
@@ -478,7 +513,10 @@ pub fn create_text_input_overlay(
                         if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
                             note.content = original_content.clone();
                         }
-                        crate::log_info(&format!("Text editing cancelled for note {}", note_id));
+                        crate::logging::log_info(&format!(
+                            "Text editing cancelled for note {}",
+                            note_id
+                        ));
 
                         // Remove the contenteditable overlay
                         if let Some(body) = document.body() {
@@ -498,7 +536,7 @@ pub fn create_text_input_overlay(
     contenteditable
         .add_event_listener_with_callback("keydown", on_keydown.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
-            crate::log_warn("Failed to attach keydown event listener");
+            crate::logging::log_warn("Failed to attach keydown event listener");
         });
     on_keydown.forget();
 
@@ -513,7 +551,7 @@ pub fn create_text_input_overlay(
     toolbar
         .add_event_listener_with_callback("mousedown", toolbar_mousedown.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
-            crate::log_warn("Failed to attach toolbar mousedown event listener");
+            crate::logging::log_warn("Failed to attach toolbar mousedown event listener");
         });
     toolbar_mousedown.forget();
 
@@ -531,7 +569,7 @@ pub fn create_text_input_overlay(
             }
 
             // Confirm changes when focus is lost
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Text editing confirmed (blur) for note {}",
                 note_id
             ));
@@ -546,9 +584,95 @@ pub fn create_text_input_overlay(
     contenteditable
         .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
-            crate::log_warn("Failed to attach blur event listener");
+            crate::logging::log_warn("Failed to attach blur event listener");
         });
     on_blur.forget();
+
+    // Attach paste event listener to sanitize pasted content
+    let on_paste = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            event.prevent_default();
+            event.stop_propagation();
+
+            // Get clipboard data from the event
+            let clipboard_data = match js_sys::Reflect::get(&event, &"clipboardData".into()) {
+                Ok(cd) => cd,
+                Err(_) => {
+                    crate::logging::log_warn("No clipboard data available in paste event");
+                    return;
+                }
+            };
+
+            // Try to get plain text first
+            let pasted_text =
+                if let Ok(text) = js_sys::Reflect::get(&clipboard_data, &"getData".into()) {
+                    if let Ok(get_data_fn) = text.dyn_into::<js_sys::Function>() {
+                        if let Ok(text_result) =
+                            get_data_fn.call1(&clipboard_data, &"text/plain".into())
+                        {
+                            if let Some(text_str) = text_result.as_string() {
+                                if !text_str.is_empty() {
+                                    text_str
+                                } else {
+                                    // Fallback to HTML content and sanitize it
+                                    if let Ok(html_result) =
+                                        get_data_fn.call1(&clipboard_data, &"text/html".into())
+                                    {
+                                        if let Some(html_str) = html_result.as_string() {
+                                            sanitize_html_to_text(&html_str)
+                                        } else {
+                                            String::new()
+                                        }
+                                    } else {
+                                        String::new()
+                                    }
+                                }
+                            } else {
+                                String::new()
+                            }
+                        } else {
+                            String::new()
+                        }
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                };
+
+            if !pasted_text.is_empty() {
+                // Insert the sanitized text using execCommand
+                let document = web_sys::window()
+                    .and_then(|w| w.document())
+                    .expect("Document should be available");
+
+                // Use document.execCommand to insert text
+                let exec_command_fn = js_sys::Function::from(
+                    js_sys::Reflect::get(
+                        document.as_ref(),
+                        &wasm_bindgen::JsValue::from_str("execCommand"),
+                    )
+                    .unwrap(),
+                );
+
+                // Call execCommand("insertText", false, text)
+                let _ = exec_command_fn.call3(
+                    document.as_ref(),
+                    &wasm_bindgen::JsValue::from_str("insertText"),
+                    &wasm_bindgen::JsValue::from_bool(false),
+                    &wasm_bindgen::JsValue::from_str(&pasted_text),
+                );
+
+                crate::logging::log_info("Pasted content sanitized and inserted");
+            }
+        },
+    ));
+    contenteditable
+        .add_event_listener_with_callback("paste", on_paste.as_ref().unchecked_ref())
+        .unwrap_or_else(|_| {
+            crate::logging::log_warn("Failed to attach paste event listener");
+        });
+    on_paste.forget();
 
     // Add to document
     if let Some(body) = document.body() {
@@ -556,5 +680,5 @@ pub fn create_text_input_overlay(
         let _ = body.append_child(&contenteditable);
     }
 
-    crate::log_info(&format!("Created text input overlay for note {}", note_id));
+    crate::logging::log_info(&format!("Created text input overlay for note {}", note_id));
 }

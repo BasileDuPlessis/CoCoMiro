@@ -35,7 +35,43 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 ## Active High Priority Tasks
 
-### 1. Add Persistence
+### Code Refactoring Tasks
+
+#### ✅ 2. Split render_canvas Function
+- Break down the ~290-line `render_canvas` function in `canvas.rs` into smaller, focused functions
+- Extract `render_grid_background()`, `render_sticky_notes()`, `render_text_content()`, `update_status_display()`
+- Maintain the same external API and behavior
+
+**Implementation Details:**
+- Identify logical boundaries within `render_canvas`
+- Create private helper functions with clear responsibilities
+- Preserve performance characteristics and error handling
+- Test that rendering still works correctly after split
+
+#### 3. Move Integration Tests
+- Create new `tests/integration_tests.rs` file
+- Move all integration tests from `lib.rs` to the new file
+- Update test module structure and imports
+- Ensure all tests still pass
+
+**Implementation Details:**
+- Create `tests/` directory if it doesn't exist
+- Move the 8 integration test functions from `lib.rs`
+- Update `#[cfg(test)]` module declarations
+- Run full test suite to verify no regressions
+
+#### 4. Break Down start_impl Function
+- Split the ~150-line `start_impl` function in `lib.rs` into smaller initialization phases
+- Extract `setup_canvas_and_context()`, `create_render_and_position_functions()`, `setup_event_system()`, `setup_window_resize_handler()`
+- Improve readability and maintainability
+
+**Implementation Details:**
+- Identify initialization phases within `start_impl`
+- Create private helper functions for each phase
+- Preserve error handling and resource management
+- Test that application startup still works correctly
+
+### 6. Add Persistence
 - Implement save/load functionality for sticky notes
 - Add data serialization and local storage
 
@@ -235,6 +271,29 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Handle touch vs mouse event conflicts
 
 ## Recently Completed Tasks
+
+### ✅ Split render_canvas Function
+- Broke down the ~290-line `render_canvas` function in `canvas.rs` into smaller, focused functions
+- Extracted `render_grid_background()`, `render_sticky_notes()`, `update_canvas_attributes()`, and `update_status_display()`
+- Maintained the same external API and behavior with proper error handling
+- All tests pass and WASM build succeeds
+
+### ✅ Extract Error Types Module
+- Created new `src/error.rs` module with comprehensive error type documentation
+- Moved `AppError` enum and `Display`/`Error` trait implementations from `lib.rs`
+- Moved `AppResult<T>` type alias for WebAssembly operations
+- Updated all imports across dependent modules (app.rs, canvas.rs, event_setup.rs, logging.rs, mouse_events.rs, keyboard_events.rs)
+- Preserved WebAssembly conditional compilation for all error conversions
+- Verified compilation for both host and WASM targets
+- All tests pass and full WASM build succeeds
+
+### ✅ Extract Logging Module
+- Created new `src/logging.rs` module with proper documentation
+- Moved all logging functions (`log_info`, `log_warn`, `log_app_error`, `log_js_error`, `log_jsvalue_error`) from `lib.rs`
+- Updated imports across all modules that use logging (mouse_events.rs, text_input.rs, event_setup.rs, keyboard_events.rs, lib.rs)
+- Preserved WebAssembly conditional compilation for all functions
+- Verified compilation for both host and WASM targets
+- All tests pass and full WASM build succeeds
 
 ### ✅ Text Editing Features (All Completed)
 - Double-click to edit sticky notes

@@ -70,40 +70,54 @@ pub fn app_markup() -> String {
 /// * `Err(AppError)` - Failed to access or cast DOM elements
 pub fn install_app(
     document: &Document,
-) -> crate::AppResult<(HtmlElement, HtmlCanvasElement, HtmlElement, HtmlElement)> {
+) -> crate::error::AppResult<(HtmlElement, HtmlCanvasElement, HtmlElement, HtmlElement)> {
     let body = document
         .body()
-        .ok_or_else(|| crate::AppError::Dom("document has no body element".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::Dom("document has no body element".to_string()))?;
     body.set_inner_html(&app_markup());
 
     let workspace = document
         .get_element_by_id("canvas-workspace")
-        .ok_or_else(|| crate::AppError::Dom("canvas workspace element not found".to_string()))?
-        .dyn_into::<HtmlElement>()
-        .map_err(|_| crate::AppError::Dom("canvas workspace is not an HTML element".to_string()))?;
-    let canvas = document
-        .get_element_by_id("infinite-canvas")
-        .ok_or_else(|| crate::AppError::Dom("canvas element not found".to_string()))?
-        .dyn_into::<HtmlCanvasElement>()
-        .map_err(|_| crate::AppError::Dom("infinite-canvas is not a canvas element".to_string()))?;
-    let status = document
-        .get_element_by_id("canvas-status")
-        .ok_or_else(|| crate::AppError::Dom("status element not found".to_string()))?
-        .dyn_into::<HtmlElement>()
-        .map_err(|_| crate::AppError::Dom("canvas-status is not an HTML element".to_string()))?;
-    let toolbar = document
-        .get_element_by_id("floating-toolbar")
-        .ok_or_else(|| crate::AppError::Dom("floating toolbar element not found".to_string()))?
-        .dyn_into::<HtmlElement>()
-        .map_err(|_| crate::AppError::Dom("floating-toolbar is not an HTML element".to_string()))?;
-    let toolbar_handle = document
-        .get_element_by_id("floating-toolbar-handle")
         .ok_or_else(|| {
-            crate::AppError::Dom("floating toolbar handle element not found".to_string())
+            crate::error::AppError::Dom("canvas workspace element not found".to_string())
         })?
         .dyn_into::<HtmlElement>()
         .map_err(|_| {
-            crate::AppError::Dom("floating-toolbar-handle is not an HTML element".to_string())
+            crate::error::AppError::Dom("canvas workspace is not an HTML element".to_string())
+        })?;
+    let canvas = document
+        .get_element_by_id("infinite-canvas")
+        .ok_or_else(|| crate::error::AppError::Dom("canvas element not found".to_string()))?
+        .dyn_into::<HtmlCanvasElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom("infinite-canvas is not a canvas element".to_string())
+        })?;
+    let status = document
+        .get_element_by_id("canvas-status")
+        .ok_or_else(|| crate::error::AppError::Dom("status element not found".to_string()))?
+        .dyn_into::<HtmlElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom("canvas-status is not an HTML element".to_string())
+        })?;
+    let toolbar = document
+        .get_element_by_id("floating-toolbar")
+        .ok_or_else(|| {
+            crate::error::AppError::Dom("floating toolbar element not found".to_string())
+        })?
+        .dyn_into::<HtmlElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom("floating-toolbar is not an HTML element".to_string())
+        })?;
+    let toolbar_handle = document
+        .get_element_by_id("floating-toolbar-handle")
+        .ok_or_else(|| {
+            crate::error::AppError::Dom("floating toolbar handle element not found".to_string())
+        })?
+        .dyn_into::<HtmlElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom(
+                "floating-toolbar-handle is not an HTML element".to_string(),
+            )
         })?;
     toolbar.set_attribute("data-handle-id", &toolbar_handle.id())?;
 

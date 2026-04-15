@@ -38,68 +38,14 @@ use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 #[cfg(target_arch = "wasm32")]
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
 
-/// Custom error types for the CoCoMiro application.
-///
-/// This enum provides specific error types for different failure scenarios,
-/// allowing for better error handling and recovery strategies.
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppError {
-    /// Browser environment errors (missing window, document, etc.)
-    BrowserEnv(String),
-    /// Canvas-related errors (context creation, rendering failures)
-    Canvas(String),
-    /// DOM manipulation errors (element access, property setting)
-    Dom(String),
-    /// Event handling errors (listener attachment failures)
-    Event(String),
-    /// State management errors (invalid state transitions)
-    State(String),
-    /// Rendering errors (drawing failures, context issues)
-    Render(String),
-    /// Generic application errors
-    Generic(String),
-}
-
-impl std::fmt::Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AppError::BrowserEnv(msg) => write!(f, "Browser environment error: {}", msg),
-            AppError::Canvas(msg) => write!(f, "Canvas error: {}", msg),
-            AppError::Dom(msg) => write!(f, "DOM error: {}", msg),
-            AppError::Event(msg) => write!(f, "Event error: {}", msg),
-            AppError::State(msg) => write!(f, "State error: {}", msg),
-            AppError::Render(msg) => write!(f, "Render error: {}", msg),
-            AppError::Generic(msg) => write!(f, "Application error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for AppError {}
-
-#[cfg(target_arch = "wasm32")]
-impl From<JsValue> for AppError {
-    fn from(js_error: JsValue) -> Self {
-        AppError::Generic(format!("JavaScript error: {:?}", js_error))
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-impl From<AppError> for JsValue {
-    fn from(error: AppError) -> Self {
-        JsValue::from_str(&error.to_string())
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Result type alias for WebAssembly operations that may fail.
-pub type AppResult<T> = Result<T, AppError>;
-
 pub mod app;
 pub mod canvas;
+pub mod error;
 pub mod event_constants;
 pub mod event_setup;
 pub mod events;
 pub mod keyboard_events;
+pub mod logging;
 pub mod mouse_events;
 pub mod sticky_notes;
 pub mod text_input;
@@ -142,83 +88,6 @@ thread_local! {
 }
 
 #[cfg(target_arch = "wasm32")]
-/// Logs JavaScript errors to the browser console with enhanced context.
-///
-/// This function provides consistent error logging for WebAssembly code,
-/// ensuring errors are visible in browser developer tools with additional context.
-///
-/// # Arguments
-/// * `context` - Descriptive context for where the error occurred
-/// * `error` - The error to log (can be AppError or JsValue)
-pub fn log_js_error(context: &str, error: &impl std::fmt::Display) {
-    web_sys::console::error_1(&JsValue::from_str(&format!(
-        "CoCoMiro [{context}]: {error}"
-    )));
-}
-
-/// Logs raw JavaScript values as errors.
-///
-/// This function is specifically for logging JsValue errors that don't
-/// implement Display but can be debug-formatted.
-///
-/// # Arguments
-/// * `context` - Descriptive context for where the error occurred
-/// * `error` - The JsValue error to log
-#[cfg(target_arch = "wasm32")]
-pub fn log_jsvalue_error(context: &str, error: &JsValue) {
-    web_sys::console::error_1(&JsValue::from_str(&format!(
-        "CoCoMiro [{context}]: {:?}",
-        error
-    )));
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Logs application errors with recovery suggestions.
-///
-/// This function logs errors and provides user-friendly recovery information
-/// when possible. For critical errors, it may suggest page refresh.
-///
-/// # Arguments
-/// * `error` - The application error to log
-/// * `operation` - Description of the operation that failed
-pub fn log_app_error(error: &AppError, operation: &str) {
-    let recovery_hint = match error {
-        AppError::BrowserEnv(_) => {
-            "Try refreshing the page or checking your browser compatibility."
-        }
-        AppError::Canvas(_) => "Try resizing the window or refreshing the page.",
-        AppError::Dom(_) => "The page may have been modified. Try refreshing.",
-        AppError::Event(_) => "Interaction may be limited. Try refreshing the page.",
-        AppError::State(_) => "Application state may be corrupted. Try refreshing the page.",
-        AppError::Render(_) => "Rendering failed. Try refreshing the page.",
-        AppError::Generic(_) => "An unexpected error occurred. Try refreshing the page.",
-    };
-
-    web_sys::console::error_1(&JsValue::from_str(&format!(
-        "CoCoMiro Error during '{}': {}\nRecovery: {}",
-        operation, error, recovery_hint
-    )));
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Logs informational messages to the browser console.
-///
-/// # Arguments
-/// * `message` - The message to log
-pub fn log_info(message: &str) {
-    web_sys::console::log_1(&JsValue::from_str(message));
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Logs warning messages to the browser console.
-///
-/// # Arguments
-/// * `message` - The warning message to log
-pub fn log_warn(message: &str) {
-    web_sys::console::warn_1(&JsValue::from_str(message));
-}
-
-#[cfg(target_arch = "wasm32")]
 /// Attempts to recover from canvas context errors by reinitializing the context.
 ///
 /// This function provides recovery for canvas context loss or corruption by
@@ -234,25 +103,31 @@ pub fn log_warn(message: &str) {
 fn recover_canvas_context(
     canvas: &HtmlCanvasElement,
     _context: &CanvasRenderingContext2d,
-) -> AppResult<CanvasRenderingContext2d> {
-    log_warn("Attempting canvas context recovery...");
+) -> crate::error::AppResult<CanvasRenderingContext2d> {
+    logging::log_warn("Attempting canvas context recovery...");
 
     // Try to get a new 2D context
     let new_context = canvas
         .get_context("2d")
-        .map_err(|_| AppError::Canvas("failed to get 2d context during recovery".to_string()))?
+        .map_err(|_| {
+            crate::error::AppError::Canvas("failed to get 2d context during recovery".to_string())
+        })?
         .ok_or_else(|| {
-            AppError::Canvas("could not access canvas context during recovery".to_string())
+            crate::error::AppError::Canvas(
+                "could not access canvas context during recovery".to_string(),
+            )
         })?
         .dyn_into::<CanvasRenderingContext2d>()
         .map_err(|_| {
-            AppError::Canvas("context is not a 2D rendering context during recovery".to_string())
+            crate::error::AppError::Canvas(
+                "context is not a 2D rendering context during recovery".to_string(),
+            )
         })?;
 
     // Resize the canvas to ensure it's properly configured
     canvas::resize_canvas(canvas, &new_context)?;
 
-    log_info("Canvas context recovery successful");
+    logging::log_info("Canvas context recovery successful");
     Ok(new_context)
 }
 
@@ -276,8 +151,8 @@ fn fallback_render(
     ctx: &CanvasRenderingContext2d,
     canvas: &HtmlCanvasElement,
     status: &HtmlElement,
-    error: &AppError,
-) -> AppResult<()> {
+    error: &crate::error::AppError,
+) -> crate::error::AppResult<()> {
     // Get canvas dimensions
     let (width, height) = canvas::canvas_css_size(canvas)?;
 
@@ -301,21 +176,25 @@ fn fallback_render(
 }
 
 #[cfg(target_arch = "wasm32")]
-fn start_impl() -> AppResult<()> {
-    let browser_window =
-        window().ok_or_else(|| AppError::BrowserEnv("window is unavailable".to_string()))?;
-    let document = browser_window
-        .document()
-        .ok_or_else(|| AppError::BrowserEnv("could not access the browser document".to_string()))?;
+fn start_impl() -> crate::error::AppResult<()> {
+    let browser_window = window()
+        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let document = browser_window.document().ok_or_else(|| {
+        crate::error::AppError::BrowserEnv("could not access the browser document".to_string())
+    })?;
 
     let (workspace, canvas, status, toolbar) = app::install_app(&document)?;
 
     let context = canvas
         .get_context("2d")
-        .map_err(|_| AppError::Canvas("failed to get 2d context".to_string()))?
-        .ok_or_else(|| AppError::Canvas("could not access the canvas context".to_string()))?
+        .map_err(|_| crate::error::AppError::Canvas("failed to get 2d context".to_string()))?
+        .ok_or_else(|| {
+            crate::error::AppError::Canvas("could not access the canvas context".to_string())
+        })?
         .dyn_into::<CanvasRenderingContext2d>()
-        .map_err(|_| AppError::Canvas("context is not a 2D rendering context".to_string()))?;
+        .map_err(|_| {
+            crate::error::AppError::Canvas("context is not a 2D rendering context".to_string())
+        })?;
     canvas::resize_canvas(&canvas, &context)?;
 
     let state = Rc::new(RefCell::new(AppState::default()));
@@ -329,7 +208,7 @@ fn start_impl() -> AppResult<()> {
         let is_rendering = is_rendering.clone();
         move || {
             if is_rendering.replace(true) {
-                log_info("Render skipped: already rendering");
+                logging::log_info("Render skipped: already rendering");
                 return;
             }
 
@@ -345,18 +224,23 @@ fn start_impl() -> AppResult<()> {
                     Err(error) => {
                         retry_count += 1;
                         if retry_count >= MAX_RETRIES {
-                            log_app_error(&error, "rendering canvas (final attempt failed)");
+                            logging::log_app_error(
+                                &error,
+                                "rendering canvas (final attempt failed)",
+                            );
 
                             // Attempt canvas context recovery before fallback
                             match recover_canvas_context(&canvas, &context) {
                                 Ok(_new_context) => {
-                                    log_info("Context recovery successful, retrying render");
+                                    logging::log_info(
+                                        "Context recovery successful, retrying render",
+                                    );
                                     // Since we can't update the closure's context reference directly,
                                     // we'll try one more render with the potentially recovered context
                                     if let Err(final_error) =
                                         canvas::render_canvas(&context, &canvas, &status, &snapshot)
                                     {
-                                        log_app_error(
+                                        logging::log_app_error(
                                             &final_error,
                                             "rendering after context recovery",
                                         );
@@ -366,7 +250,7 @@ fn start_impl() -> AppResult<()> {
                                             &status,
                                             &final_error,
                                         ) {
-                                            log_app_error(
+                                            logging::log_app_error(
                                                 &fallback_error,
                                                 "fallback rendering after recovery",
                                             );
@@ -374,16 +258,22 @@ fn start_impl() -> AppResult<()> {
                                     }
                                 }
                                 Err(recovery_error) => {
-                                    log_app_error(&recovery_error, "canvas context recovery");
+                                    logging::log_app_error(
+                                        &recovery_error,
+                                        "canvas context recovery",
+                                    );
                                     if let Err(fallback_error) =
                                         fallback_render(&context, &canvas, &status, &error)
                                     {
-                                        log_app_error(&fallback_error, "fallback rendering");
+                                        logging::log_app_error(
+                                            &fallback_error,
+                                            "fallback rendering",
+                                        );
                                     }
                                 }
                             }
                         } else {
-                            log_warn(&format!(
+                            logging::log_warn(&format!(
                                 "Render attempt {} failed, retrying: {}",
                                 retry_count, error
                             ));
@@ -404,7 +294,7 @@ fn start_impl() -> AppResult<()> {
             if let Err(error) =
                 canvas::sync_toolbar_position(&toolbar, &workspace, &mut toolbar_state.borrow_mut())
             {
-                log_app_error(&error, "positioning toolbar");
+                logging::log_app_error(&error, "positioning toolbar");
             }
         }
     });
@@ -428,7 +318,7 @@ fn start_impl() -> AppResult<()> {
         let position_toolbar = position_toolbar.clone();
         move || {
             if let Err(error) = canvas::resize_canvas(&canvas, &context) {
-                log_app_error(&error, "resizing canvas");
+                logging::log_app_error(&error, "resizing canvas");
             }
             render();
             position_toolbar();

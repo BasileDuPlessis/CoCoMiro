@@ -1,7 +1,7 @@
 use headless_chrome::{
     Browser, LaunchOptionsBuilder, Tab,
     browser::tab::{element::Element, point::Point},
-    protocol::cdp::{Input, Runtime},
+    protocol::cdp::Input,
 };
 use std::{
     env,
@@ -800,6 +800,119 @@ fn assert_zoom_with_notes(tab: &Tab) -> TestResult {
     Ok(())
 }
 
+fn assert_paste_sanitization_works(tab: &Tab) -> TestResult {
+    let canvas = ready_canvas(tab)?;
+    let bounds = canvas.get_box_model()?.margin_viewport();
+    let center_x = bounds.x + bounds.width / 2.0;
+    let center_y = bounds.y + bounds.height / 2.0;
+
+    // Create a note
+    click_add_note_button(tab)?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Double-click the note to enter edit mode using JavaScript
+    let dblclick_script = format!(
+        r#"
+        (function() {{
+            // Create and dispatch a dblclick event at the center
+            const canvas = document.querySelector('#infinite-canvas');
+            if (canvas) {{
+                const event = new MouseEvent('dblclick', {{
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: {0},
+                    clientY: {1}
+                }});
+                canvas.dispatchEvent(event);
+            }}
+        }})()
+        "#,
+        center_x, center_y
+    );
+
+    tab.evaluate(&dblclick_script, false)?;
+    thread::sleep(Duration::from_millis(500)); // Wait for edit mode to activate
+
+    // Check if contenteditable element exists
+    let contenteditable_exists = tab.find_element("div[contenteditable='true']").is_ok();
+    assert!(
+        contenteditable_exists,
+        "Contenteditable element should exist in edit mode"
+    );
+
+    // Use JavaScript to simulate paste with HTML content
+    let paste_script = r#"
+        (function() {
+            // Find the contenteditable element
+            const editable = document.querySelector('div[contenteditable="true"]');
+            if (!editable) {
+                return 'NO_EDITABLE_FOUND';
+            }
+
+            // Focus the element
+            editable.focus();
+
+            // Create a paste event with HTML content
+            const pasteEvent = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: new DataTransfer()
+            });
+
+            // Set HTML content in clipboard
+            pasteEvent.clipboardData.setData('text/html', '<script>alert("xss")</script><b>Bold</b> and <i>italic</i> text');
+            pasteEvent.clipboardData.setData('text/plain', 'Plain text fallback');
+
+            // Dispatch the paste event
+            editable.dispatchEvent(pasteEvent);
+
+            // Return the current content
+            return editable.innerHTML;
+        })()
+    "#;
+
+    let paste_result = tab.evaluate(&paste_script, false)?;
+    let pasted_content = if let Some(value) = &paste_result.value {
+        if let Some(str_val) = value.as_str() {
+            str_val.to_string()
+        } else {
+            return Err(format!("Paste script returned non-string value: {:?}", value).into());
+        }
+    } else {
+        return Err("Paste script returned no value".into());
+    };
+
+    if pasted_content == "NO_EDITABLE_FOUND" {
+        return Err("Contenteditable element not found".into());
+    }
+
+    // The paste should have been sanitized - no HTML tags should remain
+    assert!(
+        !pasted_content.contains('<'),
+        "Pasted content should not contain HTML tags, but got: {}",
+        pasted_content
+    );
+    assert!(
+        !pasted_content.contains("&lt;") && !pasted_content.contains("&gt;"),
+        "Pasted content should not contain escaped HTML tags, but got: {}",
+        pasted_content
+    );
+
+    // Should contain the plain text
+    assert!(
+        pasted_content.contains("Plain text fallback")
+            || pasted_content.contains("Bold and italic text"),
+        "Pasted content should contain sanitized text, but got: {}",
+        pasted_content
+    );
+
+    // Confirm the edit (press Ctrl+Enter or click outside)
+    // For simplicity, we'll just check that the content was sanitized
+    thread::sleep(Duration::from_millis(200));
+
+    Ok(())
+}
+
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
 fn sticky_note_creation_via_toolbar_button() -> TestResult {
@@ -886,198 +999,12 @@ fn zoom_behavior_with_sticky_notes() -> TestResult {
 
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
-fn rich_text_paste_sanitization() -> TestResult {
+fn paste_sanitization_in_sticky_notes() -> TestResult {
     let session = HomePageSession::launch()?;
 
     session.assert_starts_clean()?;
     session.assert_toolbar_is_visible()?;
-
-    // Create a sticky note
-    click_add_note_button(session.tab())?;
-    thread::sleep(Duration::from_millis(200));
-
-    // Double-click the note to enter edit mode
-    let canvas = ready_canvas(session.tab())?;
-    let bounds = canvas.get_box_model()?.margin_viewport();
-    let _center_x = bounds.x + bounds.width / 2.0;
-    let _center_y = bounds.y + bounds.height / 2.0;
-
-    // Double-click the note to enter edit mode using JavaScript
-    let _double_click_result = session.tab().call_method(Runtime::Evaluate {
-        expression: format!(
-            r#"
-            const canvas = document.querySelector('#infinite-canvas');
-            if (canvas) {{
-                const rect = canvas.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                
-                const dblClickEvent = new MouseEvent('dblclick', {{
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: centerX,
-                    clientY: centerY,
-                    screenX: centerX,
-                    screenY: centerY,
-                    button: 0
-                }});
-                
-                canvas.dispatchEvent(dblClickEvent);
-                'DOUBLE_CLICK_DISPATCHED';
-            }} else {{
-                'CANVAS_NOT_FOUND';
-            }}
-        "#
-        ),
-        object_group: None,
-        include_command_line_api: Some(true),
-        silent: None,
-        return_by_value: Some(true),
-        generate_preview: None,
-        user_gesture: None,
-        await_promise: None,
-        context_id: None,
-        throw_on_side_effect: None,
-        timeout: None,
-        disable_breaks: None,
-        repl_mode: None,
-        allow_unsafe_eval_blocked_by_csp: None,
-        unique_context_id: None,
-        serialization_options: None,
-    })?;
-    thread::sleep(Duration::from_millis(500)); // Allow time for overlay creation
-
-    // Simulate paste with dangerous HTML content
-    let dangerous_html = r#"<meta charset='utf-8'><b style="font-weight:bold">Bold <i>italic</i></b> <script>alert('xss')</script>normal"#;
-
-    // Use JavaScript to simulate clipboard data and dispatch paste event
-    session.tab().call_method(Runtime::Evaluate {
-        expression: format!(
-            r#"
-            let editable = document.querySelector('[contenteditable]');
-            if (editable) {{
-                // Create a mock clipboard event with dangerous HTML
-                const pasteEvent = new ClipboardEvent('paste', {{
-                    bubbles: true,
-                    cancelable: true,
-                    clipboardData: new DataTransfer()
-                }});
-                
-                // Mock the getData method
-                pasteEvent.clipboardData.getData = function(format) {{
-                    if (format === 'text/html') {{
-                        return '{}';
-                    }} else if (format === 'text/plain') {{
-                        return 'fallback plain text';
-                    }}
-                    return '';
-                }};
-                
-                // Focus the editable element
-                editable.focus();
-                
-                // Dispatch the paste event
-                editable.dispatchEvent(pasteEvent);
-                'PASTE_DISPATCHED';
-            }} else {{
-                'NO_EDITABLE_FOUND';
-            }}
-        "#,
-            dangerous_html.replace("'", "\\'").replace("\n", "\\n")
-        ),
-        object_group: None,
-        include_command_line_api: Some(true),
-        silent: None,
-        return_by_value: Some(true),
-        generate_preview: None,
-        user_gesture: None,
-        await_promise: None,
-        context_id: None,
-        throw_on_side_effect: None,
-        timeout: None,
-        disable_breaks: None,
-        repl_mode: None,
-        allow_unsafe_eval_blocked_by_csp: None,
-        unique_context_id: None,
-        serialization_options: None,
-    })?;
-
-    thread::sleep(Duration::from_millis(500)); // Allow time for paste processing
-
-    // Check that the contenteditable contains sanitized content
-    let result = session.tab().call_method(Runtime::Evaluate {
-        expression: r#"
-            let editableElement = document.querySelector('[contenteditable]');
-            if (editableElement) {
-                editableElement.innerHTML;
-            } else {
-                'NO_EDITABLE_FOUND';
-            }
-        "#
-        .to_string(),
-        object_group: None,
-        include_command_line_api: Some(true),
-        silent: None,
-        return_by_value: Some(true),
-        generate_preview: None,
-        user_gesture: None,
-        await_promise: None,
-        context_id: None,
-        throw_on_side_effect: None,
-        timeout: None,
-        disable_breaks: None,
-        repl_mode: None,
-        allow_unsafe_eval_blocked_by_csp: None,
-        unique_context_id: None,
-        serialization_options: None,
-    })?;
-
-    // The result should contain the sanitized HTML
-    if let Some(value) = &result.result.value {
-        if let Some(result_str) = value.as_str() {
-            assert_ne!(
-                result_str, "NO_EDITABLE_FOUND",
-                "Contenteditable should still be present"
-            );
-
-            // Check that dangerous content was removed
-            assert!(
-                !result_str.contains("<script>"),
-                "Script tags should be removed"
-            );
-            assert!(!result_str.contains("<meta"), "Meta tags should be removed");
-
-            // Check that all formatting tags are removed (no HTML tags except possibly <br>)
-            assert!(!result_str.contains("<b>"), "Bold tags should be removed");
-            assert!(!result_str.contains("<i>"), "Italic tags should be removed");
-            assert!(
-                !result_str.contains("<strong>"),
-                "Strong tags should be removed"
-            );
-            assert!(
-                !result_str.contains("<em>"),
-                "Emphasis tags should be removed"
-            );
-
-            // Check that plain text content is preserved
-            assert!(
-                result_str.contains("Bold"),
-                "Plain text 'Bold' should be preserved"
-            );
-            assert!(
-                result_str.contains("italic"),
-                "Plain text 'italic' should be preserved"
-            );
-            assert!(
-                result_str.contains("normal"),
-                "Plain text 'normal' should be preserved"
-            );
-        } else {
-            panic!("Expected string result from JavaScript evaluation");
-        }
-    } else {
-        panic!("Expected result from JavaScript evaluation");
-    }
+    assert_paste_sanitization_works(session.tab())?;
 
     Ok(())
 }

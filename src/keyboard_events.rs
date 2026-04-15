@@ -30,7 +30,7 @@ pub fn handle_key_down(
     canvas: &HtmlCanvasElement,
     state: &Rc<RefCell<crate::AppState>>,
     render: &Rc<dyn Fn()>,
-) -> Result<(), crate::AppError> {
+) -> Result<(), crate::error::AppError> {
     let viewport_width = f64::from(canvas.client_width().max(1));
     let viewport_height = f64::from(canvas.client_height().max(1));
     let viewport = &mut state.borrow_mut().viewport;
@@ -38,7 +38,7 @@ pub fn handle_key_down(
     let handled = match event.key().as_str() {
         "ArrowLeft" => {
             viewport.pan_by(-crate::event_constants::KEYBOARD_PAN_STEP, 0.0);
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Panned left by {}",
                 crate::event_constants::KEYBOARD_PAN_STEP
             ));
@@ -46,7 +46,7 @@ pub fn handle_key_down(
         }
         "ArrowRight" => {
             viewport.pan_by(crate::event_constants::KEYBOARD_PAN_STEP, 0.0);
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Panned right by {}",
                 crate::event_constants::KEYBOARD_PAN_STEP
             ));
@@ -54,7 +54,7 @@ pub fn handle_key_down(
         }
         "ArrowUp" => {
             viewport.pan_by(0.0, -crate::event_constants::KEYBOARD_PAN_STEP);
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Panned up by {}",
                 crate::event_constants::KEYBOARD_PAN_STEP
             ));
@@ -62,7 +62,7 @@ pub fn handle_key_down(
         }
         "ArrowDown" => {
             viewport.pan_by(0.0, crate::event_constants::KEYBOARD_PAN_STEP);
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Panned down by {}",
                 crate::event_constants::KEYBOARD_PAN_STEP
             ));
@@ -77,7 +77,7 @@ pub fn handle_key_down(
                 viewport_width,
                 viewport_height,
             );
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Zoomed in from {:.2} to {:.2}",
                 old_zoom, viewport.zoom
             ));
@@ -92,7 +92,7 @@ pub fn handle_key_down(
                 viewport_width,
                 viewport_height,
             );
-            crate::log_info(&format!(
+            crate::logging::log_info(&format!(
                 "Zoomed out from {:.2} to {:.2}",
                 old_zoom, viewport.zoom
             ));
@@ -100,13 +100,13 @@ pub fn handle_key_down(
         }
         "0" | "Home" => {
             viewport.reset();
-            crate::log_info("Viewport reset to default");
+            crate::logging::log_info("Viewport reset to default");
             true
         }
         "Delete" | "Backspace" => {
             if state.borrow().sticky_notes.selected_note_id.is_some() {
                 state.borrow_mut().sticky_notes.delete_selected();
-                crate::log_info("Deleted selected sticky note");
+                crate::logging::log_info("Deleted selected sticky note");
                 true
             } else {
                 false

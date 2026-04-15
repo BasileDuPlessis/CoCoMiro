@@ -294,137 +294,27 @@ const CANVAS_VERTICAL_MARGIN: f64 = 96.0;
 #[cfg(target_arch = "wasm32")]
 /// Minimum canvas edge length to ensure usability
 const MIN_CANVAS_EDGE: f64 = 320.0;
-#[cfg(target_arch = "wasm32")]
-/// Base spacing for grid lines in world coordinates
-const GRID_BASE_SPACING: f64 = 48.0;
-#[cfg(target_arch = "wasm32")]
-/// Minimum grid spacing to prevent overcrowding
-const GRID_MIN_SPACING: f64 = 24.0;
-#[cfg(target_arch = "wasm32")]
-/// Maximum grid spacing to maintain visual reference
-const GRID_MAX_SPACING: f64 = 120.0;
-#[cfg(target_arch = "wasm32")]
-/// Default help text shown in status area
-const STATUS_HELP_TEXT: &str = "Drag to pan, scroll to zoom, or use the arrow keys and +/-.";
-
-#[cfg(target_arch = "wasm32")]
-/// Calculates the CSS size for the canvas element based on viewport dimensions.
-///
-/// This function determines the appropriate canvas size considering:
-/// - Browser window inner dimensions
-/// - Configured margins for UI elements
-/// - Minimum size constraints for usability
-///
-/// # Arguments
-/// * `canvas` - The HTML canvas element
-///
-/// # Returns
-/// * `Ok((width, height))` - CSS dimensions for the canvas
-/// * `Err(AppError)` - Failed to access window or canvas properties
-pub fn canvas_css_size(canvas: &HtmlCanvasElement) -> crate::AppResult<(f64, f64)> {
-    let browser_window =
-        window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
-    let viewport_width = browser_window
-        .inner_width()
-        .map_err(|_| crate::AppError::BrowserEnv("failed to get window inner width".to_string()))?
-        .as_f64()
-        .unwrap_or(FALLBACK_VIEWPORT_WIDTH);
-    let viewport_height = browser_window
-        .inner_height()
-        .map_err(|_| crate::AppError::BrowserEnv("failed to get window inner height".to_string()))?
-        .as_f64()
-        .unwrap_or(FALLBACK_VIEWPORT_HEIGHT);
-
-    let width = match canvas.client_width() {
-        0 => (viewport_width - CANVAS_HORIZONTAL_MARGIN).max(MIN_CANVAS_EDGE),
-        value => f64::from(value),
-    };
-    let height = match canvas.client_height() {
-        0 => (viewport_height - CANVAS_VERTICAL_MARGIN).max(MIN_CANVAS_EDGE),
-        value => f64::from(value),
-    };
-
-    Ok((width, height))
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Resizes the canvas element and updates its rendering context for HiDPI displays.
-///
-/// This function handles the complex process of canvas resizing by:
-/// 1. Calculating appropriate CSS size for layout
-/// 2. Setting CSS properties for proper layout
-/// 3. Setting actual canvas bitmap size accounting for device pixel ratio
-/// 4. Configuring the rendering context transform for crisp rendering
-///
-/// # Arguments
-/// * `canvas` - The HTML canvas element to resize
-/// * `ctx` - The 2D rendering context for the canvas
-///
-/// # Returns
-/// * `Ok(())` - Canvas resized successfully
-/// * `Err(AppError)` - Failed to resize or configure canvas
-pub fn resize_canvas(
-    canvas: &HtmlCanvasElement,
-    ctx: &CanvasRenderingContext2d,
-) -> crate::AppResult<()> {
-    let browser_window =
-        window().ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
-    let (width, height) = canvas_css_size(canvas)?;
-    // Keep CSS size stable while allocating a denser backing store for Retina/HiDPI displays.
-    let device_pixel_ratio = browser_window.device_pixel_ratio().max(1.0);
-
-    canvas
-        .style()
-        .set_property("width", &format!("{}px", width.round()))?;
-    canvas
-        .style()
-        .set_property("height", &format!("{}px", height.round()))?;
-    canvas.set_width((width * device_pixel_ratio).round() as u32);
-    canvas.set_height((height * device_pixel_ratio).round() as u32);
-
-    ctx.set_transform(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)?;
-    ctx.scale(device_pixel_ratio, device_pixel_ratio)?;
-    Ok(())
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Renders the complete canvas scene including grid, sticky notes, and UI elements.
-///
-/// This is the main rendering function that draws the entire application state.
-/// The rendering order ensures proper layering and visual hierarchy.
+/// Renders the grid background on the canvas
 ///
 /// # Arguments
 /// * `ctx` - The 2D canvas rendering context
-/// * `canvas` - The HTML canvas element being rendered to
-/// * `status` - The status text element to update
-/// * `state` - The complete application state to render
-///
-/// # Returns
-/// * `Ok(())` - Rendering completed successfully
-/// * `Err(AppError)` - Rendering failed
-pub fn render_canvas(
+/// * `width` - Canvas width in CSS pixels
+/// * `height` - Canvas height in CSS pixels
+/// * `zoom` - Current zoom level
+/// * `pan_x` - Horizontal pan offset
+/// * `pan_y` - Vertical pan offset
+#[cfg(target_arch = "wasm32")]
+fn render_grid_background(
     ctx: &CanvasRenderingContext2d,
-    canvas: &HtmlCanvasElement,
-    status: &HtmlElement,
-    state: &crate::AppState,
-) -> crate::AppResult<()> {
-    // Start performance timing
-    let performance = window()
-        .and_then(|w| w.performance())
-        .ok_or_else(|| crate::AppError::BrowserEnv("performance API unavailable".to_string()))?;
-    let start_time = performance.now();
-
-    // Update FPS
-    PERFORMANCE_METRICS.with(|metrics| {
-        let mut metrics = metrics.borrow_mut();
-        metrics.update_fps(start_time);
-    });
-
-    let (width, height) = canvas_css_size(canvas)?;
-    let zoom = state.viewport.zoom;
+    width: f64,
+    height: f64,
+    zoom: f64,
+    pan_x: f64,
+    pan_y: f64,
+) -> crate::error::AppResult<()> {
     let grid_spacing = (GRID_BASE_SPACING * zoom).clamp(GRID_MIN_SPACING, GRID_MAX_SPACING);
-    let offset_x = state.viewport.pan_x.rem_euclid(grid_spacing);
-    let offset_y = state.viewport.pan_y.rem_euclid(grid_spacing);
+    let offset_x = pan_x.rem_euclid(grid_spacing);
+    let offset_y = pan_y.rem_euclid(grid_spacing);
 
     ctx.set_fill_style_str("#f8fafc");
     ctx.fill_rect(0.0, 0.0, width, height);
@@ -448,6 +338,23 @@ pub fn render_canvas(
     }
     ctx.stroke();
 
+    Ok(())
+}
+
+/// Renders all sticky notes on the canvas
+///
+/// # Arguments
+/// * `ctx` - The 2D canvas rendering context
+/// * `state` - The complete application state
+/// * `width` - Canvas width in CSS pixels
+/// * `height` - Canvas height in CSS pixels
+#[cfg(target_arch = "wasm32")]
+fn render_sticky_notes(
+    ctx: &CanvasRenderingContext2d,
+    state: &crate::AppState,
+    width: f64,
+    height: f64,
+) -> crate::error::AppResult<()> {
     // Render sticky notes
     for note in &state.sticky_notes.notes {
         // Calculate screen position from world coordinates
@@ -641,6 +548,23 @@ pub fn render_canvas(
         }
     }
 
+    Ok(())
+}
+
+/// Updates canvas attributes and cursor based on application state
+///
+/// # Arguments
+/// * `canvas` - The HTML canvas element
+/// * `state` - The complete application state
+/// * `width` - Canvas width in CSS pixels
+/// * `height` - Canvas height in CSS pixels
+#[cfg(target_arch = "wasm32")]
+fn update_canvas_attributes(
+    canvas: &HtmlCanvasElement,
+    state: &crate::AppState,
+    width: f64,
+    height: f64,
+) -> crate::error::AppResult<()> {
     canvas.set_attribute("data-ready", "true")?;
     canvas.set_attribute("data-pan-x", &format!("{:.2}", state.viewport.pan_x))?;
     canvas.set_attribute("data-pan-y", &format!("{:.2}", state.viewport.pan_y))?;
@@ -669,6 +593,190 @@ pub fn render_canvas(
 
     canvas.style().set_property("cursor", cursor)?;
 
+    Ok(())
+}
+
+/// Updates the status display element with current application metrics
+///
+/// # Arguments
+/// * `status` - The status HTML element to update
+/// * `state` - The complete application state
+/// * `fps` - Current frames per second
+/// * `avg_render_time` - Average render time in milliseconds
+#[cfg(target_arch = "wasm32")]
+fn update_status_display(
+    status: &HtmlElement,
+    state: &crate::AppState,
+    fps: f64,
+    avg_render_time: f64,
+) -> crate::error::AppResult<()> {
+    status.set_text_content(Some(&format!(
+        "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {:.0} FPS · {:.1}ms · {} notes · {}",
+        state.viewport.pan_x,
+        state.viewport.pan_y,
+        state.viewport.zoom,
+        fps,
+        avg_render_time,
+        state.sticky_notes.notes.len(),
+        STATUS_HELP_TEXT
+    )));
+
+    Ok(())
+}
+#[cfg(target_arch = "wasm32")]
+/// Base spacing for grid lines in world coordinates
+const GRID_BASE_SPACING: f64 = 48.0;
+#[cfg(target_arch = "wasm32")]
+/// Minimum grid spacing to prevent overcrowding
+const GRID_MIN_SPACING: f64 = 24.0;
+#[cfg(target_arch = "wasm32")]
+/// Maximum grid spacing to maintain visual reference
+const GRID_MAX_SPACING: f64 = 120.0;
+#[cfg(target_arch = "wasm32")]
+/// Default help text shown in status area
+const STATUS_HELP_TEXT: &str = "Drag to pan, scroll to zoom, or use the arrow keys and +/-.";
+
+#[cfg(target_arch = "wasm32")]
+/// Calculates the CSS size for the canvas element based on viewport dimensions.
+///
+/// This function determines the appropriate canvas size considering:
+/// - Browser window inner dimensions
+/// - Configured margins for UI elements
+/// - Minimum size constraints for usability
+///
+/// # Arguments
+/// * `canvas` - The HTML canvas element
+///
+/// # Returns
+/// * `Ok((width, height))` - CSS dimensions for the canvas
+/// * `Err(AppError)` - Failed to access window or canvas properties
+pub fn canvas_css_size(canvas: &HtmlCanvasElement) -> crate::error::AppResult<(f64, f64)> {
+    let browser_window = window()
+        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let viewport_width = browser_window
+        .inner_width()
+        .map_err(|_| {
+            crate::error::AppError::BrowserEnv("failed to get window inner width".to_string())
+        })?
+        .as_f64()
+        .unwrap_or(FALLBACK_VIEWPORT_WIDTH);
+    let viewport_height = browser_window
+        .inner_height()
+        .map_err(|_| {
+            crate::error::AppError::BrowserEnv("failed to get window inner height".to_string())
+        })?
+        .as_f64()
+        .unwrap_or(FALLBACK_VIEWPORT_HEIGHT);
+
+    let width = match canvas.client_width() {
+        0 => (viewport_width - CANVAS_HORIZONTAL_MARGIN).max(MIN_CANVAS_EDGE),
+        value => f64::from(value),
+    };
+    let height = match canvas.client_height() {
+        0 => (viewport_height - CANVAS_VERTICAL_MARGIN).max(MIN_CANVAS_EDGE),
+        value => f64::from(value),
+    };
+
+    Ok((width, height))
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Resizes the canvas element and updates its rendering context for HiDPI displays.
+///
+/// This function handles the complex process of canvas resizing by:
+/// 1. Calculating appropriate CSS size for layout
+/// 2. Setting CSS properties for proper layout
+/// 3. Setting actual canvas bitmap size accounting for device pixel ratio
+/// 4. Configuring the rendering context transform for crisp rendering
+///
+/// # Arguments
+/// * `canvas` - The HTML canvas element to resize
+/// * `ctx` - The 2D rendering context for the canvas
+///
+/// # Returns
+/// * `Ok(())` - Canvas resized successfully
+/// * `Err(AppError)` - Failed to resize or configure canvas
+pub fn resize_canvas(
+    canvas: &HtmlCanvasElement,
+    ctx: &CanvasRenderingContext2d,
+) -> crate::error::AppResult<()> {
+    let browser_window = window()
+        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let (width, height) = canvas_css_size(canvas)?;
+    // Keep CSS size stable while allocating a denser backing store for Retina/HiDPI displays.
+    let device_pixel_ratio = browser_window.device_pixel_ratio().max(1.0);
+
+    canvas
+        .style()
+        .set_property("width", &format!("{}px", width.round()))?;
+    canvas
+        .style()
+        .set_property("height", &format!("{}px", height.round()))?;
+    canvas.set_width((width * device_pixel_ratio).round() as u32);
+    canvas.set_height((height * device_pixel_ratio).round() as u32);
+
+    ctx.set_transform(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)?;
+    ctx.scale(device_pixel_ratio, device_pixel_ratio)?;
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Renders the complete canvas scene including grid, sticky notes, and UI elements.
+///
+/// This is the main rendering function that draws the entire application state.
+/// The rendering order ensures proper layering and visual hierarchy.
+///
+/// Renders the complete canvas scene including grid, sticky notes, and UI updates
+///
+/// This is the main rendering function that orchestrates the entire canvas drawing process.
+/// It handles performance monitoring, clears and redraws the canvas, renders all visual
+/// elements, and updates UI state.
+///
+/// # Arguments
+/// * `ctx` - The 2D canvas rendering context
+/// * `canvas` - The HTML canvas element being rendered to
+/// * `status` - The status text element to update
+/// * `state` - The complete application state to render
+///
+/// # Returns
+/// * `Ok(())` - Rendering completed successfully
+/// * `Err(AppError)` - Rendering failed
+pub fn render_canvas(
+    ctx: &CanvasRenderingContext2d,
+    canvas: &HtmlCanvasElement,
+    status: &HtmlElement,
+    state: &crate::AppState,
+) -> crate::error::AppResult<()> {
+    // Start performance timing
+    let performance = window().and_then(|w| w.performance()).ok_or_else(|| {
+        crate::error::AppError::BrowserEnv("performance API unavailable".to_string())
+    })?;
+    let start_time = performance.now();
+
+    // Update FPS
+    PERFORMANCE_METRICS.with(|metrics| {
+        let mut metrics = metrics.borrow_mut();
+        metrics.update_fps(start_time);
+    });
+
+    let (width, height) = canvas_css_size(canvas)?;
+
+    // Render grid background
+    render_grid_background(
+        ctx,
+        width,
+        height,
+        state.viewport.zoom,
+        state.viewport.pan_x,
+        state.viewport.pan_y,
+    )?;
+
+    // Render sticky notes
+    render_sticky_notes(ctx, state, width, height)?;
+
+    // Update canvas attributes and cursor
+    update_canvas_attributes(canvas, state, width, height)?;
+
     // Record render time
     let end_time = performance.now();
     let render_time = end_time - start_time;
@@ -683,16 +791,8 @@ pub fn render_canvas(
         (metrics.fps, metrics.average_render_time())
     });
 
-    status.set_text_content(Some(&format!(
-        "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {:.0} FPS · {:.1}ms · {} notes · {}",
-        state.viewport.pan_x,
-        state.viewport.pan_y,
-        state.viewport.zoom,
-        fps,
-        avg_render_time,
-        state.sticky_notes.notes.len(),
-        STATUS_HELP_TEXT
-    )));
+    // Update status display
+    update_status_display(status, state, fps, avg_render_time)?;
 
     Ok(())
 }
@@ -702,7 +802,7 @@ pub fn sync_toolbar_position(
     toolbar: &HtmlElement,
     workspace: &HtmlElement,
     state: &mut crate::toolbar::FloatingToolbarState,
-) -> crate::AppResult<()> {
+) -> crate::error::AppResult<()> {
     let max_x = (f64::from(workspace.client_width() - toolbar.offset_width())
         - TOOLBAR_EDGE_PADDING)
         .max(TOOLBAR_EDGE_PADDING);

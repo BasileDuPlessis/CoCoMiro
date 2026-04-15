@@ -19,11 +19,14 @@ use web_sys::{HtmlCanvasElement, HtmlElement};
 /// # Returns
 /// An AppError with the provided context
 #[cfg(target_arch = "wasm32")]
-pub fn js_error_to_app_error(js_error: wasm_bindgen::JsValue, context: &str) -> crate::AppError {
+pub fn js_error_to_app_error(
+    js_error: wasm_bindgen::JsValue,
+    context: &str,
+) -> crate::error::AppError {
     let message = js_error
         .as_string()
         .unwrap_or_else(|| format!("{js_error:?}"));
-    crate::AppError::Event(format!("{context}: {message}"))
+    crate::error::AppError::Event(format!("{context}: {message}"))
 }
 
 /// Terminates any active drag operations for viewport and sticky notes.
@@ -110,11 +113,11 @@ pub fn setup_event_listeners(
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     render: &Rc<dyn Fn()>,
     position_toolbar: &Rc<dyn Fn()>,
-) -> crate::AppResult<()> {
+) -> crate::error::AppResult<()> {
     let browser_window = web_sys::window()
-        .ok_or_else(|| crate::AppError::BrowserEnv("window is unavailable".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
     let document = browser_window.document().ok_or_else(|| {
-        crate::AppError::BrowserEnv("could not access the browser document".to_string())
+        crate::error::AppError::BrowserEnv("could not access the browser document".to_string())
     })?;
 
     // Mouse down on canvas
@@ -126,7 +129,7 @@ pub fn setup_event_listeners(
             if let Err(error) =
                 crate::mouse_events::handle_mouse_down(event, &canvas, &state, &render)
             {
-                crate::log_app_error(&error, "handling mouse down");
+                crate::logging::log_app_error(&error, "handling mouse down");
             }
         }
     }));
@@ -147,7 +150,7 @@ pub fn setup_event_listeners(
                 &toolbar_state,
                 &position_toolbar,
             ) {
-                crate::log_app_error(&error, "handling toolbar mouse down");
+                crate::logging::log_app_error(&error, "handling toolbar mouse down");
             }
         }
     }));
@@ -176,14 +179,18 @@ pub fn setup_event_listeners(
             );
 
             render();
-            crate::log_info("Added new sticky note");
+            crate::logging::log_info("Added new sticky note");
         }
     }));
     let add_note_button = document
         .get_element_by_id("add-note-button")
-        .ok_or_else(|| crate::AppError::Dom("add note button element not found".to_string()))?
+        .ok_or_else(|| {
+            crate::error::AppError::Dom("add note button element not found".to_string())
+        })?
         .dyn_into::<web_sys::HtmlElement>()
-        .map_err(|_| crate::AppError::Dom("add note button is not an HTML element".to_string()))?;
+        .map_err(|_| {
+            crate::error::AppError::Dom("add note button is not an HTML element".to_string())
+        })?;
     add_note_button
         .add_event_listener_with_callback("click", on_add_note_click.as_ref().unchecked_ref())
         .map_err(|e| {
@@ -207,7 +214,7 @@ pub fn setup_event_listeners(
                 &toolbar_state,
                 &position_toolbar,
             ) {
-                crate::log_app_error(&error, "handling mouse move");
+                crate::logging::log_app_error(&error, "handling mouse move");
             }
         }
     }));
@@ -229,7 +236,7 @@ pub fn setup_event_listeners(
                 &toolbar_state,
                 &position_toolbar,
             ) {
-                crate::log_app_error(&error, "handling mouse up");
+                crate::logging::log_app_error(&error, "handling mouse up");
             }
         }
     }));
@@ -252,7 +259,7 @@ pub fn setup_event_listeners(
                 &toolbar_state,
                 &position_toolbar,
             ) {
-                crate::log_app_error(&error, "handling mouse leave");
+                crate::logging::log_app_error(&error, "handling mouse leave");
             }
         }
     }));
@@ -286,7 +293,7 @@ pub fn setup_event_listeners(
         let render = render.clone();
         move |event: web_sys::WheelEvent| {
             if let Err(error) = crate::mouse_events::handle_wheel(event, &canvas, &state, &render) {
-                crate::log_app_error(&error, "handling wheel");
+                crate::logging::log_app_error(&error, "handling wheel");
             }
         }
     }));
@@ -304,7 +311,7 @@ pub fn setup_event_listeners(
             if let Err(error) =
                 crate::keyboard_events::handle_key_down(event, &canvas, &state, &render)
             {
-                crate::log_app_error(&error, "handling key down");
+                crate::logging::log_app_error(&error, "handling key down");
             }
         }
     }));
@@ -322,7 +329,7 @@ pub fn setup_event_listeners(
             if let Err(error) =
                 crate::mouse_events::handle_double_click(event, &canvas, &state, &render)
             {
-                crate::log_app_error(&error, "handling double click");
+                crate::logging::log_app_error(&error, "handling double click");
             }
         }
     }));
