@@ -231,7 +231,6 @@ impl StickyNotesState {
     /// * `viewport_width` - Width of the viewport in screen pixels
     /// * `viewport_height` - Height of the viewport in screen pixels
     /// * `viewport_state` - Current viewport state for coordinate transformation
-    #[cfg(any(test, target_arch = "wasm32"))]
     pub fn add_note_at_viewport_center(
         &mut self,
         viewport_width: f64,

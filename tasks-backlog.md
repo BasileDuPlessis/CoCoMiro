@@ -88,7 +88,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Preserve performance characteristics and error handling
 - Test that rendering still works correctly after split
 
-#### 3. Move Integration Tests
+#### ✅ 3. Move Integration Tests
 - Create new `tests/integration_tests.rs` file
 - Move all integration tests from `lib.rs` to the new file
 - Update test module structure and imports
@@ -96,11 +96,12 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 **Implementation Details:**
 - Create `tests/` directory if it doesn't exist
-- Move the 8 integration test functions from `lib.rs`
+- Move the 9 integration test functions from `lib.rs`
 - Update `#[cfg(test)]` module declarations
+- Made AppState, ViewportState, and related methods available for host compilation to support integration tests
 - Run full test suite to verify no regressions
 
-#### 4. Break Down start_impl Function
+#### ✅ 4. Break Down start_impl Function
 - Split the ~150-line `start_impl` function in `lib.rs` into smaller initialization phases
 - Extract `setup_canvas_and_context()`, `create_render_and_position_functions()`, `setup_event_system()`, `setup_window_resize_handler()`
 - Improve readability and maintainability
@@ -344,6 +345,12 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Preserved WebAssembly conditional compilation for all functions
 - Verified compilation for both host and WASM targets
 - All tests pass and full WASM build succeeds
+
+### ✅ Break Down start_impl Function
+- Split the ~150-line `start_impl` function in `lib.rs` into smaller initialization phases
+- Extracted `setup_canvas_and_context()`, `create_render_and_position_functions()`, `setup_event_system()`, and `setup_window_resize_handler()` helper functions
+- Improved readability and maintainability while preserving error handling and resource management
+- All tests pass and WASM build succeeds
 
 ### ✅ Text Editing Features (All Completed)
 - Double-click to edit sticky notes

@@ -28,14 +28,10 @@
 //! - **Zooming**: Scales the view while keeping a point stationary under the cursor
 //! - **Dragging**: Smooth viewport panning via mouse drag operations
 
-#[cfg(any(test, target_arch = "wasm32"))]
 const DEFAULT_ZOOM: f64 = 1.0;
-#[cfg(any(test, target_arch = "wasm32"))]
 const MIN_ZOOM: f64 = 0.5;
-#[cfg(any(test, target_arch = "wasm32"))]
 const MAX_ZOOM: f64 = 2.5;
 
-#[cfg(any(test, target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq)]
 /// Represents the current viewport/camera state for the infinite canvas.
 ///
@@ -54,7 +50,6 @@ pub struct ViewportState {
     pub last_mouse_pos: Option<(f64, f64)>,
 }
 
-#[cfg(any(test, target_arch = "wasm32"))]
 impl ViewportState {
     /// Initiates a viewport drag (pan) operation.
     ///
@@ -201,7 +196,6 @@ impl ViewportState {
     }
 }
 
-#[cfg(any(test, target_arch = "wasm32"))]
 impl Default for ViewportState {
     fn default() -> Self {
         Self {

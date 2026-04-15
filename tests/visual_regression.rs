@@ -1,6 +1,6 @@
+use base64;
 use headless_chrome::{Browser, LaunchOptionsBuilder, Tab, protocol::cdp::Page};
 use image::ImageFormat;
-use base64;
 use std::{
     env,
     error::Error,
@@ -19,7 +19,6 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(20);
 const SERVER_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const TRUNK_START_ATTEMPTS: usize = 5;
 const CANVAS_SELECTOR: &str = "#infinite-canvas[data-ready=\"true\"]";
-
 
 struct ChildGuard(Child);
 
@@ -82,8 +81,11 @@ impl VisualRegressionSession {
         })?;
 
         // Data is base64 encoded string
-        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &screenshot_data.data)
-            .map_err(|e| format!("Failed to decode base64 screenshot data: {}", e).into())
+        base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            &screenshot_data.data,
+        )
+        .map_err(|e| format!("Failed to decode base64 screenshot data: {}", e).into())
     }
 
     fn save_baseline(&self, name: &str, data: &[u8]) -> TestResult<PathBuf> {
@@ -287,7 +289,11 @@ fn spawn_trunk() -> TestResult<(ChildGuard, String)> {
                 .status()?;
 
             if !build_result.success() {
-                return Err(format!("trunk build failed with exit code {}", build_result.code().unwrap_or(-1)).into());
+                return Err(format!(
+                    "trunk build failed with exit code {}",
+                    build_result.code().unwrap_or(-1)
+                )
+                .into());
             }
         }
 

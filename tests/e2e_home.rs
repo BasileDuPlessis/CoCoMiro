@@ -154,7 +154,11 @@ fn spawn_trunk() -> TestResult<(ChildGuard, String)> {
                 .status()?;
 
             if !build_result.success() {
-                return Err(format!("trunk build failed with exit code {}", build_result.code().unwrap_or(-1)).into());
+                return Err(format!(
+                    "trunk build failed with exit code {}",
+                    build_result.code().unwrap_or(-1)
+                )
+                .into());
             }
         }
 
@@ -306,7 +310,12 @@ fn assert_toolbar_is_visible(tab: &Tab) -> TestResult {
     let toolbar = ready_toolbar(tab)?;
     let bounds = toolbar.get_box_model()?.margin_viewport();
 
-    assert!(bounds.height > bounds.width, "expected a vertical toolbar (height={:.1} > width={:.1})", bounds.height, bounds.width);
+    assert!(
+        bounds.height > bounds.width,
+        "expected a vertical toolbar (height={:.1} > width={:.1})",
+        bounds.height,
+        bounds.width
+    );
     assert!(
         attribute_as_f64(&toolbar, "data-x")? >= 0.0,
         "toolbar x position should be exposed"

@@ -3,8 +3,8 @@
 //! This module provides helper functions for setting dynamic inline styles
 //! that cannot be expressed as static CSS classes.
 
-use web_sys::HtmlElement;
 use wasm_bindgen::JsValue;
+use web_sys::HtmlElement;
 
 /// Extension trait for common styling operations on HTML elements
 pub trait ElementStyling {
@@ -15,7 +15,13 @@ pub trait ElementStyling {
     fn set_transform(&self, transform: &str) -> Result<(), JsValue>;
 
     /// Set position and size for overlay elements
-    fn set_overlay_position(&self, left: f64, top: f64, width: f64, height: f64) -> Result<(), JsValue>;
+    fn set_overlay_position(
+        &self,
+        left: f64,
+        top: f64,
+        width: f64,
+        height: f64,
+    ) -> Result<(), JsValue>;
 
     /// Set background color
     fn set_background_color(&self, color: &str) -> Result<(), JsValue>;
@@ -30,7 +36,13 @@ impl ElementStyling for HtmlElement {
         self.style().set_property("transform", transform)
     }
 
-    fn set_overlay_position(&self, left: f64, top: f64, width: f64, height: f64) -> Result<(), JsValue> {
+    fn set_overlay_position(
+        &self,
+        left: f64,
+        top: f64,
+        width: f64,
+        height: f64,
+    ) -> Result<(), JsValue> {
         let style = self.style();
         style.set_property("left", &format!("{}px", left))?;
         style.set_property("top", &format!("{}px", top))?;
@@ -47,9 +59,9 @@ impl ElementStyling for HtmlElement {
 /// Styling functions for specific UI components
 #[cfg(target_arch = "wasm32")]
 pub mod components {
-    use web_sys::HtmlElement;
-    use wasm_bindgen::JsValue;
     use crate::AppState;
+    use wasm_bindgen::JsValue;
+    use web_sys::HtmlElement;
 
     /// Style the text input toolbar with dynamic positioning
     #[cfg(target_arch = "wasm32")]
@@ -98,10 +110,20 @@ pub mod components {
     /// Update canvas cursor based on interaction state
     #[cfg(target_arch = "wasm32")]
     pub fn update_canvas_cursor(canvas: &HtmlElement, state: &AppState) -> Result<(), JsValue> {
-        let cursor = if state.sticky_notes.find_note_at(
-            state.viewport.world_point_at(state.mouse_x, state.mouse_y, 800.0, 600.0).0,
-            state.viewport.world_point_at(state.mouse_x, state.mouse_y, 800.0, 600.0).1,
-        ).is_some() {
+        let cursor = if state
+            .sticky_notes
+            .find_note_at(
+                state
+                    .viewport
+                    .world_point_at(state.mouse_x, state.mouse_y, 800.0, 600.0)
+                    .0,
+                state
+                    .viewport
+                    .world_point_at(state.mouse_x, state.mouse_y, 800.0, 600.0)
+                    .1,
+            )
+            .is_some()
+        {
             "grab"
         } else if state.viewport.is_dragging {
             "grabbing"
@@ -128,10 +150,17 @@ pub mod components {
 
         // Set dynamic positioning
         let style = toolbar.style();
-        style.set_property("transform", &format!("translate({:.2}px, {:.2}px)", state.x, state.y))?;
+        style.set_property(
+            "transform",
+            &format!("translate({:.2}px, {:.2}px)", state.x, state.y),
+        )?;
 
         // Set cursor based on drag state
-        let cursor = if state.is_dragging { "grabbing" } else { "grab" };
+        let cursor = if state.is_dragging {
+            "grabbing"
+        } else {
+            "grab"
+        };
         style.set_property("cursor", cursor)?;
 
         Ok(())
@@ -141,8 +170,8 @@ pub mod components {
 /// Utility functions for dynamic sizing
 #[cfg(target_arch = "wasm32")]
 pub mod sizing {
-    use web_sys::HtmlElement;
     use wasm_bindgen::JsValue;
+    use web_sys::HtmlElement;
 
     /// Set element dimensions
     pub fn set_dimensions(element: &HtmlElement, width: f64, height: f64) -> Result<(), JsValue> {
@@ -159,7 +188,9 @@ pub mod sizing {
         initial_screen_height: f64,
     ) -> Result<(), JsValue> {
         let new_height = scroll_height.max(initial_screen_height);
-        contenteditable.style().set_property("height", &format!("{}px", new_height))?;
+        contenteditable
+            .style()
+            .set_property("height", &format!("{}px", new_height))?;
         Ok(())
     }
 }
