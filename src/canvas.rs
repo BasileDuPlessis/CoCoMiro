@@ -635,8 +635,22 @@ fn update_status_display(
     fps: f64,
     avg_render_time: f64,
 ) -> crate::error::AppResult<()> {
+    // Get selected note dimensions if any
+    let selected_note_info = if let Some(note_id) = state.sticky_notes.selected_note_id {
+        if let Some(note) = state.sticky_notes.get_note(note_id) {
+            format!("Note {}: {:.0}×{:.0}", note_id, note.width, note.height)
+        } else {
+            "Note: N/A".to_string()
+        }
+    } else {
+        "No selection".to_string()
+    };
+
     status.set_text_content(Some(&format!(
-        "Pan ({:.0}, {:.0}) · Zoom {:.2}× · {:.0} FPS · {:.1}ms · {} notes · {}",
+        "Mouse ({:.0}, {:.0}) · {} · Pan ({:.0}, {:.0}) · Zoom {:.2}× · {:.0} FPS · {:.1}ms · {} notes · {}",
+        state.mouse_x,
+        state.mouse_y,
+        selected_note_info,
         state.viewport.pan_x,
         state.viewport.pan_y,
         state.viewport.zoom,

@@ -218,9 +218,9 @@ pub fn handle_mouse_move(
     let did_resize = {
         let viewport_width = f64::from(canvas.client_width().max(1));
         let viewport_height = f64::from(canvas.client_height().max(1));
-        
+
         // Extract resizing state before mutable borrow
-        let (is_resizing, note_id, handle, start_mouse_x, start_mouse_y) = {
+        let (is_resizing, note_id, handle, start_mouse_x, start_mouse_y, original_width, original_height) = {
             let resizing = &state.borrow().resizing;
             (
                 resizing.is_resizing,
@@ -228,9 +228,11 @@ pub fn handle_mouse_move(
                 resizing.handle,
                 resizing.start_mouse_x,
                 resizing.start_mouse_y,
+                resizing.original_width,
+                resizing.original_height,
             )
         };
-        
+
         if is_resizing {
             if let (Some(_note_id), Some(handle)) = (note_id, handle) {
                 // Extract viewport before mutable borrow
@@ -241,6 +243,8 @@ pub fn handle_mouse_move(
                     start_mouse_y,
                     mouse_x,
                     mouse_y,
+                    original_width,
+                    original_height,
                     &viewport,
                     viewport_width,
                     viewport_height,

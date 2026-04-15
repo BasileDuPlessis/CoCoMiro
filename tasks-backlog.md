@@ -11,6 +11,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - ✅ Basic accessibility features (ARIA labels)
 - ✅ Performance monitoring (FPS tracking)
 - ✅ Basic visual polish (box shadows)
+- ✅ Sticky note resizing (basic functionality implemented, zoom consistency pending)
 - ❌ No persistence, undo/redo system, or advanced performance optimizations
 - ❌ No mobile support
 
@@ -23,6 +24,9 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Performance metrics collection
 - Multi-line text support
 - Text selection and cursor positioning
+- Sticky note resizing with 8 resize handles
+- Resize handle hit detection and visual feedback
+- Minimum size constraints during resize
 
 **Not Yet Implemented:**
 - Persistence (save/load)
@@ -167,7 +171,27 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - ✅ Full WASM build succeeds
 - ✅ All E2E tests pass, including resize handle functionality verification
 
-#### 1.7 Add Cursor Changes for Handles
+#### ✅ 1.7 Fix Resize Speed Consistency with Zoom
+- Ensure resize speed feels consistent regardless of zoom level
+- Convert screen coordinate deltas to world space deltas using viewport zoom
+- Prevent resize from feeling faster at higher zoom levels
+
+**Implementation Details:**
+- Modify `resize_to()` method to divide screen deltas by `viewport.zoom`
+- Update method signature to use viewport parameter (remove underscore prefix)
+- Test resize behavior at zoom levels 0.5x, 1.0x, and 2.0x
+- Verify visual resize speed matches mouse movement speed
+
+**Current Status:**
+- ✅ Screen deltas are now converted to world deltas using `viewport.zoom`
+- ✅ Resize speed feels consistent across different zoom levels
+- ✅ Added comprehensive unit test `resize_to_with_zoom_consistency` validating zoom behavior
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
+- ✅ Full WASM build succeeds
+- ✅ **FIXED**: Resize logic now uses original dimensions instead of accumulating on current dimensions
+
+#### 1.8 Add Cursor Changes for Handles
 - Implement dynamic cursor changes when hovering over resize handles
 - Use appropriate cursors (nw-resize, n-resize, etc.) for each handle type
 - Update cursor in `update_canvas_attributes()`
@@ -177,7 +201,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Map `ResizeHandle` variants to CSS cursor values
 - Update canvas style cursor property dynamically
 
-#### 1.8 Support Proportional Resizing (Shift Modifier)
+#### 1.9 Support Proportional Resizing (Shift Modifier)
 - Detect Shift key during resize operations
 - Maintain aspect ratio when Shift is held
 - Provide visual feedback for proportional mode
@@ -186,16 +210,6 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Track Shift key state in resize operations
 - Calculate proportional dimensions using original aspect ratio
 - Add visual indicator (different cursor or handle styling) for proportional mode
-
-#### 1.9 Add Minimum Size Constraints
-- Implement minimum width/height limits for sticky notes
-- Prevent notes from becoming too small during resize
-- Provide smooth constraint enforcement
-
-**Implementation Details:**
-- Define `MIN_NOTE_WIDTH` and `MIN_NOTE_HEIGHT` constants (e.g., 50.0, 40.0)
-- Clamp dimensions in resize logic to minimum values
-- Ensure constraints work with proportional resizing
 
 #### 1.10 Test Resize with Viewport Zoom and Pan
 - Verify resize handles work correctly at different zoom levels

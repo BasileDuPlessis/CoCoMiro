@@ -535,7 +535,8 @@ impl StickyNotesState {
     ///
     /// This method calculates the new width and height based on the mouse delta
     /// from the resize start position and the type of handle being used.
-    /// The resize uses screen coordinates to ensure consistent behavior regardless of zoom level.
+    /// The resize uses screen coordinates converted to world coordinates using viewport zoom
+    /// to ensure consistent behavior regardless of zoom level.
     ///
     /// # Arguments
     /// * `handle` - The resize handle being used
@@ -543,7 +544,9 @@ impl StickyNotesState {
     /// * `start_mouse_y` - Mouse Y position when resize started (screen coordinates)
     /// * `current_mouse_x` - Current mouse X position (screen coordinates)
     /// * `current_mouse_y` - Current mouse Y position (screen coordinates)
-    /// * `viewport` - Current viewport state (unused, kept for API compatibility)
+    /// * `original_width` - Original width of the note before resizing
+    /// * `original_height` - Original height of the note before resizing
+    /// * `viewport` - Current viewport state for zoom-based delta conversion
     /// * `viewport_width` - Viewport width (unused, kept for API compatibility)
     /// * `viewport_height` - Viewport height (unused, kept for API compatibility)
     pub fn resize_to(
@@ -553,51 +556,57 @@ impl StickyNotesState {
         start_mouse_y: f64,
         current_mouse_x: f64,
         current_mouse_y: f64,
-        _viewport: &crate::viewport::ViewportState,
+        original_width: f64,
+        original_height: f64,
+        viewport: &crate::viewport::ViewportState,
         _viewport_width: f64,
         _viewport_height: f64,
     ) {
         if let Some(note_id) = self.selected_note_id {
             if let Some(note) = self.get_note_mut(note_id) {
-                // Use screen coordinate deltas for resize (not world coordinates)
-                // This ensures resize speed matches mouse movement regardless of zoom
-                let delta_x = current_mouse_x - start_mouse_x;
-                let delta_y = current_mouse_y - start_mouse_y;
+                // Convert screen coordinate deltas to world coordinate deltas using viewport zoom
+                // This ensures resize speed feels consistent regardless of zoom level
+                let delta_x = (current_mouse_x - start_mouse_x) / viewport.zoom;
+                let delta_y = (current_mouse_y - start_mouse_y) / viewport.zoom;
 
-                // Calculate new dimensions based on handle type
+                // Calculate new dimensions based on handle type and original dimensions
                 match handle {
                     ResizeHandle::TopLeft => {
-                        note.width = (note.width - delta_x).max(50.0); // Min width
-                        note.height = (note.height - delta_y).max(40.0); // Min height
+                        note.width = (original_width - delta_x).max(50.0); // Min width
+                        note.height = (original_height - delta_y).max(40.0); // Min height
                         note.x += delta_x; // Move note to maintain bottom-right position
                         note.y += delta_y;
                     }
                     ResizeHandle::Top => {
-                        note.height = (note.height - delta_y).max(40.0);
+                        note.width = original_width;
+                        note.height = (original_height - delta_y).max(40.0);
                         note.y += delta_y;
                     }
                     ResizeHandle::TopRight => {
-                        note.width = (note.width + delta_x).max(50.0);
-                        note.height = (note.height - delta_y).max(40.0);
+                        note.width = (original_width + delta_x).max(50.0);
+                        note.height = (original_height - delta_y).max(40.0);
                         note.y += delta_y;
                     }
                     ResizeHandle::Right => {
-                        note.width = (note.width + delta_x).max(50.0);
+                        note.width = (original_width + delta_x).max(50.0);
+                        note.height = original_height;
                     }
                     ResizeHandle::BottomRight => {
-                        note.width = (note.width + delta_x).max(50.0);
-                        note.height = (note.height + delta_y).max(40.0);
+                        note.width = (original_width + delta_x).max(50.0);
+                        note.height = (original_height + delta_y).max(40.0);
                     }
                     ResizeHandle::Bottom => {
-                        note.height = (note.height + delta_y).max(40.0);
+                        note.width = original_width;
+                        note.height = (original_height + delta_y).max(40.0);
                     }
                     ResizeHandle::BottomLeft => {
-                        note.width = (note.width - delta_x).max(50.0);
-                        note.height = (note.height + delta_y).max(40.0);
+                        note.width = (original_width - delta_x).max(50.0);
+                        note.height = (original_height + delta_y).max(40.0);
                         note.x += delta_x;
                     }
                     ResizeHandle::Left => {
-                        note.width = (note.width - delta_x).max(50.0);
+                        note.width = (original_width - delta_x).max(50.0);
+                        note.height = original_height;
                         note.x += delta_x;
                     }
                 }
@@ -998,5 +1007,89 @@ mod tests {
         let result =
             state.find_resize_handle_at(800.0, 300.0, &viewport, canvas_width, canvas_height);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resize_to_with_zoom_consistency() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        // Test resize at zoom level 1.0 (normal)
+        let mut viewport = ViewportState::default();
+        viewport.zoom = 1.0;
+
+        // Start resize from screen position (200, 200) - this is relative to start position
+        // With zoom=1, screen delta of 50px should result in 50px world delta
+        state.resize_to(
+            ResizeHandle::BottomRight,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            250.0, // current_mouse_x (50px delta)
+            230.0, // current_mouse_y (30px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Note should grow by (50, 30) in world space
+        assert_eq!(state.notes[0].width, 250.0); // 200 + 50
+        assert_eq!(state.notes[0].height, 180.0); // 150 + 30
+
+        // Reset note for next test
+        state.notes[0].width = 200.0;
+        state.notes[0].height = 150.0;
+
+        // Test resize at zoom level 2.0 (zoomed in)
+        viewport.zoom = 2.0;
+
+        // Same screen delta (50px, 30px) should result in smaller world delta (25px, 15px)
+        // because screen deltas are divided by zoom
+        state.resize_to(
+            ResizeHandle::BottomRight,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            250.0, // current_mouse_x (50px delta)
+            230.0, // current_mouse_y (30px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Note should grow by (25, 15) in world space (50/2, 30/2)
+        assert_eq!(state.notes[0].width, 225.0); // 200 + 25
+        assert_eq!(state.notes[0].height, 165.0); // 150 + 15
+
+        // Reset note for next test
+        state.notes[0].width = 200.0;
+        state.notes[0].height = 150.0;
+
+        // Test resize at zoom level 0.5 (zoomed out)
+        viewport.zoom = 0.5;
+
+        // Same screen delta (50px, 30px) should result in larger world delta (100px, 60px)
+        // because screen deltas are divided by zoom
+        state.resize_to(
+            ResizeHandle::BottomRight,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            250.0, // current_mouse_x (50px delta)
+            230.0, // current_mouse_y (30px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Note should grow by (100, 60) in world space (50/0.5, 30/0.5)
+        assert_eq!(state.notes[0].width, 300.0); // 200 + 100
+        assert_eq!(state.notes[0].height, 210.0); // 150 + 60
     }
 }
