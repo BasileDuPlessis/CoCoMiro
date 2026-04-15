@@ -671,6 +671,8 @@ pub fn create_text_input_overlay(
                                                         let _ = fragment.append_child(&child);
                                                     }
                                                     let _ = range.insert_node(&fragment);
+                                                    crate::log_info("Pasted HTML content (sanitized) using Range API");
+                                                    return;
                                                 }
                                             }
                                         }
@@ -690,7 +692,7 @@ pub fn create_text_input_overlay(
                                         &sanitized_html.into(),
                                     );
 
-                                    crate::log_info("Pasted HTML content (sanitized)");
+                                    crate::log_info("Pasted HTML content (sanitized) using execCommand");
                                     return;
                                 }
                             }
