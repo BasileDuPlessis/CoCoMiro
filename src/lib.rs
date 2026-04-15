@@ -778,7 +778,7 @@ mod integration_tests {
             let complex_html = "Start <b>bold <i>bold-italic</i> still bold</b> end";
             let segments = parse_formatted_text(complex_html);
 
-            assert_eq!(segments.len(), 4);
+            assert_eq!(segments.len(), 5);
 
             // "Start "
             assert_eq!(segments[0].text, "Start ");
@@ -799,6 +799,11 @@ mod integration_tests {
             assert_eq!(segments[3].text, " still bold");
             assert!(segments[3].bold);
             assert!(!segments[3].italic);
+
+            // " end"
+            assert_eq!(segments[4].text, " end");
+            assert!(!segments[4].bold);
+            assert!(!segments[4].italic);
         }
 
         // Test underline formatting

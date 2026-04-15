@@ -212,12 +212,15 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 let end_pos = tag_end + end_pos;
                 let formatted_text = &remaining[tag_end..end_pos];
 
-                segments.push(TextSegment {
-                    text: formatted_text.to_string(),
-                    bold: is_bold,
-                    italic: is_italic,
-                    underline: is_underline,
-                });
+                // Recursively parse the content inside the tag
+                let sub_segments = parse_formatted_text(formatted_text);
+                for mut sub_segment in sub_segments {
+                    // Merge formatting flags
+                    sub_segment.bold |= is_bold;
+                    sub_segment.italic |= is_italic;
+                    sub_segment.underline |= is_underline;
+                    segments.push(sub_segment);
+                }
 
                 remaining = &remaining[end_pos + closing_tag.len()..];
             } else {
