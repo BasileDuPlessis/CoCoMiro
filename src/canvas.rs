@@ -349,182 +349,142 @@ fn render_grid_background(
 /// * `width` - Canvas width in CSS pixels
 /// * `height` - Canvas height in CSS pixels
 #[cfg(target_arch = "wasm32")]
-fn render_sticky_notes(
+#[cfg(target_arch = "wasm32")]
+/// Renders the background and border for a single sticky note
+fn render_note_background_and_border(
     ctx: &CanvasRenderingContext2d,
+    note: &crate::sticky_notes::StickyNote,
+    screen_x: f64,
+    screen_y: f64,
+    screen_width: f64,
+    screen_height: f64,
+    is_selected: bool,
+) -> crate::error::AppResult<()> {
+    // Draw note background
+    ctx.set_fill_style_str(&note.color);
+    ctx.fill_rect(screen_x, screen_y, screen_width, screen_height);
+
+    // Draw note border
+    ctx.set_stroke_style_str(if is_selected {
+        "#2563eb" // Blue border for selected notes
+    } else {
+        "#374151" // Gray border for unselected notes
+    });
+    ctx.set_line_width(2.0);
+    ctx.stroke_rect(screen_x, screen_y, screen_width, screen_height);
+
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Renders resize handles for a selected sticky note
+fn render_note_resize_handles(
+    ctx: &CanvasRenderingContext2d,
+    note: &crate::sticky_notes::StickyNote,
     state: &crate::AppState,
     width: f64,
     height: f64,
 ) -> crate::error::AppResult<()> {
-    // Render sticky notes
-    for note in &state.sticky_notes.notes {
-        // Calculate screen position from world coordinates
-        // This matches the center cross positioning: screen = world * zoom + center + pan
-        let screen_x = note.x * state.viewport.zoom + width / 2.0 + state.viewport.pan_x;
-        let screen_y = note.y * state.viewport.zoom + height / 2.0 + state.viewport.pan_y;
-        let screen_width = note.width * state.viewport.zoom;
-        let screen_height = note.height * state.viewport.zoom;
-
-        // Draw note background
-        ctx.set_fill_style_str(&note.color);
-        ctx.fill_rect(screen_x, screen_y, screen_width, screen_height);
-
-        // Draw note border
-        ctx.set_stroke_style_str(if Some(note.id) == state.sticky_notes.selected_note_id {
-            "#2563eb" // Blue border for selected notes
+    let handle_positions = note.handle_positions(&state.viewport, width, height);
+    for (_handle, hx, hy) in handle_positions {
+        // Determine handle color based on state
+        let fill_color = if false {
+            // if state.resizing.is_resizing
+            //     && state.resizing.note_id == Some(note.id)
+            //     && state.resizing.handle == Some(handle)
+            // {
+            // Active handle (being resized)
+            "#2563eb"
         } else {
-            "#374151" // Gray border for unselected notes
-        });
-        ctx.set_line_width(2.0);
-        ctx.stroke_rect(screen_x, screen_y, screen_width, screen_height);
+            // } else if state.hovered_resize_handle == Some((note.id, handle)) {
+            // Hovered handle
+            // "#6b7280"
+            // } else {
+            // Normal handle
+            "#9ca3af"
+        };
 
-        // Draw resize handles for selected notes
-        if Some(note.id) == state.sticky_notes.selected_note_id {
-            let handle_positions = note.handle_positions(&state.viewport, width, height);
-            for (_handle, hx, hy) in handle_positions {
-                // Determine handle color based on state
-                let fill_color = if false {
-                    // if state.resizing.is_resizing
-                    //     && state.resizing.note_id == Some(note.id)
-                    //     && state.resizing.handle == Some(handle)
-                    // {
-                    // Active handle (being resized)
-                    "#2563eb"
-                } else {
-                    // } else if state.hovered_resize_handle == Some((note.id, handle)) {
-                    // Hovered handle
-                    // "#6b7280"
-                    // } else {
-                    // Normal handle
-                    "#9ca3af"
-                };
+        // Draw handle as a filled square
+        ctx.set_fill_style_str(fill_color);
+        let handle_size = crate::sticky_notes::RESIZE_HANDLE_SIZE;
+        ctx.fill_rect(
+            hx - handle_size / 2.0,
+            hy - handle_size / 2.0,
+            handle_size,
+            handle_size,
+        );
 
-                // Draw handle as a filled square
-                ctx.set_fill_style_str(fill_color);
-                let handle_size = crate::sticky_notes::RESIZE_HANDLE_SIZE;
-                ctx.fill_rect(
-                    hx - handle_size / 2.0,
-                    hy - handle_size / 2.0,
-                    handle_size,
-                    handle_size,
-                );
+        // Draw handle border
+        ctx.set_stroke_style_str("#ffffff");
+        ctx.set_line_width(1.0);
+        ctx.stroke_rect(
+            hx - handle_size / 2.0,
+            hy - handle_size / 2.0,
+            handle_size,
+            handle_size,
+        );
+    }
 
-                // Draw handle border
-                ctx.set_stroke_style_str("#ffffff");
-                ctx.set_line_width(1.0);
-                ctx.stroke_rect(
-                    hx - handle_size / 2.0,
-                    hy - handle_size / 2.0,
-                    handle_size,
-                    handle_size,
-                );
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Renders the text content of a sticky note with rich formatting and wrapping
+fn render_note_text_content(
+    ctx: &CanvasRenderingContext2d,
+    note: &crate::sticky_notes::StickyNote,
+    screen_x: f64,
+    screen_y: f64,
+    screen_width: f64,
+    _screen_height: f64,
+) -> crate::error::AppResult<()> {
+    if note.content.is_empty() {
+        return Ok(());
+    }
+
+    ctx.set_text_align("left");
+    ctx.set_text_baseline("top");
+    // Add some padding
+    let text_x = screen_x + 8.0;
+    let text_y = screen_y + 8.0;
+    let max_text_width = screen_width - 16.0; // Account for padding
+
+    // Parse the entire content for formatting
+    let formatted_segments = parse_formatted_text(&note.content);
+
+    // Process text with line breaks and wrapping while preserving formatting
+    let mut all_lines = Vec::new();
+    let mut current_line_segments = Vec::new();
+    let mut current_line_width = 0.0;
+
+    for segment in formatted_segments {
+        // Handle line breaks in the segment
+        let lines_in_segment: Vec<&str> = segment.text.lines().collect();
+
+        for (i, line_part) in lines_in_segment.iter().enumerate() {
+            if i > 0 {
+                // This is a new line due to \n, finalize current line and start new one
+                if !current_line_segments.is_empty() {
+                    all_lines.push(current_line_segments);
+                    current_line_segments = Vec::new();
+                    current_line_width = 0.0;
+                }
             }
-        }
 
-        // Draw note content text with rich formatting and wrapping
-        if !note.content.is_empty() {
-            ctx.set_text_align("left");
-            ctx.set_text_baseline("top");
-            // Add some padding
-            let text_x = screen_x + 8.0;
-            let text_y = screen_y + 8.0;
-            let max_text_width = screen_width - 16.0; // Account for padding
+            if line_part.is_empty() {
+                continue;
+            }
 
-            // Parse the entire content for formatting
-            let formatted_segments = parse_formatted_text(&note.content);
+            // Process the line part character by character to preserve spaces
+            let chars: Vec<char> = line_part.chars().collect();
+            let mut current_word = String::new();
 
-            // Process text with line breaks and wrapping while preserving formatting
-            let mut all_lines = Vec::new();
-            let mut current_line_segments = Vec::new();
-            let mut current_line_width = 0.0;
-
-            for segment in formatted_segments {
-                // Handle line breaks in the segment
-                let lines_in_segment: Vec<&str> = segment.text.lines().collect();
-
-                for (i, line_part) in lines_in_segment.iter().enumerate() {
-                    if i > 0 {
-                        // This is a new line due to \n, finalize current line and start new one
-                        if !current_line_segments.is_empty() {
-                            all_lines.push(current_line_segments);
-                            current_line_segments = Vec::new();
-                            current_line_width = 0.0;
-                        }
-                    }
-
-                    if line_part.is_empty() {
-                        continue;
-                    }
-
-                    // Process the line part character by character to preserve spaces
-                    let chars: Vec<char> = line_part.chars().collect();
-                    let mut current_word = String::new();
-
-                    for (_char_idx, &ch) in chars.iter().enumerate() {
-                        if ch.is_whitespace() {
-                            // Finish current word if any
-                            if !current_word.is_empty() {
-                                let word_segment = TextSegment {
-                                    text: current_word.clone(),
-                                    bold: segment.bold,
-                                    italic: segment.italic,
-                                    underline: segment.underline,
-                                };
-
-                                // Calculate word width
-                                let font = format_font(&word_segment, 14.0);
-                                ctx.set_font(&font);
-                                let word_width = ctx.measure_text(&word_segment.text)?.width();
-
-                                // Check if adding this word would exceed line width
-                                if current_line_width + word_width <= max_text_width
-                                    || current_line_segments.is_empty()
-                                {
-                                    current_line_segments.push(word_segment);
-                                    current_line_width += word_width;
-                                } else {
-                                    // Start new line
-                                    if !current_line_segments.is_empty() {
-                                        all_lines.push(current_line_segments);
-                                    }
-                                    current_line_segments = vec![word_segment];
-                                    current_line_width = word_width;
-                                }
-                                current_word.clear();
-                            }
-
-                            // Add space
-                            let space_segment = TextSegment {
-                                text: ch.to_string(),
-                                bold: segment.bold,
-                                italic: segment.italic,
-                                underline: segment.underline,
-                            };
-
-                            ctx.set_font(&format_font(&space_segment, 14.0));
-                            let space_width = ctx.measure_text(&space_segment.text)?.width();
-
-                            if current_line_width + space_width <= max_text_width
-                                || current_line_segments.is_empty()
-                            {
-                                current_line_segments.push(space_segment);
-                                current_line_width += space_width;
-                            } else {
-                                // Start new line with space
-                                if !current_line_segments.is_empty() {
-                                    all_lines.push(current_line_segments);
-                                }
-                                current_line_segments = vec![space_segment];
-                                current_line_width = space_width;
-                            }
-                        } else {
-                            current_word.push(ch);
-                        }
-                    }
-
-                    // Add the last word if any
+            for (_char_idx, &ch) in chars.iter().enumerate() {
+                if ch.is_whitespace() {
+                    // Finish current word if any
                     if !current_word.is_empty() {
                         let word_segment = TextSegment {
-                            text: current_word,
+                            text: current_word.clone(),
                             bold: segment.bold,
                             italic: segment.italic,
                             underline: segment.underline,
@@ -549,46 +509,145 @@ fn render_sticky_notes(
                             current_line_segments = vec![word_segment];
                             current_line_width = word_width;
                         }
+                        current_word.clear();
                     }
+
+                    // Add space
+                    let space_segment = TextSegment {
+                        text: ch.to_string(),
+                        bold: segment.bold,
+                        italic: segment.italic,
+                        underline: segment.underline,
+                    };
+
+                    ctx.set_font(&format_font(&space_segment, 14.0));
+                    let space_width = ctx.measure_text(&space_segment.text)?.width();
+
+                    if current_line_width + space_width <= max_text_width
+                        || current_line_segments.is_empty()
+                    {
+                        current_line_segments.push(space_segment);
+                        current_line_width += space_width;
+                    } else {
+                        // Start new line with space
+                        if !current_line_segments.is_empty() {
+                            all_lines.push(current_line_segments);
+                        }
+                        current_line_segments = vec![space_segment];
+                        current_line_width = space_width;
+                    }
+                } else {
+                    current_word.push(ch);
                 }
             }
 
-            // Add the last line if not empty
-            if !current_line_segments.is_empty() {
-                all_lines.push(current_line_segments);
-            }
+            // Add the last word if any
+            if !current_word.is_empty() {
+                let word_segment = TextSegment {
+                    text: current_word,
+                    bold: segment.bold,
+                    italic: segment.italic,
+                    underline: segment.underline,
+                };
 
-            // Render all lines
-            let mut y_offset = 0.0;
-            for line_segments in all_lines {
-                let mut x_offset = 0.0;
-                for segment in line_segments {
-                    let font = format_font(&segment, 14.0);
-                    ctx.set_font(&font);
+                // Calculate word width
+                let font = format_font(&word_segment, 14.0);
+                ctx.set_font(&font);
+                let word_width = ctx.measure_text(&word_segment.text)?.width();
 
-                    // Set text decoration for underline
-                    if segment.underline {
-                        ctx.set_stroke_style_str("#000000");
-                        ctx.set_line_width(1.0);
-                        let text_width = ctx.measure_text(&segment.text)?.width();
-                        let underline_y = text_y + y_offset + 14.0 + 1.0; // Below baseline
-                        ctx.begin_path();
-                        ctx.move_to(text_x + x_offset, underline_y);
-                        ctx.line_to(text_x + x_offset + text_width, underline_y);
-                        ctx.stroke();
+                // Check if adding this word would exceed line width
+                if current_line_width + word_width <= max_text_width
+                    || current_line_segments.is_empty()
+                {
+                    current_line_segments.push(word_segment);
+                    current_line_width += word_width;
+                } else {
+                    // Start new line
+                    if !current_line_segments.is_empty() {
+                        all_lines.push(current_line_segments);
                     }
-
-                    // Draw the text
-                    ctx.set_fill_style_str("#000000");
-                    ctx.fill_text(&segment.text, text_x + x_offset, text_y + y_offset)?;
-
-                    // Update x offset for next segment
-                    let segment_width = ctx.measure_text(&segment.text)?.width();
-                    x_offset += segment_width;
+                    current_line_segments = vec![word_segment];
+                    current_line_width = word_width;
                 }
-                y_offset += 18.0; // Line height
             }
         }
+    }
+
+    // Add the last line if not empty
+    if !current_line_segments.is_empty() {
+        all_lines.push(current_line_segments);
+    }
+
+    // Render all lines
+    let mut y_offset = 0.0;
+    for line_segments in all_lines {
+        let mut x_offset = 0.0;
+        for segment in line_segments {
+            let font = format_font(&segment, 14.0);
+            ctx.set_font(&font);
+
+            // Set text decoration for underline
+            if segment.underline {
+                ctx.set_stroke_style_str("#000000");
+                ctx.set_line_width(1.0);
+                let text_width = ctx.measure_text(&segment.text)?.width();
+                let underline_y = text_y + y_offset + 14.0 + 1.0; // Below baseline
+                ctx.begin_path();
+                ctx.move_to(text_x + x_offset, underline_y);
+                ctx.line_to(text_x + x_offset + text_width, underline_y);
+                ctx.stroke();
+            }
+
+            // Draw the text
+            ctx.set_fill_style_str("#000000");
+            ctx.fill_text(&segment.text, text_x + x_offset, text_y + y_offset)?;
+
+            // Update x offset for next segment
+            let segment_width = ctx.measure_text(&segment.text)?.width();
+            x_offset += segment_width;
+        }
+        y_offset += 18.0; // Line height
+    }
+
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn render_sticky_notes(
+    ctx: &CanvasRenderingContext2d,
+    state: &crate::AppState,
+    width: f64,
+    height: f64,
+) -> crate::error::AppResult<()> {
+    // Render sticky notes
+    for note in &state.sticky_notes.notes {
+        // Calculate screen position from world coordinates
+        // This matches the center cross positioning: screen = world * zoom + center + pan
+        let screen_x = note.x * state.viewport.zoom + width / 2.0 + state.viewport.pan_x;
+        let screen_y = note.y * state.viewport.zoom + height / 2.0 + state.viewport.pan_y;
+        let screen_width = note.width * state.viewport.zoom;
+        let screen_height = note.height * state.viewport.zoom;
+
+        let is_selected = Some(note.id) == state.sticky_notes.selected_note_id;
+
+        // Render note background and border
+        render_note_background_and_border(
+            ctx,
+            note,
+            screen_x,
+            screen_y,
+            screen_width,
+            screen_height,
+            is_selected,
+        )?;
+
+        // Draw resize handles for selected notes
+        if is_selected {
+            render_note_resize_handles(ctx, note, state, width, height)?;
+        }
+
+        // Draw note content text with rich formatting and wrapping
+        render_note_text_content(ctx, note, screen_x, screen_y, screen_width, screen_height)?;
     }
 
     Ok(())

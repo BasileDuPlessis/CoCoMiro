@@ -15,6 +15,8 @@ use web_sys::{HtmlCanvasElement, HtmlElement, MouseEvent, WheelEvent};
 #[cfg(target_arch = "wasm32")]
 use crate::event_setup::{end_drag_if_needed, end_toolbar_drag_if_needed};
 #[cfg(target_arch = "wasm32")]
+use crate::sticky_notes::{DEFAULT_NOTE_HEIGHT, DEFAULT_NOTE_WIDTH};
+#[cfg(target_arch = "wasm32")]
 use crate::text_input::create_text_input_overlay;
 
 /// Handles mouse down events on the canvas.
@@ -73,8 +75,8 @@ pub fn handle_mouse_down(
             let sticky_notes = &state.borrow().sticky_notes;
             let note = sticky_notes.get_note(note_id);
             (
-                note.map(|n| n.width).unwrap_or(200.0),
-                note.map(|n| n.height).unwrap_or(150.0),
+                note.map(|n| n.width).unwrap_or(DEFAULT_NOTE_WIDTH),
+                note.map(|n| n.height).unwrap_or(DEFAULT_NOTE_HEIGHT),
             )
         };
 
@@ -220,7 +222,15 @@ pub fn handle_mouse_move(
         let viewport_height = f64::from(canvas.client_height().max(1));
 
         // Extract resizing state before mutable borrow
-        let (is_resizing, note_id, handle, start_mouse_x, start_mouse_y, original_width, original_height) = {
+        let (
+            is_resizing,
+            note_id,
+            handle,
+            start_mouse_x,
+            start_mouse_y,
+            original_width,
+            original_height,
+        ) = {
             let resizing = &state.borrow().resizing;
             (
                 resizing.is_resizing,

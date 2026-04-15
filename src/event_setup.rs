@@ -83,48 +83,17 @@ pub fn end_toolbar_drag_if_needed(
     }
 }
 
-/// Sets up all event listeners for the CoCoMiro application.
-///
-/// This function establishes comprehensive event handling by:
-/// 1. Creating closures for each event type with proper state capture
-/// 2. Attaching event listeners to DOM elements and window
-/// 3. Configuring event propagation and default behavior prevention
-/// 4. Setting up cleanup handlers for drag operations
-///
-/// Event listeners are attached to:
-/// - Canvas: mouse, wheel, keyboard events
-/// - Toolbar: mouse events for dragging
-/// - Window: resize, blur, mouse events for drag cleanup
-/// - Add button: click events for note creation
-///
-/// # Arguments
-/// * `canvas` - The main canvas element for drawing interactions
-/// * `workspace` - The workspace container element
-/// * `toolbar` - The floating toolbar element
-/// * `state` - Reference to the main application state
-/// * `toolbar_state` - Reference to the toolbar state
-/// * `render` - Closure to trigger canvas re-rendering
-/// * `position_toolbar` - Closure to update toolbar position
-///
-/// # Returns
-/// * `Ok(())` - All event listeners set up successfully
-/// * `Err(AppError)` - Failed to set up event listeners
+/// Sets up mouse event listeners for canvas interactions
 #[cfg(target_arch = "wasm32")]
-pub fn setup_event_listeners(
+fn setup_mouse_event_listeners(
     canvas: &HtmlCanvasElement,
-    _workspace: &HtmlElement,
-    toolbar: &HtmlElement,
+    browser_window: &web_sys::Window,
+    document: &web_sys::Document,
     state: &Rc<RefCell<crate::AppState>>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     render: &Rc<dyn Fn()>,
     position_toolbar: &Rc<dyn Fn()>,
 ) -> crate::error::AppResult<()> {
-    let browser_window = web_sys::window()
-        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
-    let document = browser_window.document().ok_or_else(|| {
-        crate::error::AppError::BrowserEnv("could not access the browser document".to_string())
-    })?;
-
     // Mouse down on canvas
     let on_mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
@@ -142,66 +111,6 @@ pub fn setup_event_listeners(
         .add_event_listener_with_callback("mousedown", on_mouse_down.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to canvas"))?;
     on_mouse_down.forget();
-
-    // Mouse down on toolbar handle
-    let on_toolbar_mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
-        let canvas = canvas.clone();
-        let toolbar_state = toolbar_state.clone();
-        let position_toolbar = position_toolbar.clone();
-        move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_toolbar_mouse_down(
-                event,
-                &canvas,
-                &toolbar_state,
-                &position_toolbar,
-            ) {
-                crate::logging::log_app_error(&error, "handling toolbar mouse down");
-            }
-        }
-    }));
-    toolbar
-        .add_event_listener_with_callback(
-            "mousedown",
-            on_toolbar_mouse_down.as_ref().unchecked_ref(),
-        )
-        .map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to toolbar"))?;
-    on_toolbar_mouse_down.forget();
-
-    // Click on add note button
-    let on_add_note_click = Closure::<dyn FnMut()>::wrap(Box::new({
-        let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
-        move || {
-            let viewport_width = f64::from(canvas.client_width().max(1));
-            let viewport_height = f64::from(canvas.client_height().max(1));
-
-            let viewport = state.borrow().viewport.clone();
-            state.borrow_mut().sticky_notes.add_note_at_viewport_center(
-                viewport_width,
-                viewport_height,
-                &viewport,
-            );
-
-            render();
-            crate::logging::log_info("Added new sticky note");
-        }
-    }));
-    let add_note_button = document
-        .get_element_by_id("add-note-button")
-        .ok_or_else(|| {
-            crate::error::AppError::Dom("add note button element not found".to_string())
-        })?
-        .dyn_into::<web_sys::HtmlElement>()
-        .map_err(|_| {
-            crate::error::AppError::Dom("add note button is not an HTML element".to_string())
-        })?;
-    add_note_button
-        .add_event_listener_with_callback("click", on_add_note_click.as_ref().unchecked_ref())
-        .map_err(|e| {
-            js_error_to_app_error(e, "failed to attach click listener to add note button")
-        })?;
-    on_add_note_click.forget();
 
     // Mouse move
     let on_mouse_move = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
@@ -275,22 +184,99 @@ pub fn setup_event_listeners(
         })?;
     on_mouse_leave.forget();
 
-    // Blur window
-    let on_blur = Closure::<dyn FnMut()>::wrap(Box::new({
-        let state = state.clone();
-        let render = render.clone();
+    Ok(())
+}
+
+/// Sets up toolbar event listeners
+#[cfg(target_arch = "wasm32")]
+fn setup_toolbar_event_listeners(
+    canvas: &HtmlCanvasElement,
+    toolbar: &HtmlElement,
+    toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
+    position_toolbar: &Rc<dyn Fn()>,
+) -> crate::error::AppResult<()> {
+    // Mouse down on toolbar handle
+    let on_toolbar_mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
+        let canvas = canvas.clone();
         let toolbar_state = toolbar_state.clone();
         let position_toolbar = position_toolbar.clone();
-        move || {
-            end_drag_if_needed(&state, &render);
-            end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
+        move |event: web_sys::MouseEvent| {
+            if let Err(error) = crate::mouse_events::handle_toolbar_mouse_down(
+                event,
+                &canvas,
+                &toolbar_state,
+                &position_toolbar,
+            ) {
+                crate::logging::log_app_error(&error, "handling toolbar mouse down");
+            }
         }
     }));
-    browser_window
-        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
-        .map_err(|e| js_error_to_app_error(e, "failed to attach blur listener to window"))?;
-    on_blur.forget();
+    toolbar
+        .add_event_listener_with_callback(
+            "mousedown",
+            on_toolbar_mouse_down.as_ref().unchecked_ref(),
+        )
+        .map_err(|e| js_error_to_app_error(e, "failed to attach mousedown listener to toolbar"))?;
+    on_toolbar_mouse_down.forget();
 
+    Ok(())
+}
+
+/// Sets up button event listeners
+#[cfg(target_arch = "wasm32")]
+fn setup_button_event_listeners(
+    document: &web_sys::Document,
+    canvas: &HtmlCanvasElement,
+    state: &Rc<RefCell<crate::AppState>>,
+    render: &Rc<dyn Fn()>,
+) -> crate::error::AppResult<()> {
+    // Click on add note button
+    let on_add_note_click = Closure::<dyn FnMut()>::wrap(Box::new({
+        let canvas = canvas.clone();
+        let state = state.clone();
+        let render = render.clone();
+        move || {
+            let viewport_width = f64::from(canvas.client_width().max(1));
+            let viewport_height = f64::from(canvas.client_height().max(1));
+
+            let viewport = state.borrow().viewport.clone();
+            state.borrow_mut().sticky_notes.add_note_at_viewport_center(
+                viewport_width,
+                viewport_height,
+                &viewport,
+            );
+
+            render();
+            crate::logging::log_info("Added new sticky note");
+        }
+    }));
+    let add_note_button = document
+        .get_element_by_id("add-note-button")
+        .ok_or_else(|| {
+            crate::error::AppError::Dom("add note button element not found".to_string())
+        })?
+        .dyn_into::<web_sys::HtmlElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom("add note button is not an HTML element".to_string())
+        })?;
+    add_note_button
+        .add_event_listener_with_callback("click", on_add_note_click.as_ref().unchecked_ref())
+        .map_err(|e| {
+            js_error_to_app_error(e, "failed to attach click listener to add note button")
+        })?;
+    on_add_note_click.forget();
+
+    Ok(())
+}
+
+/// Sets up keyboard and wheel event listeners
+#[cfg(target_arch = "wasm32")]
+fn setup_keyboard_and_wheel_listeners(
+    canvas: &HtmlCanvasElement,
+    _browser_window: &web_sys::Window,
+    state: &Rc<RefCell<crate::AppState>>,
+    render: &Rc<dyn Fn()>,
+) -> crate::error::AppResult<()> {
     // Wheel
     let on_wheel = Closure::<dyn FnMut(web_sys::WheelEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
@@ -342,6 +328,92 @@ pub fn setup_event_listeners(
         .add_event_listener_with_callback("dblclick", on_double_click.as_ref().unchecked_ref())
         .map_err(|e| js_error_to_app_error(e, "failed to attach dblclick listener to canvas"))?;
     on_double_click.forget();
+
+    Ok(())
+}
+
+/// Sets up cleanup event listeners for drag operations
+#[cfg(target_arch = "wasm32")]
+fn setup_cleanup_listeners(
+    browser_window: &web_sys::Window,
+    state: &Rc<RefCell<crate::AppState>>,
+    toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
+    render: &Rc<dyn Fn()>,
+    position_toolbar: &Rc<dyn Fn()>,
+) -> crate::error::AppResult<()> {
+    // Blur window
+    let on_blur = Closure::<dyn FnMut()>::wrap(Box::new({
+        let state = state.clone();
+        let render = render.clone();
+        let toolbar_state = toolbar_state.clone();
+        let position_toolbar = position_toolbar.clone();
+        move || {
+            end_drag_if_needed(&state, &render);
+            end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
+        }
+    }));
+    browser_window
+        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
+        .map_err(|e| js_error_to_app_error(e, "failed to attach blur listener to window"))?;
+    on_blur.forget();
+
+    Ok(())
+}
+/// * `canvas` - The main canvas element for drawing interactions
+/// * `workspace` - The workspace container element
+/// * `toolbar` - The floating toolbar element
+/// * `state` - Reference to the main application state
+/// * `toolbar_state` - Reference to the toolbar state
+/// * `render` - Closure to trigger canvas re-rendering
+/// * `position_toolbar` - Closure to update toolbar position
+///
+/// # Returns
+/// * `Ok(())` - All event listeners set up successfully
+/// * `Err(AppError)` - Failed to set up event listeners
+#[cfg(target_arch = "wasm32")]
+pub fn setup_event_listeners(
+    canvas: &HtmlCanvasElement,
+    _workspace: &HtmlElement,
+    toolbar: &HtmlElement,
+    state: &Rc<RefCell<crate::AppState>>,
+    toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
+    render: &Rc<dyn Fn()>,
+    position_toolbar: &Rc<dyn Fn()>,
+) -> crate::error::AppResult<()> {
+    let browser_window = web_sys::window()
+        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
+    let document = browser_window.document().ok_or_else(|| {
+        crate::error::AppError::BrowserEnv("could not access the browser document".to_string())
+    })?;
+
+    // Set up mouse event listeners
+    setup_mouse_event_listeners(
+        canvas,
+        &browser_window,
+        &document,
+        state,
+        toolbar_state,
+        render,
+        position_toolbar,
+    )?;
+
+    // Set up toolbar event listeners
+    setup_toolbar_event_listeners(canvas, toolbar, toolbar_state, position_toolbar)?;
+
+    // Set up button event listeners
+    setup_button_event_listeners(&document, canvas, state, render)?;
+
+    // Set up keyboard and wheel event listeners
+    setup_keyboard_and_wheel_listeners(canvas, &browser_window, state, render)?;
+
+    // Set up cleanup event listeners
+    setup_cleanup_listeners(
+        &browser_window,
+        state,
+        toolbar_state,
+        render,
+        position_toolbar,
+    )?;
 
     Ok(())
 }

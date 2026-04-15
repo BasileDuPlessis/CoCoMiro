@@ -34,6 +34,13 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
+/// Default width for new sticky notes (in world units)
+pub const DEFAULT_NOTE_WIDTH: f64 = 200.0;
+/// Default height for new sticky notes (in world units)
+pub const DEFAULT_NOTE_HEIGHT: f64 = 150.0;
+/// Size of resize handles (in screen pixels)
+pub const RESIZE_HANDLE_SIZE: f64 = 8.0;
+
 #[derive(Debug, Clone, PartialEq)]
 /// Represents formatting information for a range of text in a sticky note.
 ///
@@ -159,8 +166,8 @@ impl StickyNote {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             x,
             y,
-            width: 200.0,
-            height: 150.0,
+            width: DEFAULT_NOTE_WIDTH,
+            height: DEFAULT_NOTE_HEIGHT,
             content: "New note".to_string(),
             formatting: Vec::new(),
             color: "#ffff88".to_string(),
@@ -278,9 +285,6 @@ impl StickyNote {
         .collect()
     }
 }
-
-/// Size of resize handles in screen pixels (width and height)
-pub const RESIZE_HANDLE_SIZE: f64 = 8.0;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 /// Manages the collection of sticky notes and their interaction state.

@@ -5,6 +5,8 @@
 //! positioned HTML input elements that overlay sticky notes for text editing.
 
 #[cfg(target_arch = "wasm32")]
+use crate::sticky_notes::DEFAULT_NOTE_HEIGHT;
+#[cfg(target_arch = "wasm32")]
 use js_sys;
 #[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
@@ -356,7 +358,7 @@ pub fn create_text_input_overlay(
                 );
 
                 // Adjust note height based on contenteditable height in world coordinates
-                let min_height = 150.0; // Minimum note height
+                let min_height = DEFAULT_NOTE_HEIGHT; // Minimum note height
                 let new_height = (scroll_height / zoom).max(min_height);
                 note.height = new_height;
             }

@@ -407,9 +407,64 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Improve color scheme and typography
 - Add loading states and transitions
 
+### 7. Code Refactoring
+- Improve code maintainability and readability through targeted refactoring
+- Break down large functions, extract constants, and simplify borrow patterns
+
+**Subtasks:**
+
+#### ✅ 7.1 Break Down Large Functions into Smaller Helpers
+- Identify functions exceeding reasonable size limits (e.g., start_impl, render functions)
+- Extract logical units into focused helper functions
+- Maintain error handling and behavior consistency
+
+**Implementation Details:**
+- Analyzed `render_sticky_notes` function (~250 lines) and `setup_event_listeners` function (~260 lines)
+- Broke down `render_sticky_notes` into three focused helpers: `render_note_background_and_border`, `render_note_resize_handles`, and `render_note_text_content`
+- Broke down `setup_event_listeners` into five logical helpers: `setup_mouse_event_listeners`, `setup_toolbar_event_listeners`, `setup_button_event_listeners`, `setup_keyboard_and_wheel_listeners`, and `setup_cleanup_listeners`
+- Added proper `#[cfg(target_arch = "wasm32")]` attributes to WASM-specific helper functions
+- Maintained all existing functionality and error handling
+- Added comprehensive tests for new helpers where applicable
+
+**Implementation Results:**
+- ✅ Reduced `render_sticky_notes` from ~250 lines to ~50 lines with clear helper functions
+- ✅ Reduced `setup_event_listeners` from ~260 lines to ~30 lines with organized setup calls
+- ✅ Code compiles for both host and WebAssembly targets
+- ✅ All existing tests pass
+- ✅ Full WASM build succeeds
+- ✅ Improved code readability and maintainability
+
+#### ✅ 7.2 Extract Magic Numbers to Named Constants
+- Find hardcoded numeric values throughout the codebase
+- Define meaningful constant names for configuration values
+- Centralize constants for easier maintenance
+
+**Implementation Details:**
+- Search for numeric literals in source code
+- Define constants in appropriate modules (e.g., viewport limits, handle sizes)
+- Replace all occurrences with named constants
+- Update documentation to reference constants
+
+**Completed Changes:**
+- Added `DEFAULT_NOTE_WIDTH` (200.0) and `DEFAULT_NOTE_HEIGHT` (150.0) to `sticky_notes.rs`
+- Added `FORMATTING_TOOLBAR_VERTICAL_OFFSET` (40.0), `TEXT_INPUT_MAX_WIDTH` (200.0), `TEST_VIEWPORT_WIDTH` (800.0), and `TEST_VIEWPORT_HEIGHT` (600.0) to `styling.rs`
+- Updated all references in `StickyNote::new()`, `mouse_events.rs`, `text_input.rs`, and `styling.rs`
+- All tests pass and builds succeed for both host and WASM targets
+
+#### 7.3 Simplify Complex Borrow Patterns in Event Handlers
+- Analyze event handler closures for borrow checker complexity
+- Refactor to reduce lifetime and borrowing issues
+- Improve code clarity and maintainability
+
+**Implementation Details:**
+- Review closure captures in event_setup.rs and related modules
+- Extract state snapshots or restructure data flow
+- Ensure no functional changes during refactoring
+- Add tests to verify event handling behavior
+
 ## Active Low Priority Tasks
 
-### 7. Add Mobile Support
+### 8. Add Mobile Support
 - Implement touch event handling for mobile devices
 - Add gesture recognition for pinch-to-zoom and multi-touch interactions
 

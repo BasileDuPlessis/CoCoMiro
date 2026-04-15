@@ -63,6 +63,15 @@ pub mod components {
     use wasm_bindgen::JsValue;
     use web_sys::HtmlElement;
 
+    /// Vertical offset for positioning formatting toolbar above text input (in pixels)
+    pub const FORMATTING_TOOLBAR_VERTICAL_OFFSET: f64 = 40.0;
+    /// Maximum width limit for text input overlays (in pixels)
+    pub const TEXT_INPUT_MAX_WIDTH: f64 = 200.0;
+    /// Default test viewport width for styling calculations (in pixels)
+    pub const TEST_VIEWPORT_WIDTH: f64 = 800.0;
+    /// Default test viewport height for styling calculations (in pixels)
+    pub const TEST_VIEWPORT_HEIGHT: f64 = 600.0;
+
     /// Style the text input toolbar with dynamic positioning
     #[cfg(target_arch = "wasm32")]
     pub fn style_text_input_toolbar(
@@ -77,8 +86,11 @@ pub mod components {
         // Set dynamic positioning styles
         let style = toolbar.style();
         style.set_property("left", &format!("{}px", left))?;
-        style.set_property("top", &format!("{}px", top - 40.0))?; // Position above contenteditable
-        style.set_property("width", &format!("{}px", width.min(200.0)))?; // Limit max width
+        style.set_property(
+            "top",
+            &format!("{}px", top - FORMATTING_TOOLBAR_VERTICAL_OFFSET),
+        )?; // Position above contenteditable
+        style.set_property("width", &format!("{}px", width.min(TEXT_INPUT_MAX_WIDTH)))?; // Limit max width
 
         Ok(())
     }
@@ -115,11 +127,21 @@ pub mod components {
             .find_note_at(
                 state
                     .viewport
-                    .world_point_at(state.mouse_x, state.mouse_y, 800.0, 600.0)
+                    .world_point_at(
+                        state.mouse_x,
+                        state.mouse_y,
+                        TEST_VIEWPORT_WIDTH,
+                        TEST_VIEWPORT_HEIGHT,
+                    )
                     .0,
                 state
                     .viewport
-                    .world_point_at(state.mouse_x, state.mouse_y, 800.0, 600.0)
+                    .world_point_at(
+                        state.mouse_x,
+                        state.mouse_y,
+                        TEST_VIEWPORT_WIDTH,
+                        TEST_VIEWPORT_HEIGHT,
+                    )
                     .1,
             )
             .is_some()
