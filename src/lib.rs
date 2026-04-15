@@ -846,5 +846,36 @@ mod integration_tests {
             assert_eq!(segments[2].text, " text");
             assert!(!segments[2].bold);
         }
+
+        // Test HTML with <br> tags for line breaks
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::parse_formatted_text;
+
+            let br_html = "Line 1<br>Line 2<br />Line 3";
+            let segments = parse_formatted_text(br_html);
+
+            assert_eq!(segments.len(), 5);
+
+            // "Line 1"
+            assert_eq!(segments[0].text, "Line 1");
+            assert!(!segments[0].bold);
+
+            // "\n"
+            assert_eq!(segments[1].text, "\n");
+            assert!(!segments[1].bold);
+
+            // "Line 2"
+            assert_eq!(segments[2].text, "Line 2");
+            assert!(!segments[2].bold);
+
+            // "\n"
+            assert_eq!(segments[3].text, "\n");
+            assert!(!segments[3].bold);
+
+            // "Line 3"
+            assert_eq!(segments[4].text, "Line 3");
+            assert!(!segments[4].bold);
+        }
     }
 }

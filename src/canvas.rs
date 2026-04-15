@@ -139,6 +139,8 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
             ("<u>", "underline", "</u>"),
             ("<u ", "underline", "</u>"),
             ("<span ", "span", "</span>"),
+            ("<br>", "br", "</br>"),
+            ("<br ", "br", "</br>"),
         ];
 
         let mut earliest_pos = None;
@@ -188,6 +190,16 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 let has_underline =
                     tag_content.contains("text-decoration:") && tag_content.contains("underline");
                 (has_bold, has_italic, has_underline)
+            } else if tag_type == "br" {
+                // <br> tags represent line breaks
+                segments.push(TextSegment {
+                    text: "\n".to_string(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                });
+                remaining = &remaining[tag_end..];
+                continue;
             } else {
                 (
                     tag_type == "bold",
