@@ -10,6 +10,127 @@ use wasm_bindgen::{JsCast, closure::Closure};
 #[cfg(target_arch = "wasm32")]
 use web_sys::{HtmlCanvasElement, HtmlElement};
 
+/// Shared context for event handlers to reduce complex borrow patterns.
+///
+/// This struct bundles all the shared state and functions that event handlers need,
+/// reducing the number of individual Rc<RefCell<>> clones and simplifying closure captures.
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone)]
+struct EventContext {
+    /// Main application state
+    state: Rc<RefCell<crate::AppState>>,
+    /// Toolbar state
+    toolbar_state: Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
+    /// Canvas re-rendering function
+    render: Rc<dyn Fn()>,
+    /// Toolbar positioning function
+    position_toolbar: Rc<dyn Fn()>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl EventContext {
+    /// Creates a new event context with the provided shared resources.
+    fn new(
+        state: Rc<RefCell<crate::AppState>>,
+        toolbar_state: Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
+        render: Rc<dyn Fn()>,
+        position_toolbar: Rc<dyn Fn()>,
+    ) -> Self {
+        Self {
+            state,
+            toolbar_state,
+            render,
+            position_toolbar,
+        }
+    }
+
+    /// Handles mouse down events using the shared context.
+    fn handle_mouse_down(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_mouse_down(event, canvas, &self.state, &self.render)
+    }
+
+    /// Handles mouse move events using the shared context.
+    fn handle_mouse_move(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_mouse_move(
+            event,
+            canvas,
+            &self.state,
+            &self.render,
+            &self.toolbar_state,
+            &self.position_toolbar,
+        )
+    }
+
+    /// Handles mouse up events using the shared context.
+    fn handle_mouse_up(&self, event: web_sys::MouseEvent) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_mouse_up(
+            event,
+            &self.state,
+            &self.render,
+            &self.toolbar_state,
+            &self.position_toolbar,
+        )
+    }
+
+    /// Handles mouse leave events using the shared context.
+    fn handle_mouse_leave(&self, event: web_sys::MouseEvent) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_mouse_leave(
+            event,
+            &self.state,
+            &self.render,
+            &self.toolbar_state,
+            &self.position_toolbar,
+        )
+    }
+
+    /// Handles wheel events using the shared context.
+    fn handle_wheel(&self, event: web_sys::WheelEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_wheel(event, canvas, &self.state, &self.render)
+    }
+
+    /// Handles key down events using the shared context.
+    fn handle_key_down(&self, event: web_sys::KeyboardEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+        crate::keyboard_events::handle_key_down(event, canvas, &self.state, &self.render)
+    }
+
+    /// Handles double click events using the shared context.
+    fn handle_double_click(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_double_click(event, canvas, &self.state, &self.render)
+    }
+
+    /// Handles toolbar mouse down events using the shared context.
+    fn handle_toolbar_mouse_down(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+        crate::mouse_events::handle_toolbar_mouse_down(
+            event,
+            canvas,
+            &self.toolbar_state,
+            &self.position_toolbar,
+        )
+    }
+
+    /// Handles add note button clicks using the shared context.
+    fn handle_add_note_click(&self, canvas: &HtmlCanvasElement) {
+        let viewport_width = f64::from(canvas.client_width().max(1));
+        let viewport_height = f64::from(canvas.client_height().max(1));
+
+        let viewport = self.state.borrow().viewport.clone();
+        self.state.borrow_mut().sticky_notes.add_note_at_viewport_center(
+            viewport_width,
+            viewport_height,
+            &viewport,
+        );
+
+        (self.render)();
+        crate::logging::log_info("Added new sticky note");
+    }
+
+    /// Handles window blur events using the shared context.
+    fn handle_window_blur(&self) {
+        end_drag_if_needed(&self.state, &self.render);
+        end_toolbar_drag_if_needed(&self.toolbar_state, &self.position_toolbar);
+    }
+}
+
 /// Converts a JsValue error to an AppError with context.
 ///
 /// # Arguments
@@ -89,20 +210,14 @@ fn setup_mouse_event_listeners(
     canvas: &HtmlCanvasElement,
     browser_window: &web_sys::Window,
     document: &web_sys::Document,
-    state: &Rc<RefCell<crate::AppState>>,
-    toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
-    render: &Rc<dyn Fn()>,
-    position_toolbar: &Rc<dyn Fn()>,
+    context: &EventContext,
 ) -> crate::error::AppResult<()> {
     // Mouse down on canvas
     let on_mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
+        let context = context.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) =
-                crate::mouse_events::handle_mouse_down(event, &canvas, &state, &render)
-            {
+            if let Err(error) = context.handle_mouse_down(event, &canvas) {
                 crate::logging::log_app_error(&error, "handling mouse down");
             }
         }
@@ -115,19 +230,9 @@ fn setup_mouse_event_listeners(
     // Mouse move
     let on_mouse_move = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
-        let toolbar_state = toolbar_state.clone();
-        let position_toolbar = position_toolbar.clone();
+        let context = context.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_move(
-                event,
-                &canvas,
-                &state,
-                &render,
-                &toolbar_state,
-                &position_toolbar,
-            ) {
+            if let Err(error) = context.handle_mouse_move(event, &canvas) {
                 crate::logging::log_app_error(&error, "handling mouse move");
             }
         }
@@ -138,18 +243,9 @@ fn setup_mouse_event_listeners(
 
     // Mouse up
     let on_mouse_up = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
-        let state = state.clone();
-        let render = render.clone();
-        let toolbar_state = toolbar_state.clone();
-        let position_toolbar = position_toolbar.clone();
+        let context = context.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_up(
-                event,
-                &state,
-                &render,
-                &toolbar_state,
-                &position_toolbar,
-            ) {
+            if let Err(error) = context.handle_mouse_up(event) {
                 crate::logging::log_app_error(&error, "handling mouse up");
             }
         }
@@ -161,18 +257,9 @@ fn setup_mouse_event_listeners(
 
     // Mouse leave document
     let on_mouse_leave = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
-        let state = state.clone();
-        let render = render.clone();
-        let toolbar_state = toolbar_state.clone();
-        let position_toolbar = position_toolbar.clone();
+        let context = context.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_mouse_leave(
-                event,
-                &state,
-                &render,
-                &toolbar_state,
-                &position_toolbar,
-            ) {
+            if let Err(error) = context.handle_mouse_leave(event) {
                 crate::logging::log_app_error(&error, "handling mouse leave");
             }
         }
@@ -192,21 +279,14 @@ fn setup_mouse_event_listeners(
 fn setup_toolbar_event_listeners(
     canvas: &HtmlCanvasElement,
     toolbar: &HtmlElement,
-    toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
-    position_toolbar: &Rc<dyn Fn()>,
+    context: &EventContext,
 ) -> crate::error::AppResult<()> {
     // Mouse down on toolbar handle
     let on_toolbar_mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
-        let toolbar_state = toolbar_state.clone();
-        let position_toolbar = position_toolbar.clone();
+        let context = context.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) = crate::mouse_events::handle_toolbar_mouse_down(
-                event,
-                &canvas,
-                &toolbar_state,
-                &position_toolbar,
-            ) {
+            if let Err(error) = context.handle_toolbar_mouse_down(event, &canvas) {
                 crate::logging::log_app_error(&error, "handling toolbar mouse down");
             }
         }
@@ -227,27 +307,14 @@ fn setup_toolbar_event_listeners(
 fn setup_button_event_listeners(
     document: &web_sys::Document,
     canvas: &HtmlCanvasElement,
-    state: &Rc<RefCell<crate::AppState>>,
-    render: &Rc<dyn Fn()>,
+    context: &EventContext,
 ) -> crate::error::AppResult<()> {
     // Click on add note button
     let on_add_note_click = Closure::<dyn FnMut()>::wrap(Box::new({
         let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
+        let context = context.clone();
         move || {
-            let viewport_width = f64::from(canvas.client_width().max(1));
-            let viewport_height = f64::from(canvas.client_height().max(1));
-
-            let viewport = state.borrow().viewport.clone();
-            state.borrow_mut().sticky_notes.add_note_at_viewport_center(
-                viewport_width,
-                viewport_height,
-                &viewport,
-            );
-
-            render();
-            crate::logging::log_info("Added new sticky note");
+            context.handle_add_note_click(&canvas);
         }
     }));
     let add_note_button = document
@@ -274,16 +341,14 @@ fn setup_button_event_listeners(
 fn setup_keyboard_and_wheel_listeners(
     canvas: &HtmlCanvasElement,
     _browser_window: &web_sys::Window,
-    state: &Rc<RefCell<crate::AppState>>,
-    render: &Rc<dyn Fn()>,
+    context: &EventContext,
 ) -> crate::error::AppResult<()> {
     // Wheel
     let on_wheel = Closure::<dyn FnMut(web_sys::WheelEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
+        let context = context.clone();
         move |event: web_sys::WheelEvent| {
-            if let Err(error) = crate::mouse_events::handle_wheel(event, &canvas, &state, &render) {
+            if let Err(error) = context.handle_wheel(event, &canvas) {
                 crate::logging::log_app_error(&error, "handling wheel");
             }
         }
@@ -296,12 +361,9 @@ fn setup_keyboard_and_wheel_listeners(
     // Key down
     let on_key_down = Closure::<dyn FnMut(web_sys::KeyboardEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
+        let context = context.clone();
         move |event: web_sys::KeyboardEvent| {
-            if let Err(error) =
-                crate::keyboard_events::handle_key_down(event, &canvas, &state, &render)
-            {
+            if let Err(error) = context.handle_key_down(event, &canvas) {
                 crate::logging::log_app_error(&error, "handling key down");
             }
         }
@@ -314,12 +376,9 @@ fn setup_keyboard_and_wheel_listeners(
     // Double-click detection for text editing
     let on_double_click = Closure::<dyn FnMut(web_sys::MouseEvent)>::wrap(Box::new({
         let canvas = canvas.clone();
-        let state = state.clone();
-        let render = render.clone();
+        let context = context.clone();
         move |event: web_sys::MouseEvent| {
-            if let Err(error) =
-                crate::mouse_events::handle_double_click(event, &canvas, &state, &render)
-            {
+            if let Err(error) = context.handle_double_click(event, &canvas) {
                 crate::logging::log_app_error(&error, "handling double click");
             }
         }
@@ -336,20 +395,13 @@ fn setup_keyboard_and_wheel_listeners(
 #[cfg(target_arch = "wasm32")]
 fn setup_cleanup_listeners(
     browser_window: &web_sys::Window,
-    state: &Rc<RefCell<crate::AppState>>,
-    toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
-    render: &Rc<dyn Fn()>,
-    position_toolbar: &Rc<dyn Fn()>,
+    context: &EventContext,
 ) -> crate::error::AppResult<()> {
     // Blur window
     let on_blur = Closure::<dyn FnMut()>::wrap(Box::new({
-        let state = state.clone();
-        let render = render.clone();
-        let toolbar_state = toolbar_state.clone();
-        let position_toolbar = position_toolbar.clone();
+        let context = context.clone();
         move || {
-            end_drag_if_needed(&state, &render);
-            end_toolbar_drag_if_needed(&toolbar_state, &position_toolbar);
+            context.handle_window_blur();
         }
     }));
     browser_window
@@ -359,6 +411,13 @@ fn setup_cleanup_listeners(
 
     Ok(())
 }
+/// Sets up all event listeners for the CoCoMiro application.
+///
+/// This function creates a shared event context and delegates to specialized
+/// setup functions for different types of event listeners. The shared context
+/// reduces complex borrow patterns by bundling all shared state together.
+///
+/// # Arguments
 /// * `canvas` - The main canvas element for drawing interactions
 /// * `workspace` - The workspace container element
 /// * `toolbar` - The floating toolbar element
@@ -386,34 +445,28 @@ pub fn setup_event_listeners(
         crate::error::AppError::BrowserEnv("could not access the browser document".to_string())
     })?;
 
+    // Create shared event context to reduce complex borrow patterns
+    let context = EventContext::new(
+        state.clone(),
+        toolbar_state.clone(),
+        render.clone(),
+        position_toolbar.clone(),
+    );
+
     // Set up mouse event listeners
-    setup_mouse_event_listeners(
-        canvas,
-        &browser_window,
-        &document,
-        state,
-        toolbar_state,
-        render,
-        position_toolbar,
-    )?;
+    setup_mouse_event_listeners(canvas, &browser_window, &document, &context)?;
 
     // Set up toolbar event listeners
-    setup_toolbar_event_listeners(canvas, toolbar, toolbar_state, position_toolbar)?;
+    setup_toolbar_event_listeners(canvas, toolbar, &context)?;
 
     // Set up button event listeners
-    setup_button_event_listeners(&document, canvas, state, render)?;
+    setup_button_event_listeners(&document, canvas, &context)?;
 
     // Set up keyboard and wheel event listeners
-    setup_keyboard_and_wheel_listeners(canvas, &browser_window, state, render)?;
+    setup_keyboard_and_wheel_listeners(canvas, &browser_window, &context)?;
 
     // Set up cleanup event listeners
-    setup_cleanup_listeners(
-        &browser_window,
-        state,
-        toolbar_state,
-        render,
-        position_toolbar,
-    )?;
+    setup_cleanup_listeners(&browser_window, &context)?;
 
     Ok(())
 }
