@@ -138,10 +138,11 @@ pub fn handle_mouse_down(
         return Ok(());
     }
 
-    // If no sticky note hit, start canvas drag
+    // If no sticky note hit, clear selection and start canvas drag
+    state.borrow_mut().sticky_notes.clear_selection();
     state.borrow_mut().viewport.start_drag(mouse_x, mouse_y);
     crate::logging::log_info(&format!(
-        "Canvas drag started at ({}, {})",
+        "Canvas drag started at ({}, {}), selection cleared",
         mouse_x, mouse_y
     ));
     render();

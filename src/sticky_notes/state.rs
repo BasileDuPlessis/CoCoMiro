@@ -105,6 +105,15 @@ impl StickyNotesState {
         self.drag_offset = None;
     }
 
+    /// Clears the current note selection.
+    ///
+    /// This method deselects any currently selected note, causing its
+    /// resize handles to disappear. This is typically called when clicking
+    /// on empty canvas space or when selecting a different note.
+    pub fn clear_selection(&mut self) {
+        self.selected_note_id = None;
+    }
+
     /// Adds a new note positioned at the center of the current viewport.
     ///
     /// This method creates a note at the viewport center in world coordinates,

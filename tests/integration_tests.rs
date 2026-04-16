@@ -407,4 +407,25 @@ mod integration_tests {
             assert!(!segments[4].bold);
         }
     }
+
+    #[test]
+    fn sticky_note_selection_clearing() {
+        // Test that clicking on empty canvas clears note selection
+        let mut app_state = AppState::default();
+
+        // Add a note and select it
+        let note = StickyNote::new(100.0, 100.0);
+        let note_id = note.id;
+        app_state.sticky_notes.add_note(note);
+        app_state.sticky_notes.selected_note_id = Some(note_id);
+
+        // Verify note is selected
+        assert_eq!(app_state.sticky_notes.selected_note_id, Some(note_id));
+
+        // Clear selection (simulating click on empty canvas)
+        app_state.sticky_notes.clear_selection();
+
+        // Verify selection is cleared
+        assert!(app_state.sticky_notes.selected_note_id.is_none());
+    }
 }
