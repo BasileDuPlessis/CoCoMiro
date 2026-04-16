@@ -575,50 +575,14 @@ impl StickyNotesState {
 
                 // Calculate new dimensions based on handle type and original dimensions
                 match handle {
-                    ResizeHandle::TopLeft => {
-                        let old_width = note.width;
-                        let old_height = note.height;
-                        note.width = (original_width - delta_x).max(50.0);
-                        note.height = (original_height - delta_y).max(40.0);
-                        note.x += old_width - note.width; // Move note to keep right edge fixed
-                        note.y += old_height - note.height; // Move note to keep bottom edge fixed
-                    }
-                    ResizeHandle::Top => {
-                        let old_height = note.height;
-                        note.width = original_width;
-                        note.height = (original_height - delta_y).max(40.0);
-                        note.y += old_height - note.height; // Move note to keep bottom edge fixed
-                    }
-                    ResizeHandle::TopRight => {
-                        note.width = (original_width + delta_x).max(50.0);
-                        note.height = (original_height - delta_y).max(40.0);
-                        note.y += delta_y; // Move note to keep bottom-left corner fixed
-                    }
-                    ResizeHandle::Right => {
-                        note.width = (original_width + delta_x).max(50.0);
-                        note.height = original_height;
-                    }
-                    ResizeHandle::BottomRight => {
-                        note.width = (original_width + delta_x).max(50.0);
-                        note.height = (original_height + delta_y).max(40.0);
-                    }
-                    ResizeHandle::Bottom => {
-                        note.width = original_width;
-                        note.height = (original_height + delta_y).max(40.0);
-                    }
-                    ResizeHandle::BottomLeft => {
-                        let old_width = note.width;
-                        note.width = (original_width - delta_x).max(50.0);
-                        note.height = (original_height + delta_y).max(40.0);
-                        note.x += old_width - note.width; // Move note to keep right edge fixed
-                        // note.y stays fixed
-                    }
-                    ResizeHandle::Left => {
-                        let old_width = note.width;
-                        note.width = (original_width - delta_x).max(50.0);
-                        note.height = original_height;
-                        note.x += old_width - note.width; // Move note to keep right edge fixed
-                    }
+                    ResizeHandle::TopLeft => Self::resize_top_left(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::Top => Self::resize_top(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::TopRight => Self::resize_top_right(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::Right => Self::resize_right(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::BottomRight => Self::resize_bottom_right(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::Bottom => Self::resize_bottom(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::BottomLeft => Self::resize_bottom_left(note, delta_x, delta_y, original_width, original_height),
+                    ResizeHandle::Left => Self::resize_left(note, delta_x, delta_y, original_width, original_height),
                 }
             }
         }
@@ -630,6 +594,66 @@ impl StickyNotesState {
     /// the resize operation.
     pub fn end_resize(&mut self) {
         // Currently no special cleanup needed, but method provided for consistency
+    }
+
+    /// Resizes the note using the top-left handle, keeping the bottom-right corner fixed.
+    fn resize_top_left(note: &mut StickyNote, delta_x: f64, delta_y: f64, original_width: f64, original_height: f64) {
+        let old_width = note.width;
+        let old_height = note.height;
+        note.width = (original_width - delta_x).max(50.0);
+        note.height = (original_height - delta_y).max(40.0);
+        note.x += old_width - note.width; // Move note to keep right edge fixed
+        note.y += old_height - note.height; // Move note to keep bottom edge fixed
+    }
+
+    /// Resizes the note using the top handle, keeping the bottom edge fixed.
+    fn resize_top(note: &mut StickyNote, _delta_x: f64, delta_y: f64, original_width: f64, original_height: f64) {
+        let old_height = note.height;
+        note.width = original_width;
+        note.height = (original_height - delta_y).max(40.0);
+        note.y += old_height - note.height; // Move note to keep bottom edge fixed
+    }
+
+    /// Resizes the note using the top-right handle, keeping the bottom-left corner fixed.
+    fn resize_top_right(note: &mut StickyNote, delta_x: f64, delta_y: f64, original_width: f64, original_height: f64) {
+        note.width = (original_width + delta_x).max(50.0);
+        note.height = (original_height - delta_y).max(40.0);
+        note.y += delta_y; // Move note to keep bottom-left corner fixed
+    }
+
+    /// Resizes the note using the right handle, keeping the left edge fixed.
+    fn resize_right(note: &mut StickyNote, delta_x: f64, _delta_y: f64, original_width: f64, original_height: f64) {
+        note.width = (original_width + delta_x).max(50.0);
+        note.height = original_height;
+    }
+
+    /// Resizes the note using the bottom-right handle, keeping the top-left corner fixed.
+    fn resize_bottom_right(note: &mut StickyNote, delta_x: f64, delta_y: f64, original_width: f64, original_height: f64) {
+        note.width = (original_width + delta_x).max(50.0);
+        note.height = (original_height + delta_y).max(40.0);
+    }
+
+    /// Resizes the note using the bottom handle, keeping the top edge fixed.
+    fn resize_bottom(note: &mut StickyNote, _delta_x: f64, delta_y: f64, original_width: f64, original_height: f64) {
+        note.width = original_width;
+        note.height = (original_height + delta_y).max(40.0);
+    }
+
+    /// Resizes the note using the bottom-left handle, keeping the top-right corner fixed.
+    fn resize_bottom_left(note: &mut StickyNote, delta_x: f64, delta_y: f64, original_width: f64, original_height: f64) {
+        let old_width = note.width;
+        note.width = (original_width - delta_x).max(50.0);
+        note.height = (original_height + delta_y).max(40.0);
+        note.x += old_width - note.width; // Move note to keep right edge fixed
+        // note.y stays fixed
+    }
+
+    /// Resizes the note using the left handle, keeping the right edge fixed.
+    fn resize_left(note: &mut StickyNote, delta_x: f64, _delta_y: f64, original_width: f64, original_height: f64) {
+        let old_width = note.width;
+        note.width = (original_width - delta_x).max(50.0);
+        note.height = original_height;
+        note.x += old_width - note.width; // Move note to keep right edge fixed
     }
 }
 
