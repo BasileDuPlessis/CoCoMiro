@@ -757,12 +757,102 @@ mod tests {
             600.0,
         );
 
-        // Width should stay the same
-        assert_eq!(state.notes[0].width, 200.0);
-        // Height should increase by 40px (from 150 to 190)
-        assert_eq!(state.notes[0].height, 190.0);
         // Position should stay the same (resize from center)
         assert_eq!(state.notes[0].x, 100.0);
         assert_eq!(state.notes[0].y, 100.0);
+    }
+
+    #[test]
+    fn resize_bottom_right_handle_keeps_top_left_corner_fixed() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag bottom-right handle 55px right and 35px down (delta_x = 55, delta_y = 35)
+        state.resize_to(
+            ResizeHandle::BottomRight,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            255.0, // current_mouse_x (55px delta)
+            235.0, // current_mouse_y (35px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should increase by 55px (from 200 to 255)
+        assert_eq!(state.notes[0].width, 255.0);
+        // Height should increase by 35px (from 150 to 185)
+        assert_eq!(state.notes[0].height, 185.0);
+        // Top-left corner should stay fixed at (100, 100)
+        // Position should stay the same (resize from top-left)
+        assert_eq!(state.notes[0].x, 100.0);
+        assert_eq!(state.notes[0].y, 100.0);
+    }
+
+    #[test]
+    fn resize_minimum_size_enforcement() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Try to resize below minimum size (width < 50, height < 40)
+        state.resize_to(
+            ResizeHandle::TopLeft,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            400.0, // current_mouse_x (large positive delta to shrink width)
+            400.0, // current_mouse_y (large positive delta to shrink height)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should be clamped to minimum 50.0
+        assert_eq!(state.notes[0].width, 50.0);
+        // Height should be clamped to minimum 40.0
+        assert_eq!(state.notes[0].height, 40.0);
+    }
+
+    #[test]
+    fn resize_with_no_selected_note_does_nothing() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0);
+        state.add_note(note);
+        // Note: selected_note_id is None
+
+        let viewport = ViewportState::default();
+        let original_width = state.notes[0].width;
+        let original_height = state.notes[0].height;
+
+        // Try to resize with no selected note
+        state.resize_to(
+            ResizeHandle::BottomRight,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            250.0, // current_mouse_x
+            230.0, // current_mouse_y
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Note should remain unchanged
+        assert_eq!(state.notes[0].width, original_width);
+        assert_eq!(state.notes[0].height, original_height);
     }
 }
