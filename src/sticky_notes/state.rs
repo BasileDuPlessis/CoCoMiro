@@ -390,9 +390,10 @@ impl StickyNotesState {
         original_width: f64,
         original_height: f64,
     ) {
+        let old_height = note.height;
         note.width = (original_width + delta_x).max(50.0);
         note.height = (original_height - delta_y).max(40.0);
-        note.y += delta_y; // Move note to keep bottom-left corner fixed
+        note.y += old_height - note.height; // Move note down to keep bottom-left corner fixed
     }
 
     /// Resizes the note using the right handle, keeping the left edge fixed.
