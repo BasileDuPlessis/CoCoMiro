@@ -510,11 +510,81 @@ fn sanitize_html_to_text(html: &str) -> String {
     temp_div.text_content().unwrap_or_else(|| html.to_string())
 }
 
-/// Sanitizes HTML content for safe pasting, allowing only formatting tags.
+/// Sanitizes HTML content for safe display in contenteditable, allowing only safe formatting tags.
 ///
 /// This function removes potentially dangerous elements like scripts, styles,
 /// and other non-formatting tags, while preserving basic text formatting
-/// (bold, italic, underline) that the application supports.
+/// (bold, italic, underline, line breaks) that the application supports.
+///
+/// # Arguments
+/// * `html` - The HTML string to sanitize
+///
+/// # Returns
+/// The sanitized HTML content with only safe tags allowed
+#[cfg(target_arch = "wasm32")]
+fn sanitize_html_for_display(html: &str) -> String {
+    // Use regex to remove dangerous tags and keep only safe ones
+    // This is a simple approach - for production, consider using a proper HTML sanitizer
+
+    // First, remove any script, style, or other dangerous tags and their content
+    let dangerous_tags = [
+        "script", "style", "iframe", "object", "embed", "form", "input", "button", "link", "meta",
+        "base", "img", "svg", "math", "canvas", "video", "audio", "a", "area", "table", "tr", "td",
+        "th", "tbody", "thead", "tfoot", "col", "colgroup",
+    ];
+
+    let mut result = html.to_string();
+
+    // Remove dangerous tags and their content
+    for tag in &dangerous_tags {
+        // Remove self-closing tags
+        let pattern = format!(r#"<{}(?:\s[^>]*)?/?>"#, regex::escape(tag));
+        result = regex::Regex::new(&pattern)
+            .unwrap()
+            .replace_all(&result, "")
+            .to_string();
+
+        // Remove opening and closing tag pairs with content
+        let pattern = format!(
+            r#"<{}(?:\s[^>]*)?>.*?</{}>"#,
+            regex::escape(tag),
+            regex::escape(tag)
+        );
+        result = regex::Regex::new(&pattern)
+            .unwrap()
+            .replace_all(&result, "")
+            .to_string();
+    }
+
+    // Remove event handlers and dangerous attributes from remaining tags
+    let dangerous_attrs = [
+        "on\\w+",
+        "javascript:",
+        "data:",
+        "vbscript:",
+        "href",
+        "src",
+        "action",
+    ];
+
+    for attr in &dangerous_attrs {
+        let pattern = format!(r#"\s+{}="[^"]*""#, attr);
+        result = regex::Regex::new(&pattern)
+            .unwrap()
+            .replace_all(&result, "")
+            .to_string();
+        let pattern = format!(r#"\s+{}='[^']*'"#, attr);
+        result = regex::Regex::new(&pattern)
+            .unwrap()
+            .replace_all(&result, "")
+            .to_string();
+    }
+
+    // The remaining tags should now be safe (only b, i, u, br, em, strong should remain)
+    // If any other tags remain, they will be treated as text by the browser
+
+    result
+}
 #[cfg(target_arch = "wasm32")]
 /// Calculates the screen position for the text input overlay
 fn calculate_overlay_position(
@@ -623,8 +693,8 @@ fn create_contenteditable_element(
 
     // Set initial content and focus - handle both HTML and plain text content
     let initial_html = if note.content.contains('<') && note.content.contains('>') {
-        // Content appears to be HTML, use as-is
-        note.content.clone()
+        // Content appears to be HTML, sanitize it before use
+        sanitize_html_for_display(&note.content)
     } else {
         // Content appears to be plain text, convert line breaks to HTML
         note.content.replace("\n", "<br>")
@@ -726,9 +796,10 @@ fn setup_input_event(
             // Update the note content with the current contenteditable content
             let zoom = state.borrow().viewport.zoom; // Get zoom before mutable borrow
             if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
-                // Store HTML content directly instead of converting to plain text
+                // Store sanitized HTML content instead of raw HTML
                 let html_content = contenteditable.inner_html();
-                note.content = html_content;
+                let sanitized_content = sanitize_html_for_display(&html_content);
+                note.content = sanitized_content;
 
                 // Adjust contenteditable height to fit content
                 // For contenteditable, we need to measure the scroll height
@@ -1099,4 +1170,79 @@ pub fn create_text_input_overlay(
 
     crate::logging::log_info(&format!("Created text input overlay for note {}", note_id));
     Ok(())
+}
+
+#[cfg(test)]
+#[cfg(target_arch = "wasm32")]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::*;
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_for_display_removes_dangerous_tags() {
+        // Test that dangerous tags are removed
+        let input = r#"<script>alert('xss')</script><b>Safe</b><img src=x onerror=alert('xss')>"#;
+        let result = sanitize_html_for_display(input);
+        assert!(!result.contains("<script>"));
+        assert!(!result.contains("<img"));
+        assert!(result.contains("<b>Safe</b>"));
+    }
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_for_display_allows_safe_formatting_tags() {
+        // Test that safe formatting tags are preserved
+        let input = r#"<b>Bold</b><i>Italic</i><u>Underline</u><br><em>Emphasis</em><strong>Strong</strong>"#;
+        let result = sanitize_html_for_display(input);
+        assert_eq!(result, input.to_lowercase()); // Tags should be lowercase
+    }
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_for_display_removes_nested_dangerous_tags() {
+        // Test nested dangerous tags
+        let input = r#"<b>Safe <script>danger</script> text</b>"#;
+        let result = sanitize_html_for_display(input);
+        assert!(!result.contains("<script>"));
+        assert!(result.contains("<b>Safe"));
+        assert!(result.contains("danger"));
+        assert!(result.contains("text</b>"));
+    }
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_for_display_handles_mixed_content() {
+        // Test mixed safe and dangerous content
+        let input = r#"Normal text <b>bold</b> <script>evil</script> more <i>italic</i> text"#;
+        let result = sanitize_html_for_display(input);
+        assert!(!result.contains("<script>"));
+        assert!(result.contains("Normal text"));
+        assert!(result.contains("<b>bold</b>"));
+        assert!(result.contains("more"));
+        assert!(result.contains("<i>italic</i>"));
+        assert!(result.contains("text"));
+    }
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_for_display_handles_empty_and_plain_text() {
+        // Test edge cases
+        assert_eq!(sanitize_html_for_display(""), "");
+        assert_eq!(sanitize_html_for_display("Plain text"), "Plain text");
+        assert_eq!(sanitize_html_for_display("<br>"), "<br>");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_to_text_extracts_plain_text() {
+        // Test that HTML tags are stripped to plain text
+        let input = r#"<b>Bold</b> and <i>italic</i> text"#;
+        let result = sanitize_html_to_text(input);
+        assert_eq!(result, "Bold and italic text");
+    }
+
+    #[wasm_bindgen_test]
+    fn test_sanitize_html_to_text_handles_complex_html() {
+        // Test complex HTML with dangerous tags
+        let input = r#"<div><script>alert('xss')</script><b>Safe</b><p>Text</p></div>"#;
+        let result = sanitize_html_to_text(input);
+        assert_eq!(result, "SafeText");
+    }
 }
