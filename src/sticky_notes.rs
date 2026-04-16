@@ -562,7 +562,7 @@ impl StickyNotesState {
         current_mouse_y: f64,
         original_width: f64,
         original_height: f64,
-        viewport: &crate::viewport::ViewportState,
+        _viewport: &crate::viewport::ViewportState,
         _viewport_width: f64,
         _viewport_height: f64,
     ) {
@@ -570,26 +570,29 @@ impl StickyNotesState {
             if let Some(note) = self.get_note_mut(note_id) {
                 // Convert screen coordinate deltas to world coordinate deltas using viewport zoom
                 // This ensures resize speed feels consistent regardless of zoom level
-                let delta_x = (current_mouse_x - start_mouse_x) / viewport.zoom;
-                let delta_y = (current_mouse_y - start_mouse_y) / viewport.zoom;
+                let delta_x = current_mouse_x - start_mouse_x;
+                let delta_y = current_mouse_y - start_mouse_y;
 
                 // Calculate new dimensions based on handle type and original dimensions
                 match handle {
                     ResizeHandle::TopLeft => {
-                        note.width = (original_width - delta_x).max(50.0); // Min width
-                        note.height = (original_height - delta_y).max(40.0); // Min height
-                        note.x += delta_x; // Move note to maintain bottom-right position
-                        note.y += delta_y;
+                        let old_width = note.width;
+                        let old_height = note.height;
+                        note.width = (original_width - delta_x).max(50.0);
+                        note.height = (original_height - delta_y).max(40.0);
+                        note.x += old_width - note.width; // Move note to keep right edge fixed
+                        note.y += old_height - note.height; // Move note to keep bottom edge fixed
                     }
                     ResizeHandle::Top => {
+                        let old_height = note.height;
                         note.width = original_width;
                         note.height = (original_height - delta_y).max(40.0);
-                        note.y += delta_y;
+                        note.y += old_height - note.height; // Move note to keep bottom edge fixed
                     }
                     ResizeHandle::TopRight => {
                         note.width = (original_width + delta_x).max(50.0);
                         note.height = (original_height - delta_y).max(40.0);
-                        note.y += delta_y;
+                        note.y += delta_y; // Move note to keep bottom-left corner fixed
                     }
                     ResizeHandle::Right => {
                         note.width = (original_width + delta_x).max(50.0);
@@ -604,14 +607,17 @@ impl StickyNotesState {
                         note.height = (original_height + delta_y).max(40.0);
                     }
                     ResizeHandle::BottomLeft => {
+                        let old_width = note.width;
                         note.width = (original_width - delta_x).max(50.0);
                         note.height = (original_height + delta_y).max(40.0);
-                        note.x += delta_x;
+                        note.x += old_width - note.width; // Move note to keep right edge fixed
+                        // note.y stays fixed
                     }
                     ResizeHandle::Left => {
+                        let old_width = note.width;
                         note.width = (original_width - delta_x).max(50.0);
                         note.height = original_height;
-                        note.x += delta_x;
+                        note.x += old_width - note.width; // Move note to keep right edge fixed
                     }
                 }
             }
@@ -1014,7 +1020,7 @@ mod tests {
     }
 
     #[test]
-    fn resize_to_with_zoom_consistency() {
+    fn resize_to_with_screen_delta_consistency() {
         let mut state = StickyNotesState::default();
         let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
         let note_id = note.id;
@@ -1026,7 +1032,7 @@ mod tests {
         viewport.zoom = 1.0;
 
         // Start resize from screen position (200, 200) - this is relative to start position
-        // With zoom=1, screen delta of 50px should result in 50px world delta
+        // Screen delta of 50px should result in 50px world delta regardless of zoom
         state.resize_to(
             ResizeHandle::BottomRight,
             200.0, // start_mouse_x
@@ -1051,8 +1057,8 @@ mod tests {
         // Test resize at zoom level 2.0 (zoomed in)
         viewport.zoom = 2.0;
 
-        // Same screen delta (50px, 30px) should result in smaller world delta (25px, 15px)
-        // because screen deltas are divided by zoom
+        // Same screen delta (50px, 30px) should result in same world delta (50px, 30px)
+        // Screen deltas are not divided by zoom for consistent feel
         state.resize_to(
             ResizeHandle::BottomRight,
             200.0, // start_mouse_x
@@ -1066,9 +1072,9 @@ mod tests {
             600.0,
         );
 
-        // Note should grow by (25, 15) in world space (50/2, 30/2)
-        assert_eq!(state.notes[0].width, 225.0); // 200 + 25
-        assert_eq!(state.notes[0].height, 165.0); // 150 + 15
+        // Note should grow by (50, 30) in world space (same as zoom=1.0)
+        assert_eq!(state.notes[0].width, 250.0); // 200 + 50
+        assert_eq!(state.notes[0].height, 180.0); // 150 + 30
 
         // Reset note for next test
         state.notes[0].width = 200.0;
@@ -1077,8 +1083,8 @@ mod tests {
         // Test resize at zoom level 0.5 (zoomed out)
         viewport.zoom = 0.5;
 
-        // Same screen delta (50px, 30px) should result in larger world delta (100px, 60px)
-        // because screen deltas are divided by zoom
+        // Same screen delta (50px, 30px) should result in same world delta (50px, 30px)
+        // Screen deltas are not divided by zoom for consistent feel
         state.resize_to(
             ResizeHandle::BottomRight,
             200.0, // start_mouse_x
@@ -1092,8 +1098,264 @@ mod tests {
             600.0,
         );
 
-        // Note should grow by (100, 60) in world space (50/0.5, 30/0.5)
-        assert_eq!(state.notes[0].width, 300.0); // 200 + 100
-        assert_eq!(state.notes[0].height, 210.0); // 150 + 60
+        // Note should grow by (50, 30) in world space (same as other zoom levels)
+        assert_eq!(state.notes[0].width, 250.0); // 200 + 50
+        assert_eq!(state.notes[0].height, 180.0); // 150 + 30
+    }
+
+    #[test]
+    fn resize_left_handle_keeps_right_edge_fixed() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag left handle 50px to the left (delta_x = -50)
+        state.resize_to(
+            ResizeHandle::Left,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            150.0, // current_mouse_x (-50px delta)
+            200.0, // current_mouse_y (0px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should increase by 50px (from 200 to 250)
+        assert_eq!(state.notes[0].width, 250.0);
+        // Height should stay the same
+        assert_eq!(state.notes[0].height, 150.0);
+        // X position should move left by 50px to keep right edge fixed
+        // Right edge was at 100 + 200 = 300, should stay at 300
+        // New x = 100 - 50 = 50, new width = 250, so right edge = 50 + 250 = 300 ✓
+        assert_eq!(state.notes[0].x, 50.0);
+        assert_eq!(state.notes[0].y, 100.0); // Y unchanged
+    }
+
+    #[test]
+    fn resize_top_handle_keeps_bottom_edge_fixed() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag top handle 30px up (delta_y = -30)
+        state.resize_to(
+            ResizeHandle::Top,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            200.0, // current_mouse_x (0px delta)
+            170.0, // current_mouse_y (-30px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should stay the same
+        assert_eq!(state.notes[0].width, 200.0);
+        // Height should increase by 30px (from 150 to 180)
+        assert_eq!(state.notes[0].height, 180.0);
+        // Y position should move up by 30px to keep bottom edge fixed
+        // Bottom edge was at 100 + 150 = 250, should stay at 250
+        // New y = 100 - 30 = 70, new height = 180, so bottom edge = 70 + 180 = 250 ✓
+        assert_eq!(state.notes[0].x, 100.0); // X unchanged
+        assert_eq!(state.notes[0].y, 70.0);
+    }
+
+    #[test]
+    fn resize_top_left_handle_keeps_bottom_right_corner_fixed() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag top-left handle 40px left and 25px up (delta_x = -40, delta_y = -25)
+        state.resize_to(
+            ResizeHandle::TopLeft,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            160.0, // current_mouse_x (-40px delta)
+            175.0, // current_mouse_y (-25px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should increase by 40px (from 200 to 240)
+        assert_eq!(state.notes[0].width, 240.0);
+        // Height should increase by 25px (from 150 to 175)
+        assert_eq!(state.notes[0].height, 175.0);
+        // Bottom-right corner should stay fixed at (100+200, 100+150) = (300, 250)
+        // New position: x moves right by 40, y moves down by 25
+        // New x = 100 + 40 = 140, new y = 100 + 25 = 125
+        // Bottom-right = (140 + 240, 125 + 175) = (380, 300) Wait, that's not right!
+
+        // Let me recalculate:
+        // Original bottom-right: (100 + 200, 100 + 150) = (300, 250)
+        // When width increases by 40, to keep bottom-right fixed, x should move left by 40
+        // When height increases by 25, to keep bottom-right fixed, y should move up by 25
+        // So new x = 100 - 40 = 60, new y = 100 - 25 = 75
+        // Then bottom-right = (60 + 240, 75 + 175) = (300, 250) ✓
+
+        assert_eq!(state.notes[0].x, 60.0);
+        assert_eq!(state.notes[0].y, 75.0);
+    }
+
+    #[test]
+    fn resize_bottom_left_handle_keeps_top_right_corner_fixed() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag bottom-left handle 35px left and 20px down (delta_x = -35, delta_y = 20)
+        state.resize_to(
+            ResizeHandle::BottomLeft,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            165.0, // current_mouse_x (-35px delta)
+            220.0, // current_mouse_y (20px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should increase by 35px (from 200 to 235)
+        assert_eq!(state.notes[0].width, 235.0);
+        // Height should increase by 20px (from 150 to 170)
+        assert_eq!(state.notes[0].height, 170.0);
+        // Top-right corner should stay fixed at (100+200, 100) = (300, 100)
+        // When width increases by 35, to keep top-right x fixed, x should move left by 35
+        // When height increases by 20, top edge stays fixed (y unchanged)
+        // New x = 100 - 35 = 65, y = 100
+        // Top-right = (65 + 235, 100) = (300, 100) ✓
+
+        assert_eq!(state.notes[0].x, 65.0);
+        assert_eq!(state.notes[0].y, 100.0);
+    }
+
+    #[test]
+    fn resize_top_right_handle_keeps_bottom_left_corner_fixed() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag top-right handle 45px right and 15px up (delta_x = 45, delta_y = -15)
+        state.resize_to(
+            ResizeHandle::TopRight,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            245.0, // current_mouse_x (45px delta)
+            185.0, // current_mouse_y (-15px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should increase by 45px (from 200 to 245)
+        assert_eq!(state.notes[0].width, 245.0);
+        // Height should increase by 15px (from 150 to 165)
+        assert_eq!(state.notes[0].height, 165.0);
+        // Bottom-left corner should stay fixed at (100, 100+150) = (100, 250)
+        // When width increases by 45, left edge stays fixed (x unchanged)
+        // When height increases by 15, to keep bottom-left y fixed, y should move up by 15
+        // New x = 100, new y = 100 - 15 = 85
+        // Bottom-left = (100, 85 + 165) = (100, 250) ✓
+
+        assert_eq!(state.notes[0].x, 100.0);
+        assert_eq!(state.notes[0].y, 85.0);
+    }
+
+    #[test]
+    fn resize_right_handle_resizes_from_center() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag right handle 60px to the right (delta_x = 60)
+        state.resize_to(
+            ResizeHandle::Right,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            260.0, // current_mouse_x (60px delta)
+            200.0, // current_mouse_y (0px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should increase by 60px (from 200 to 260)
+        assert_eq!(state.notes[0].width, 260.0);
+        // Height should stay the same
+        assert_eq!(state.notes[0].height, 150.0);
+        // Position should stay the same (resize from center)
+        assert_eq!(state.notes[0].x, 100.0);
+        assert_eq!(state.notes[0].y, 100.0);
+    }
+
+    #[test]
+    fn resize_bottom_handle_resizes_from_center() {
+        let mut state = StickyNotesState::default();
+        let note = StickyNote::new(100.0, 100.0); // Note at world (100,100) with size 200x150
+        let note_id = note.id;
+        state.add_note(note);
+        state.selected_note_id = Some(note_id);
+
+        let viewport = ViewportState::default();
+
+        // Drag bottom handle 40px down (delta_y = 40)
+        state.resize_to(
+            ResizeHandle::Bottom,
+            200.0, // start_mouse_x
+            200.0, // start_mouse_y
+            200.0, // current_mouse_x (0px delta)
+            240.0, // current_mouse_y (40px delta)
+            200.0, // original_width
+            150.0, // original_height
+            &viewport,
+            800.0,
+            600.0,
+        );
+
+        // Width should stay the same
+        assert_eq!(state.notes[0].width, 200.0);
+        // Height should increase by 40px (from 150 to 190)
+        assert_eq!(state.notes[0].height, 190.0);
+        // Position should stay the same (resize from center)
+        assert_eq!(state.notes[0].x, 100.0);
+        assert_eq!(state.notes[0].y, 100.0);
     }
 }

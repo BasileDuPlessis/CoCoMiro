@@ -48,7 +48,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 **Subtasks:**
 
-#### 1.8 Add Cursor Changes for Handles
+#### 1.8 ✅ Add Cursor Changes for Handles
 - Implement dynamic cursor changes when hovering over resize handles
 - Use appropriate cursors (nw-resize, n-resize, etc.) for each handle type
 - Update cursor in `update_canvas_attributes()`
@@ -57,6 +57,15 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Add cursor detection logic in mouse move handler
 - Map `ResizeHandle` variants to CSS cursor values
 - Update canvas style cursor property dynamically
+
+**Completed Changes:**
+- Removed `hovered_resize_handle` field from `AppState` to avoid RefCell double borrow issues
+- Updated `update_canvas_cursor()` to calculate hovered resize handle on demand instead of storing it
+- Fixed RefCell double borrow panic in `end_drag_if_needed()` by eliminating mutable state updates during event handling
+- Code compiles for both host and WebAssembly targets
+- All existing tests pass
+- Full WASM build succeeds
+- E2E resize handle test passes
 
 #### 1.9 Support Proportional Resizing (Shift Modifier)
 - Detect Shift key during resize operations
@@ -86,25 +95,6 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 - Map `ResizeHandle` variants to CSS cursor values
 - Update canvas style cursor property dynamically
 
-#### 1.9 Support Proportional Resizing (Shift Modifier)
-- Detect Shift key during resize operations
-- Maintain aspect ratio when Shift is held
-- Provide visual feedback for proportional mode
-
-**Implementation Details:**
-- Track Shift key state in resize operations
-- Calculate proportional dimensions using original aspect ratio
-- Add visual indicator (different cursor or handle styling) for proportional mode
-
-#### 1.10 Test Resize with Viewport Zoom and Pan
-- Verify resize handles work correctly at different zoom levels
-- Ensure handle positions update properly during pan operations
-- Test edge cases with extreme zoom levels
-
-**Implementation Details:**
-- Test handle hit detection at various zoom levels
-- Verify cursor changes work with viewport transformations
-- Ensure minimum size constraints scale appropriately with zoom
 
 ### 2. Add Persistence
 - Implement save/load functionality for sticky notes
