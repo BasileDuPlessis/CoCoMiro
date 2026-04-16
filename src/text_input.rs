@@ -683,8 +683,7 @@ fn setup_overlay_events(
         });
     on_keydown.forget();
 
-    // Add mousedown handlers to prevent blur from removing overlay
-    setup_mousedown_handlers(toolbar, color_picker)?;
+    // Mousedown handlers are now set up in setup_blur_event
 
     // Attach blur event listener for clicking outside
     let on_blur = setup_blur_event(contenteditable, toolbar, color_picker, document, note_id);
@@ -842,17 +841,27 @@ fn setup_keydown_event(
 }
 
 #[cfg(target_arch = "wasm32")]
-/// Sets up mousedown handlers to prevent overlay removal when toolbar is clicked
-fn setup_mousedown_handlers(
+/// Sets up the blur event listener for clicking outside the overlay
+fn setup_blur_event(
+    contenteditable: &web_sys::HtmlElement,
     toolbar: &web_sys::HtmlElement,
     color_picker: &web_sys::HtmlElement,
-) -> Result<(), JsValue> {
-    let toolbar_clicked = Rc::new(RefCell::new(false));
-    let toolbar_clicked_clone = toolbar_clicked.clone();
+    document: &web_sys::Document,
+    note_id: u32,
+) -> wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)> {
+    let document = document.clone();
+    let contenteditable = contenteditable.clone();
+    let toolbar = toolbar.clone();
+    let color_picker = color_picker.clone();
 
+    // Shared flag to track if toolbar/color picker was clicked
+    let overlay_clicked = Rc::new(RefCell::new(false));
+
+    // Set up mousedown handlers to track clicks on overlay elements
+    let overlay_clicked_clone = overlay_clicked.clone();
     let toolbar_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
         Box::new(move |_event: web_sys::Event| {
-            *toolbar_clicked_clone.borrow_mut() = true;
+            *overlay_clicked_clone.borrow_mut() = true;
         }),
     );
     toolbar
@@ -861,11 +870,10 @@ fn setup_mousedown_handlers(
             crate::logging::log_warn("Failed to attach toolbar mousedown event listener");
         });
 
-    // Also attach to color picker
-    let color_picker_clicked_clone = toolbar_clicked.clone();
+    let overlay_clicked_clone2 = overlay_clicked.clone();
     let color_picker_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
         Box::new(move |_event: web_sys::Event| {
-            *color_picker_clicked_clone.borrow_mut() = true;
+            *overlay_clicked_clone2.borrow_mut() = true;
         }),
     );
     color_picker
@@ -880,30 +888,15 @@ fn setup_mousedown_handlers(
     toolbar_mousedown.forget();
     color_picker_mousedown.forget();
 
-    Ok(())
-}
-
-#[cfg(target_arch = "wasm32")]
-/// Sets up the blur event listener for clicking outside the overlay
-fn setup_blur_event(
-    contenteditable: &web_sys::HtmlElement,
-    toolbar: &web_sys::HtmlElement,
-    color_picker: &web_sys::HtmlElement,
-    document: &web_sys::Document,
-    note_id: u32,
-) -> wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)> {
-    let document = document.clone();
-    let contenteditable = contenteditable.clone();
-    let toolbar = toolbar.clone();
-    let color_picker = color_picker.clone();
-
     wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |_event: web_sys::Event| {
-            // Check if toolbar was clicked (preventing overlay removal)
-            // Note: This is a simplified version - the original used a shared flag
-            // For the refactored version, we'll just confirm on blur
+            // Check if toolbar or color picker was clicked - if so, don't remove overlay
+            if *overlay_clicked.borrow() {
+                *overlay_clicked.borrow_mut() = false; // Reset flag
+                return; // Don't remove overlay
+            }
 
-            // Confirm changes when focus is lost
+            // Confirm changes when focus is lost (clicked outside)
             crate::logging::log_info(&format!(
                 "Text editing confirmed (blur) for note {}",
                 note_id
@@ -917,6 +910,29 @@ fn setup_blur_event(
             }
         },
     ))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn insert_sanitized_text(document: &web_sys::Document, text: &str) -> Result<(), JsValue> {
+    // Use document.execCommand to insert text
+    let exec_command_fn = js_sys::Function::from(
+        js_sys::Reflect::get(
+            document.as_ref(),
+            &wasm_bindgen::JsValue::from_str("execCommand"),
+        )
+        .unwrap(),
+    );
+
+    // Call execCommand("insertText", false, text)
+    let _ = exec_command_fn.call3(
+        document.as_ref(),
+        &wasm_bindgen::JsValue::from_str("insertText"),
+        &wasm_bindgen::JsValue::from_bool(false),
+        &wasm_bindgen::JsValue::from_str(text),
+    );
+
+    crate::logging::log_info("Pasted content sanitized and inserted");
+    Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -945,30 +961,6 @@ fn extract_clipboard_text(clipboard_data: &wasm_bindgen::JsValue) -> Result<Stri
     }
 
     Ok(String::new())
-}
-
-/// Inserts sanitized text into the contenteditable element
-#[cfg(target_arch = "wasm32")]
-fn insert_sanitized_text(document: &web_sys::Document, text: &str) -> Result<(), JsValue> {
-    // Use document.execCommand to insert text
-    let exec_command_fn = js_sys::Function::from(
-        js_sys::Reflect::get(
-            document.as_ref(),
-            &wasm_bindgen::JsValue::from_str("execCommand"),
-        )
-        .unwrap(),
-    );
-
-    // Call execCommand("insertText", false, text)
-    let _ = exec_command_fn.call3(
-        document.as_ref(),
-        &wasm_bindgen::JsValue::from_str("insertText"),
-        &wasm_bindgen::JsValue::from_bool(false),
-        &wasm_bindgen::JsValue::from_str(text),
-    );
-
-    crate::logging::log_info("Pasted content sanitized and inserted");
-    Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
