@@ -429,30 +429,13 @@ fn render_note_resize_handles(
 }
 
 #[cfg(target_arch = "wasm32")]
-/// Renders the text content of a sticky note with rich formatting and wrapping
-fn render_note_text_content(
+/// Parses text content into formatted lines with word wrapping
+fn parse_text_into_lines(
+    content: &str,
+    max_text_width: f64,
     ctx: &CanvasRenderingContext2d,
-    note: &crate::sticky_notes::StickyNote,
-    screen_x: f64,
-    screen_y: f64,
-    screen_width: f64,
-    _screen_height: f64,
-) -> crate::error::AppResult<()> {
-    if note.content.is_empty() {
-        return Ok(());
-    }
-
-    ctx.set_text_align("left");
-    ctx.set_text_baseline("top");
-    // Add some padding
-    let text_x = screen_x + 8.0;
-    let text_y = screen_y + 8.0;
-    let max_text_width = screen_width - 16.0; // Account for padding
-
-    // Parse the entire content for formatting
-    let formatted_segments = parse_formatted_text(&note.content);
-
-    // Process text with line breaks and wrapping while preserving formatting
+) -> crate::error::AppResult<Vec<Vec<TextSegment>>> {
+    let formatted_segments = parse_formatted_text(content);
     let mut all_lines = Vec::new();
     let mut current_line_segments = Vec::new();
     let mut current_line_width = 0.0;
@@ -479,7 +462,7 @@ fn render_note_text_content(
             let chars: Vec<char> = line_part.chars().collect();
             let mut current_word = String::new();
 
-            for (_char_idx, &ch) in chars.iter().enumerate() {
+            for &ch in &chars {
                 if ch.is_whitespace() {
                     // Finish current word if any
                     if !current_word.is_empty() {
@@ -490,25 +473,15 @@ fn render_note_text_content(
                             underline: segment.underline,
                         };
 
-                        // Calculate word width
-                        let font = format_font(&word_segment, 14.0);
-                        ctx.set_font(&font);
-                        let word_width = ctx.measure_text(&word_segment.text)?.width();
-
-                        // Check if adding this word would exceed line width
-                        if current_line_width + word_width <= max_text_width
-                            || current_line_segments.is_empty()
-                        {
-                            current_line_segments.push(word_segment);
-                            current_line_width += word_width;
-                        } else {
-                            // Start new line
-                            if !current_line_segments.is_empty() {
-                                all_lines.push(current_line_segments);
-                            }
-                            current_line_segments = vec![word_segment];
-                            current_line_width = word_width;
-                        }
+                        let word_width = measure_text_segment(ctx, &word_segment)?;
+                        try_add_word_to_line(
+                            &mut current_line_segments,
+                            &mut current_line_width,
+                            &mut all_lines,
+                            word_segment,
+                            word_width,
+                            max_text_width,
+                        )?;
                         current_word.clear();
                     }
 
@@ -520,22 +493,15 @@ fn render_note_text_content(
                         underline: segment.underline,
                     };
 
-                    ctx.set_font(&format_font(&space_segment, 14.0));
-                    let space_width = ctx.measure_text(&space_segment.text)?.width();
-
-                    if current_line_width + space_width <= max_text_width
-                        || current_line_segments.is_empty()
-                    {
-                        current_line_segments.push(space_segment);
-                        current_line_width += space_width;
-                    } else {
-                        // Start new line with space
-                        if !current_line_segments.is_empty() {
-                            all_lines.push(current_line_segments);
-                        }
-                        current_line_segments = vec![space_segment];
-                        current_line_width = space_width;
-                    }
+                    let space_width = measure_text_segment(ctx, &space_segment)?;
+                    try_add_word_to_line(
+                        &mut current_line_segments,
+                        &mut current_line_width,
+                        &mut all_lines,
+                        space_segment,
+                        space_width,
+                        max_text_width,
+                    )?;
                 } else {
                     current_word.push(ch);
                 }
@@ -550,25 +516,15 @@ fn render_note_text_content(
                     underline: segment.underline,
                 };
 
-                // Calculate word width
-                let font = format_font(&word_segment, 14.0);
-                ctx.set_font(&font);
-                let word_width = ctx.measure_text(&word_segment.text)?.width();
-
-                // Check if adding this word would exceed line width
-                if current_line_width + word_width <= max_text_width
-                    || current_line_segments.is_empty()
-                {
-                    current_line_segments.push(word_segment);
-                    current_line_width += word_width;
-                } else {
-                    // Start new line
-                    if !current_line_segments.is_empty() {
-                        all_lines.push(current_line_segments);
-                    }
-                    current_line_segments = vec![word_segment];
-                    current_line_width = word_width;
-                }
+                let word_width = measure_text_segment(ctx, &word_segment)?;
+                try_add_word_to_line(
+                    &mut current_line_segments,
+                    &mut current_line_width,
+                    &mut all_lines,
+                    word_segment,
+                    word_width,
+                    max_text_width,
+                )?;
             }
         }
     }
@@ -578,12 +534,58 @@ fn render_note_text_content(
         all_lines.push(current_line_segments);
     }
 
-    // Render all lines
+    Ok(all_lines)
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Measures the width of a text segment with its formatting
+fn measure_text_segment(
+    ctx: &CanvasRenderingContext2d,
+    segment: &TextSegment,
+) -> crate::error::AppResult<f64> {
+    let font = format_font(segment, 14.0);
+    ctx.set_font(&font);
+    Ok(ctx.measure_text(&segment.text)?.width())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Attempts to add a word to the current line, starting a new line if needed
+fn try_add_word_to_line(
+    current_line_segments: &mut Vec<TextSegment>,
+    current_line_width: &mut f64,
+    all_lines: &mut Vec<Vec<TextSegment>>,
+    segment: TextSegment,
+    segment_width: f64,
+    max_text_width: f64,
+) -> crate::error::AppResult<()> {
+    // Check if adding this segment would exceed line width
+    if *current_line_width + segment_width <= max_text_width || current_line_segments.is_empty() {
+        current_line_segments.push(segment);
+        *current_line_width += segment_width;
+    } else {
+        // Start new line
+        if !current_line_segments.is_empty() {
+            all_lines.push(std::mem::take(current_line_segments));
+        }
+        current_line_segments.push(segment);
+        *current_line_width = segment_width;
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Renders formatted text lines to the canvas
+fn render_text_lines(
+    ctx: &CanvasRenderingContext2d,
+    lines: &[Vec<TextSegment>],
+    text_x: f64,
+    text_y: f64,
+) -> crate::error::AppResult<()> {
     let mut y_offset = 0.0;
-    for line_segments in all_lines {
+    for line_segments in lines {
         let mut x_offset = 0.0;
         for segment in line_segments {
-            let font = format_font(&segment, 14.0);
+            let font = format_font(segment, 14.0);
             ctx.set_font(&font);
 
             // Set text decoration for underline
@@ -608,6 +610,35 @@ fn render_note_text_content(
         }
         y_offset += 18.0; // Line height
     }
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Renders the text content of a sticky note with rich formatting and wrapping
+fn render_note_text_content(
+    ctx: &CanvasRenderingContext2d,
+    note: &crate::sticky_notes::StickyNote,
+    screen_x: f64,
+    screen_y: f64,
+    screen_width: f64,
+    _screen_height: f64,
+) -> crate::error::AppResult<()> {
+    if note.content.is_empty() {
+        return Ok(());
+    }
+
+    ctx.set_text_align("left");
+    ctx.set_text_baseline("top");
+    // Add some padding
+    let text_x = screen_x + 8.0;
+    let text_y = screen_y + 8.0;
+    let max_text_width = screen_width - 16.0; // Account for padding
+
+    // Parse text into formatted lines with wrapping
+    let lines = parse_text_into_lines(&note.content, max_text_width, ctx)?;
+
+    // Render the formatted lines
+    render_text_lines(ctx, &lines, text_x, text_y)?;
 
     Ok(())
 }

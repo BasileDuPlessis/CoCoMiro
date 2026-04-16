@@ -250,6 +250,10 @@ impl HomePageSession {
     fn assert_resize_handle_click_and_drag_works(&self) -> TestResult {
         assert_resize_handle_click_and_drag_works(self.tab())
     }
+
+    fn assert_sticky_note_color_picker_behavior(&self) -> TestResult {
+        assert_sticky_note_color_picker_behavior(self.tab())
+    }
 }
 
 fn attribute_as_f64(element: &Element<'_>, name: &str) -> TestResult<f64> {
@@ -1166,6 +1170,361 @@ fn resize_handle_click_and_drag_resizes_note() -> TestResult {
     session.assert_starts_clean()?;
     session.assert_toolbar_is_visible()?;
     session.assert_resize_handle_click_and_drag_works()?;
+
+    Ok(())
+}
+
+fn assert_sticky_note_color_picker_behavior(tab: &Tab) -> TestResult {
+    let canvas = ready_canvas(tab)?;
+    let bounds = canvas.get_box_model()?.margin_viewport();
+    let center_x = bounds.x + bounds.width / 2.0;
+    let center_y = bounds.y + bounds.height / 2.0;
+
+    // Create a note first
+    click_add_note_button(tab)?;
+    thread::sleep(Duration::from_millis(200));
+
+    // 1. Double-click note → Text editing starts, toolbar appears
+    let dblclick_script = format!(
+        r#"
+        (function() {{
+            const canvas = document.querySelector('#infinite-canvas');
+            if (canvas) {{
+                const event = new MouseEvent('dblclick', {{
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: {0},
+                    clientY: {1}
+                }});
+                canvas.dispatchEvent(event);
+            }}
+        }})()
+        "#,
+        center_x, center_y
+    );
+
+    tab.evaluate(&dblclick_script, false)?;
+    thread::sleep(Duration::from_millis(500));
+
+    // Verify text editing toolbar is visible
+    let text_toolbar_exists = tab.find_element(".text-input-toolbar").is_ok();
+    assert!(
+        text_toolbar_exists,
+        "Text editing toolbar should be visible after double-clicking note"
+    );
+
+    // Verify contenteditable exists
+    let contenteditable_exists = tab.find_element("div[contenteditable='true']").is_ok();
+    assert!(
+        contenteditable_exists,
+        "Contenteditable element should exist in edit mode"
+    );
+
+    // 2. Click color button → Color picker opens
+    let color_button = tab.find_element(".formatting-button--color")?;
+    println!("Found color button, clicking...");
+    color_button.click()?;
+    println!("Clicked color button, waiting...");
+    thread::sleep(Duration::from_millis(1000)); // Increased wait time significantly
+
+    // Debug: Check if color picker exists
+    let color_picker_result = tab.find_element(".color-picker");
+    match color_picker_result {
+        Ok(picker) => {
+            let style = picker
+                .get_attribute_value("style")
+                .unwrap_or_default()
+                .unwrap_or_default();
+            println!("Color picker found with style: {:?}", style);
+            assert!(
+                style.contains("display: flex"),
+                "Color picker should have display: flex, but style is: {:?}",
+                style
+            );
+        }
+        Err(_) => {
+            println!("Color picker not found, checking all elements...");
+            // Check if any elements exist at all
+            let all_elements = tab.find_elements("*")?;
+            println!("Total elements found: {}", all_elements.len());
+
+            // Check for any elements with color-related classes
+            let color_elements: Vec<_> = all_elements
+                .into_iter()
+                .filter(|el| {
+                    let class = el
+                        .get_attribute_value("class")
+                        .unwrap_or_default()
+                        .unwrap_or_default();
+                    class.contains("color") || class.contains("picker")
+                })
+                .collect();
+            println!(
+                "Elements with color/picker classes: {}",
+                color_elements.len()
+            );
+            for el in &color_elements {
+                let class = el
+                    .get_attribute_value("class")
+                    .unwrap_or_default()
+                    .unwrap_or_default();
+                println!("  Element class: {}", class);
+            }
+
+            panic!("Color picker not found after clicking color button");
+        }
+    }
+
+    // 3. Select color → Color changes, color picker disappears (toolbar stays)
+    // Click on the first color option (yellow)
+    let color_options = tab.find_elements(".color-picker-option")?;
+    println!("Found {} color options", color_options.len());
+    assert!(
+        !color_options.is_empty(),
+        "Color picker should have color options"
+    );
+
+    color_options[0].click()?; // Click first color (yellow)
+    println!("Clicked first color option, waiting...");
+    thread::sleep(Duration::from_millis(200));
+
+    // Verify color picker is hidden
+    println!("Checking if color picker is hidden...");
+    let color_picker_element = tab.find_element(".color-picker")?;
+    let display_style = color_picker_element.get_attribute_value("style")?;
+    println!("Color picker style after click: {:?}", display_style);
+    let is_hidden = display_style.map_or(false, |style| style.contains("display: none"));
+    assert!(
+        is_hidden,
+        "Color picker should be hidden (display: none) after selecting color"
+    );
+
+    // Verify toolbar is still visible
+    println!("Checking if toolbar is still visible...");
+    let text_toolbar_still_visible = tab.find_element(".text-input-toolbar");
+    match text_toolbar_still_visible {
+        Ok(_) => println!("Toolbar found successfully"),
+        Err(_) => {
+            println!("Toolbar not found, checking all elements...");
+            let all_elements = tab.find_elements("*")?;
+            println!("Total elements: {}", all_elements.len());
+
+            // Check for toolbar-like elements
+            let toolbar_elements: Vec<_> = all_elements
+                .into_iter()
+                .filter(|el| {
+                    let class = el
+                        .get_attribute_value("class")
+                        .unwrap_or_default()
+                        .unwrap_or_default();
+                    class.contains("toolbar")
+                        || class.contains("formatting")
+                        || class.contains("button")
+                })
+                .collect();
+            println!(
+                "Elements with toolbar/formatting/button classes: {}",
+                toolbar_elements.len()
+            );
+            for el in &toolbar_elements {
+                let class = el
+                    .get_attribute_value("class")
+                    .unwrap_or_default()
+                    .unwrap_or_default();
+                println!("  Element with class: {}", class);
+            }
+
+            panic!("Text editing toolbar not found after selecting color");
+        }
+    }
+    assert!(
+        text_toolbar_still_visible.is_ok(),
+        "Text editing toolbar should still be visible after selecting color"
+    );
+
+    // 4. Continue typing → Clean interface with text area visible + toolbar
+    // (Already verified above)
+
+    // 5. Click color button → Color picker opens
+    println!("Looking for color button again...");
+    let color_button_again = tab.find_element(".formatting-button--color")?;
+    println!("Found color button again, clicking...");
+    color_button_again.click()?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Verify color picker opens again
+    println!("Checking if color picker opens again...");
+    let color_picker_visible_again = tab.find_element(".color-picker");
+    match color_picker_visible_again {
+        Ok(picker) => {
+            let style = picker
+                .get_attribute_value("style")
+                .unwrap_or_default()
+                .unwrap_or_default();
+            println!("Color picker found again with style: {:?}", style);
+            assert!(
+                style.contains("display: flex"),
+                "Color picker should be visible again"
+            );
+        }
+        Err(_) => {
+            println!("Color picker not found again, checking all elements...");
+            let all_elements = tab.find_elements("*")?;
+            let picker_elements: Vec<_> = all_elements
+                .into_iter()
+                .filter(|el| {
+                    let class = el
+                        .get_attribute_value("class")
+                        .unwrap_or_default()
+                        .unwrap_or_default();
+                    class.contains("color-picker")
+                })
+                .collect();
+            println!(
+                "Elements with color-picker class: {}",
+                picker_elements.len()
+            );
+            panic!("Color picker should open again when clicking color button");
+        }
+    }
+
+    // 6. Select color → Color changes, color picker disappears (toolbar stays)
+    println!("Looking for color options again...");
+    let color_options_again = tab.find_elements(".color-picker-option")?;
+    println!("Found {} color options again", color_options_again.len());
+    assert!(
+        !color_options_again.is_empty(),
+        "Color picker should still have color options"
+    );
+
+    // Click a different color (second option, light blue)
+    println!("Clicking second color option...");
+    color_options_again[1].click()?;
+    println!("Clicked second color option, waiting...");
+    thread::sleep(Duration::from_millis(200));
+
+    // Verify color picker is hidden again
+    println!("Checking if color picker is hidden again...");
+    let color_picker_result_again = tab.find_element(".color-picker");
+    match color_picker_result_again {
+        Ok(picker) => {
+            let display_style_again = picker.get_attribute_value("style")?;
+            println!(
+                "Color picker style after second click: {:?}",
+                display_style_again
+            );
+            let is_hidden_again =
+                display_style_again.map_or(false, |style| style.contains("display: none"));
+            assert!(
+                is_hidden_again,
+                "Color picker should be hidden again after selecting second color"
+            );
+        }
+        Err(_) => {
+            println!("Color picker not found after second click, checking all elements...");
+            let all_elements = tab.find_elements("*")?;
+            let picker_elements: Vec<_> = all_elements
+                .into_iter()
+                .filter(|el| {
+                    let class = el
+                        .get_attribute_value("class")
+                        .unwrap_or_default()
+                        .unwrap_or_default();
+                    class.contains("color-picker")
+                })
+                .collect();
+            println!(
+                "Elements with color-picker class: {}",
+                picker_elements.len()
+            );
+            panic!("Color picker should still exist after selecting second color");
+        }
+    }
+
+    // Verify toolbar is still visible
+    let text_toolbar_still_visible_after_second = tab.find_element(".text-input-toolbar").is_ok();
+    assert!(
+        text_toolbar_still_visible_after_second,
+        "Text editing toolbar should still be visible after selecting second color"
+    );
+
+    // 7. Change text (simulate typing)
+    let contenteditable = tab.find_element("div[contenteditable='true']")?;
+    contenteditable.click()?;
+    thread::sleep(Duration::from_millis(100)); // Ensure focus
+
+    // Type some text using keyboard events
+    tab.call_method(Input::DispatchKeyEvent {
+        Type: Input::DispatchKeyEventTypeOption::KeyDown,
+        modifiers: None,
+        timestamp: None,
+        text: Some("H".to_string()),
+        unmodified_text: Some("H".to_string()),
+        key_identifier: None,
+        code: Some("KeyH".to_string()),
+        key: Some("H".to_string()),
+        windows_virtual_key_code: None,
+        native_virtual_key_code: None,
+        auto_repeat: None,
+        is_keypad: None,
+        is_system_key: None,
+        location: None,
+        commands: None,
+    })?;
+    thread::sleep(Duration::from_millis(100));
+
+    // 8. Press Enter → Editing session ends completely
+    println!("Sending Enter key...");
+    tab.call_method(Input::DispatchKeyEvent {
+        Type: Input::DispatchKeyEventTypeOption::KeyDown,
+        modifiers: None,
+        timestamp: None,
+        text: Some("\r".to_string()),
+        unmodified_text: Some("\r".to_string()),
+        key_identifier: None,
+        code: Some("Enter".to_string()),
+        key: Some("Enter".to_string()),
+        windows_virtual_key_code: None,
+        native_virtual_key_code: None,
+        auto_repeat: None,
+        is_keypad: None,
+        is_system_key: None,
+        location: None,
+        commands: None,
+    })?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Verify editing session has ended
+    println!("Checking if toolbar is hidden...");
+    let text_toolbar_hidden = tab.find_element(".text-input-toolbar");
+    if text_toolbar_hidden.is_ok() {
+        println!("Toolbar still visible after Ctrl+Enter");
+    }
+    assert!(
+        text_toolbar_hidden.is_err(),
+        "Text editing toolbar should be hidden after pressing Ctrl+Enter"
+    );
+
+    let contenteditable_hidden = tab.find_element("div[contenteditable='true']").is_err();
+    assert!(
+        contenteditable_hidden,
+        "Contenteditable element should be hidden after pressing Enter"
+    );
+
+    // Verify canvas is still functional
+    let _ = pan_coordinates(&canvas)?;
+
+    Ok(())
+}
+
+#[test]
+#[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_home -- --ignored`"]
+fn sticky_note_color_picker_behavior() -> TestResult {
+    let session = HomePageSession::launch()?;
+
+    session.assert_starts_clean()?;
+    session.assert_toolbar_is_visible()?;
+    assert_sticky_note_color_picker_behavior(session.tab())?;
 
     Ok(())
 }
