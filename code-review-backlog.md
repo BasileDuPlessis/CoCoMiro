@@ -47,24 +47,24 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [x] Track and drop formatting button closures on overlay destruction
 - [x] Add memory leak tests or monitoring
 
-### 4. Remove Duplicate #[cfg] Attributes
+### 4. ✅ Remove Duplicate #[cfg] Attributes
 **Severity:** High
 **Files:** `src/lib.rs`, `src/canvas.rs`
 **Issue:** Duplicate `#[cfg(target_arch = "wasm32")]` attributes on functions.
 
 **Subtasks:**
-- [ ] Remove duplicate `#[cfg(target_arch = "wasm32")]` from `start_impl()` in `src/lib.rs`
-- [ ] Remove duplicate `#[cfg(target_arch = "wasm32")]` from render functions in `src/canvas.rs`
-- [ ] Verify compilation still works for both targets
+- [x] Remove duplicate `#[cfg(target_arch = "wasm32")]` from `start_impl()` in `src/lib.rs`
+- [x] Remove duplicate `#[cfg(target_arch = "wasm32")]` from render functions in `src/canvas.rs`
+- [x] Verify compilation still works for both targets
 
-### 5. Fix AppResult Type Availability
+### 5. ✅ Fix AppResult Type Availability
 **Severity:** High
 **Files:** `src/error.rs`
 **Issue:** `AppResult` type alias is only available on WASM target despite `AppError` being available everywhere.
 
 **Subtasks:**
-- [ ] Remove `#[cfg(target_arch = "wasm32")]` gate from `AppResult` type alias
-- [ ] Verify host compilation still works
+- [x] Remove `#[cfg(target_arch = "wasm32")]` gate from `AppResult` type alias
+- [x] Verify host compilation still works
 
 ### 6. Refactor resize_to Function Signature
 **Severity:** High

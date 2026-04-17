@@ -381,7 +381,6 @@ fn setup_window_resize_handler(
 }
 
 #[cfg(target_arch = "wasm32")]
-#[cfg(target_arch = "wasm32")]
 fn start_impl() -> crate::error::AppResult<()> {
     let browser_window = window()
         .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
