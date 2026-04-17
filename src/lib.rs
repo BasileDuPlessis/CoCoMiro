@@ -58,7 +58,7 @@ pub mod viewport;
 /// This struct holds the complete state of the CoCoMiro application,
 /// including viewport settings and sticky note data. It's used for
 /// both testing and WebAssembly execution.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AppState {
     /// Current viewport state (pan, zoom, drag status)
     pub viewport: viewport::ViewportState,
@@ -72,6 +72,23 @@ pub struct AppState {
     pub resizing: sticky_notes::ResizingState,
     // /// Currently hovered resize handle (note_id, handle)
     // pub hovered_resize_handle: Option<(u32, sticky_notes::ResizeHandle)>,
+    /// Text input overlay closures (WASM only)
+    #[cfg(target_arch = "wasm32")]
+    pub text_input_overlay_closures: Option<crate::text_input::TextInputOverlayClosures>,
+}
+
+impl Clone for AppState {
+    fn clone(&self) -> Self {
+        Self {
+            viewport: self.viewport.clone(),
+            sticky_notes: self.sticky_notes.clone(),
+            mouse_x: self.mouse_x,
+            mouse_y: self.mouse_y,
+            resizing: self.resizing.clone(),
+            #[cfg(target_arch = "wasm32")]
+            text_input_overlay_closures: None, // Don't clone closures
+        }
+    }
 }
 
 impl Default for AppState {
@@ -83,6 +100,8 @@ impl Default for AppState {
             mouse_y: 0.0,
             resizing: sticky_notes::ResizingState::default(),
             // hovered_resize_handle: None,
+            #[cfg(target_arch = "wasm32")]
+            text_input_overlay_closures: None,
         }
     }
 }

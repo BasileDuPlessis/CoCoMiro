@@ -15,6 +15,57 @@ use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 
+/// Struct to hold all closures for the text input overlay to prevent memory leaks.
+/// When this struct is dropped, all closures are properly cleaned up.
+#[cfg(target_arch = "wasm32")]
+#[derive(Default)]
+pub struct TextInputOverlayClosures {
+    /// Input event closure for text changes
+    pub input_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Keydown event closure for Enter/Escape handling
+    pub keydown_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::KeyboardEvent)>>,
+    /// Blur event closure for clicking outside
+    pub blur_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Paste event closure for sanitizing pasted content
+    pub paste_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Bold button click closure
+    pub bold_button_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Italic button click closure
+    pub italic_button_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Underline button click closure
+    pub underline_button_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Color button click closure
+    pub color_button_closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+    /// Color option click closures (one per color)
+    pub color_option_closures: Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl std::fmt::Debug for TextInputOverlayClosures {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TextInputOverlayClosures")
+            .field("input_closure", &self.input_closure.is_some())
+            .field("keydown_closure", &self.keydown_closure.is_some())
+            .field("blur_closure", &self.blur_closure.is_some())
+            .field("paste_closure", &self.paste_closure.is_some())
+            .field("bold_button_closure", &self.bold_button_closure.is_some())
+            .field(
+                "italic_button_closure",
+                &self.italic_button_closure.is_some(),
+            )
+            .field(
+                "underline_button_closure",
+                &self.underline_button_closure.is_some(),
+            )
+            .field("color_button_closure", &self.color_button_closure.is_some())
+            .field(
+                "color_option_closures_count",
+                &self.color_option_closures.len(),
+            )
+            .finish()
+    }
+}
+
 /// Creates a formatting button with specified properties
 #[cfg(target_arch = "wasm32")]
 fn create_formatting_button(
@@ -91,8 +142,15 @@ fn add_buttons_to_toolbar(
     document: &web_sys::Document,
     toolbar: &web_sys::HtmlElement,
     contenteditable: &web_sys::HtmlElement,
-    current_color: &str,
-) -> Result<web_sys::Element, JsValue> {
+) -> Result<
+    (
+        web_sys::Element,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+    ),
+    JsValue,
+> {
     // Create buttons
     let bold_button = create_formatting_button(
         document,
@@ -118,7 +176,7 @@ fn add_buttons_to_toolbar(
         "formatting-button formatting-button--underline",
     )?;
 
-    let color_button = create_color_button(document, current_color)?;
+    let color_button = create_color_button(document, "#FFFF88")?; // Default color
 
     // Add buttons to toolbar
     let _ = toolbar.append_child(&bold_button);
@@ -127,11 +185,17 @@ fn add_buttons_to_toolbar(
     let _ = toolbar.append_child(&color_button);
 
     // Add click handlers for formatting buttons
-    add_formatting_handler(&bold_button, "bold", contenteditable)?;
-    add_formatting_handler(&italic_button, "italic", contenteditable)?;
-    add_formatting_handler(&underline_button, "underline", contenteditable)?;
+    let bold_closure = add_formatting_handler(&bold_button, "bold", contenteditable)?;
+    let italic_closure = add_formatting_handler(&italic_button, "italic", contenteditable)?;
+    let underline_closure =
+        add_formatting_handler(&underline_button, "underline", contenteditable)?;
 
-    Ok(color_button)
+    Ok((
+        color_button,
+        bold_closure,
+        italic_closure,
+        underline_closure,
+    ))
 }
 
 /// Creates a formatting toolbar positioned above the text input overlay.
@@ -153,7 +217,7 @@ fn add_buttons_to_toolbar(
 /// * `current_color` - Current background color of the note
 ///
 /// # Returns
-/// A tuple containing the created toolbar HTML element and the color picker element
+/// A tuple containing the created toolbar HTML element, the color picker element, and all the formatting button closures
 #[cfg(target_arch = "wasm32")]
 fn create_formatting_toolbar(
     document: &web_sys::Document,
@@ -165,15 +229,27 @@ fn create_formatting_toolbar(
     note_id: u32,
     render: &Rc<dyn Fn()>,
     current_color: &str,
-) -> Result<(web_sys::HtmlElement, web_sys::HtmlElement), JsValue> {
+) -> Result<
+    (
+        web_sys::HtmlElement,
+        web_sys::HtmlElement,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+    ),
+    JsValue,
+> {
     // Create toolbar container
     let toolbar = create_toolbar_container(document, overlay_left, overlay_top, screen_width)?;
 
-    // Add buttons to toolbar and get color button
-    let color_button = add_buttons_to_toolbar(document, &toolbar, contenteditable, current_color)?;
+    // Add buttons to toolbar and get color button and closures
+    let (color_button, bold_closure, italic_closure, underline_closure) =
+        add_buttons_to_toolbar(document, &toolbar, contenteditable)?;
 
     // Create and add color picker
-    let color_picker = add_color_picker_handler(
+    let (color_picker, color_option_closures, color_button_closure) = add_color_picker_handler(
         &color_button,
         document,
         contenteditable,
@@ -185,7 +261,61 @@ fn create_formatting_toolbar(
         current_color,
     )?;
 
-    Ok((toolbar, color_picker))
+    Ok((
+        toolbar,
+        color_picker,
+        bold_closure,
+        italic_closure,
+        underline_closure,
+        color_option_closures,
+        color_button_closure,
+    ))
+}
+
+/// Applies text formatting using modern Selection/Range APIs instead of deprecated execCommand
+#[cfg(target_arch = "wasm32")]
+fn apply_text_formatting(
+    contenteditable: &web_sys::HtmlElement,
+    format_type: &str,
+) -> Result<(), JsValue> {
+    let document = contenteditable.owner_document().unwrap();
+    let selection = document.get_selection().unwrap().unwrap();
+    let range = selection.get_range_at(0).unwrap();
+
+    // Get the selected text
+    let selected_text = range.clone().to_string().as_string().unwrap_or_default();
+
+    // Determine the tag based on format type
+    let tag = match format_type {
+        "bold" => "b",
+        "italic" => "i",
+        "underline" => "u",
+        _ => return Err(JsValue::from_str("Unsupported format type")),
+    };
+
+    // Create the formatted HTML
+    let formatted_html = if selected_text.is_empty() {
+        // No selection - insert empty tag at cursor
+        format!("<{}></{}>", tag, tag)
+    } else {
+        // Wrap selected text with tag
+        format!("<{}>{}</{}>", tag, selected_text, tag)
+    };
+
+    // Delete the current selection and insert the formatted text
+    let _ = range.delete_contents();
+    let fragment = document.create_document_fragment();
+    let temp_div = document.create_element("div")?;
+    temp_div.set_inner_html(&formatted_html);
+    while let Some(child) = temp_div.first_child() {
+        fragment.append_child(&child)?;
+    }
+    range.insert_node(&fragment)?;
+
+    // Restore focus to contenteditable
+    let _ = contenteditable.focus();
+
+    Ok(())
 }
 
 /// Adds a click handler to a formatting button.
@@ -194,12 +324,15 @@ fn create_formatting_toolbar(
 /// * `button` - The button element to add handler to
 /// * `format_type` - The type of formatting ("bold", "italic", "underline")
 /// * `contenteditable` - The contenteditable element to apply formatting to
+///
+/// # Returns
+/// The created closure that was attached to the button
 #[cfg(target_arch = "wasm32")]
 fn add_formatting_handler(
     button: &web_sys::Element,
     format_type: &str,
     contenteditable: &web_sys::HtmlElement,
-) -> Result<(), JsValue> {
+) -> Result<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>, JsValue> {
     let contenteditable = contenteditable.clone();
     let format_type = format_type.to_string();
 
@@ -208,29 +341,20 @@ fn add_formatting_handler(
             event.prevent_default();
             event.stop_propagation();
 
-            // Get the document to execute formatting commands
-            let document = contenteditable.owner_document().unwrap();
-
-            // Apply formatting using document.execCommand()
-            let document_js = document.as_ref();
-            let command = wasm_bindgen::JsValue::from_str(format_type.as_str());
-            let exec_command_fn = js_sys::Function::from(
-                js_sys::Reflect::get(document_js, &wasm_bindgen::JsValue::from_str("execCommand"))
-                    .unwrap(),
-            );
-            let success = exec_command_fn
-                .call1(document_js, &command)
-                .ok()
-                .and_then(|val| val.as_bool())
-                .unwrap_or(false);
-
-            if success {
-                crate::logging::log_info(&format!(
-                    "Successfully applied {} formatting",
-                    format_type
-                ));
-            } else {
-                crate::logging::log_warn(&format!("Failed to apply {} formatting", format_type));
+            // Apply formatting using modern Selection/Range APIs
+            match apply_text_formatting(&contenteditable, &format_type) {
+                Ok(_) => {
+                    crate::logging::log_info(&format!(
+                        "Successfully applied {} formatting",
+                        format_type
+                    ));
+                }
+                Err(e) => {
+                    crate::logging::log_warn(&format!(
+                        "Failed to apply {} formatting: {:?}",
+                        format_type, e
+                    ));
+                }
             }
 
             // Focus the contenteditable to keep it active
@@ -242,8 +366,8 @@ fn add_formatting_handler(
         .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
         .map_err(|_| JsValue::from_str("Failed to add click event listener"))?;
 
-    closure.forget();
-    Ok(())
+    // Return the closure instead of forgetting it
+    Ok(closure)
 }
 
 /// Creates the color picker dropdown container
@@ -285,7 +409,7 @@ fn get_available_colors() -> Vec<(&'static str, &'static str)> {
     vec![
         ("#ffff88", "Yellow"),
         ("#add8e6", "Light Blue"),
-        ("#ffb6c1", "Light Red"),
+        ("#ff6b6b", "Red"),
         ("#ffb6d9", "Light Pink"),
         ("#d3d3d3", "Light Grey"),
     ]
@@ -331,8 +455,9 @@ fn add_color_options_to_picker(
     render: &Rc<dyn Fn()>,
     contenteditable: &web_sys::HtmlElement,
     color_button: &web_sys::Element,
-) -> Result<(), JsValue> {
+) -> Result<Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>, JsValue> {
     let colors = get_available_colors();
+    let mut closures = Vec::new();
 
     for (color_hex, color_name) in colors {
         let color_option = create_color_option(document, color_hex, color_name)?;
@@ -384,13 +509,13 @@ fn add_color_options_to_picker(
             .add_event_listener_with_callback("click", color_closure.as_ref().unchecked_ref())
             .map_err(|_| JsValue::from_str("Failed to add color click event listener"))?;
 
-        color_closure.forget();
+        closures.push(color_closure);
 
         // Add to color picker
         let _ = color_picker.append_child(&color_option);
     }
 
-    Ok(())
+    Ok(closures)
 }
 
 /// Sets up the click handler for the color button to show/hide the color picker
@@ -399,7 +524,7 @@ fn setup_color_button_handler(
     color_button: &web_sys::Element,
     color_picker: &web_sys::HtmlElement,
     contenteditable: &web_sys::HtmlElement,
-) -> Result<(), JsValue> {
+) -> Result<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>, JsValue> {
     let color_picker_clone = color_picker.clone();
     let contenteditable_clone = contenteditable.clone();
 
@@ -420,9 +545,7 @@ fn setup_color_button_handler(
         .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
         .map_err(|_| JsValue::from_str("Failed to add color button click event listener"))?;
 
-    closure.forget();
-
-    Ok(())
+    Ok(closure)
 }
 
 /// Adds a click handler to the color button that shows/hides a color picker.
@@ -439,7 +562,7 @@ fn setup_color_button_handler(
 /// * `current_color` - Current background color of the note
 ///
 /// # Returns
-/// The created color picker element
+/// The created color picker element and the color button closure
 #[cfg(target_arch = "wasm32")]
 fn add_color_picker_handler(
     color_button: &web_sys::Element,
@@ -451,12 +574,19 @@ fn add_color_picker_handler(
     overlay_left: f64,
     overlay_top: f64,
     _current_color: &str,
-) -> Result<web_sys::HtmlElement, JsValue> {
+) -> Result<
+    (
+        web_sys::HtmlElement,
+        Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+    ),
+    JsValue,
+> {
     // Create color picker container
     let color_picker = create_color_picker_container(document, overlay_left, overlay_top)?;
 
     // Add color options to the picker
-    add_color_options_to_picker(
+    let color_option_closures = add_color_options_to_picker(
         document,
         &color_picker,
         state,
@@ -473,9 +603,10 @@ fn add_color_picker_handler(
     let _ = body.append_child(&color_picker);
 
     // Set up color button handler
-    setup_color_button_handler(color_button, &color_picker, contenteditable)?;
+    let color_button_closure =
+        setup_color_button_handler(color_button, &color_picker, contenteditable)?;
 
-    Ok(color_picker)
+    Ok((color_picker, color_option_closures, color_button_closure))
 }
 
 /// Sanitizes HTML content by extracting only plain text content.
@@ -653,6 +784,11 @@ fn create_contenteditable_element(
         web_sys::HtmlElement,
         web_sys::HtmlElement,
         web_sys::HtmlElement,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
     ),
     JsValue,
 > {
@@ -669,7 +805,15 @@ fn create_contenteditable_element(
     contenteditable.set_attribute("contenteditable", "true")?;
 
     // Create formatting toolbar
-    let (toolbar, color_picker) = create_formatting_toolbar(
+    let (
+        toolbar,
+        color_picker,
+        bold_closure,
+        italic_closure,
+        underline_closure,
+        color_option_closures,
+        color_button_closure,
+    ) = create_formatting_toolbar(
         document,
         &contenteditable,
         overlay_left,
@@ -710,7 +854,16 @@ fn create_contenteditable_element(
 
     contenteditable.focus()?;
 
-    Ok((contenteditable, toolbar, color_picker))
+    Ok((
+        contenteditable,
+        toolbar,
+        color_picker,
+        bold_closure,
+        italic_closure,
+        underline_closure,
+        color_option_closures,
+        color_button_closure,
+    ))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -725,7 +878,15 @@ fn setup_overlay_events(
     screen_height: f64,
     original_content: &str,
     document: &web_sys::Document,
-) -> Result<(), JsValue> {
+) -> Result<
+    (
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::KeyboardEvent)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+        wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>,
+    ),
+    JsValue,
+> {
     // Attach input event listener to handle text changes
     let on_input = setup_input_event(contenteditable, state, note_id, render, screen_height);
     contenteditable
@@ -733,7 +894,6 @@ fn setup_overlay_events(
         .unwrap_or_else(|_| {
             crate::logging::log_warn("Failed to attach input event listener");
         });
-    on_input.forget();
 
     // Attach keydown event listener for Enter/Escape handling
     let on_keydown = setup_keydown_event(
@@ -751,18 +911,23 @@ fn setup_overlay_events(
         .unwrap_or_else(|_| {
             crate::logging::log_warn("Failed to attach keydown event listener");
         });
-    on_keydown.forget();
 
     // Mousedown handlers are now set up in setup_blur_event
 
     // Attach blur event listener for clicking outside
-    let on_blur = setup_blur_event(contenteditable, toolbar, color_picker, document, note_id);
+    let on_blur = setup_blur_event(
+        contenteditable,
+        toolbar,
+        color_picker,
+        document,
+        note_id,
+        state,
+    );
     contenteditable
         .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::logging::log_warn("Failed to attach blur event listener");
         });
-    on_blur.forget();
 
     // Attach paste event listener to sanitize pasted content
     let on_paste = setup_paste_event();
@@ -771,9 +936,8 @@ fn setup_overlay_events(
         .unwrap_or_else(|_| {
             crate::logging::log_warn("Failed to attach paste event listener");
         });
-    on_paste.forget();
 
-    Ok(())
+    Ok((on_input, on_keydown, on_blur, on_paste))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -876,6 +1040,9 @@ fn setup_keydown_event(
                         note_id
                     ));
 
+                    // Clear overlay closures from state to prevent memory leaks
+                    state.borrow_mut().text_input_overlay_closures = None;
+
                     // Remove the contenteditable overlay
                     if let Some(body) = document.body() {
                         let _ = body.remove_child(&toolbar);
@@ -892,6 +1059,9 @@ fn setup_keydown_event(
                         "Text editing cancelled for note {}",
                         note_id
                     ));
+
+                    // Clear overlay closures from state to prevent memory leaks
+                    state.borrow_mut().text_input_overlay_closures = None;
 
                     // Remove the contenteditable overlay
                     if let Some(body) = document.body() {
@@ -919,11 +1089,13 @@ fn setup_blur_event(
     color_picker: &web_sys::HtmlElement,
     document: &web_sys::Document,
     note_id: u32,
+    state: &Rc<RefCell<crate::AppState>>,
 ) -> wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)> {
     let document = document.clone();
     let contenteditable = contenteditable.clone();
     let toolbar = toolbar.clone();
     let color_picker = color_picker.clone();
+    let state = state.clone();
 
     // Shared flag to track if toolbar/color picker was clicked
     let overlay_clicked = Rc::new(RefCell::new(false));
@@ -973,6 +1145,9 @@ fn setup_blur_event(
                 note_id
             ));
 
+            // Clear overlay closures from state to prevent memory leaks
+            state.borrow_mut().text_input_overlay_closures = None;
+
             // Remove the contenteditable overlay
             if let Some(body) = document.body() {
                 let _ = body.remove_child(&toolbar);
@@ -983,24 +1158,34 @@ fn setup_blur_event(
     ))
 }
 
+/// Inserts sanitized text using modern Selection/Range APIs instead of deprecated execCommand
 #[cfg(target_arch = "wasm32")]
 fn insert_sanitized_text(document: &web_sys::Document, text: &str) -> Result<(), JsValue> {
-    // Use document.execCommand to insert text
-    let exec_command_fn = js_sys::Function::from(
-        js_sys::Reflect::get(
-            document.as_ref(),
-            &wasm_bindgen::JsValue::from_str("execCommand"),
-        )
-        .unwrap(),
-    );
+    let selection = document.get_selection().unwrap().unwrap();
 
-    // Call execCommand("insertText", false, text)
-    let _ = exec_command_fn.call3(
-        document.as_ref(),
-        &wasm_bindgen::JsValue::from_str("insertText"),
-        &wasm_bindgen::JsValue::from_bool(false),
-        &wasm_bindgen::JsValue::from_str(text),
-    );
+    // If there's a selection, replace it; otherwise insert at cursor
+    if let Ok(range) = selection.get_range_at(0) {
+        // Delete current selection
+        let _ = range.delete_contents();
+
+        // Create a text node using JavaScript
+        let text_node_js = js_sys::Reflect::get(document.as_ref(), &"createTextNode".into())
+            .unwrap()
+            .dyn_into::<js_sys::Function>()
+            .unwrap()
+            .call1(document.as_ref(), &wasm_bindgen::JsValue::from_str(text))
+            .unwrap();
+
+        let text_node = text_node_js.dyn_into::<web_sys::Node>()?;
+
+        range.insert_node(&text_node)?;
+
+        // Move cursor to end of inserted text
+        range.set_start_after(&text_node)?;
+        range.set_end_after(&text_node)?;
+        let _ = selection.remove_all_ranges();
+        selection.add_range(&range)?;
+    }
 
     crate::logging::log_info("Pasted content sanitized and inserted");
     Ok(())
@@ -1009,7 +1194,6 @@ fn insert_sanitized_text(document: &web_sys::Document, text: &str) -> Result<(),
 #[cfg(target_arch = "wasm32")]
 /// Sets up the paste event listener to sanitize pasted content
 /// Extracts text content from clipboard data
-#[cfg(target_arch = "wasm32")]
 fn extract_clipboard_text(clipboard_data: &wasm_bindgen::JsValue) -> Result<String, JsValue> {
     // Try to get plain text first
     if let Ok(text) = js_sys::Reflect::get(clipboard_data, &"getData".into()) {
@@ -1137,7 +1321,16 @@ pub fn create_text_input_overlay(
         calculate_overlay_position(canvas, &note, state)?;
 
     // Create contenteditable element
-    let (contenteditable, toolbar, color_picker) = create_contenteditable_element(
+    let (
+        contenteditable,
+        toolbar,
+        color_picker,
+        bold_closure,
+        italic_closure,
+        underline_closure,
+        color_option_closures,
+        color_button_closure,
+    ) = create_contenteditable_element(
         &document,
         overlay_left,
         overlay_top,
@@ -1153,7 +1346,7 @@ pub fn create_text_input_overlay(
     let original_content = note.content.clone();
 
     // Set up all event listeners
-    setup_overlay_events(
+    let (input_closure, keydown_closure, blur_closure, paste_closure) = setup_overlay_events(
         &contenteditable,
         &toolbar,
         &color_picker,
@@ -1164,6 +1357,19 @@ pub fn create_text_input_overlay(
         &original_content,
         &document,
     )?;
+
+    // Store all closures in the app state to prevent memory leaks
+    state.borrow_mut().text_input_overlay_closures = Some(TextInputOverlayClosures {
+        input_closure: Some(input_closure),
+        keydown_closure: Some(keydown_closure),
+        blur_closure: Some(blur_closure),
+        paste_closure: Some(paste_closure),
+        bold_button_closure: Some(bold_closure),
+        italic_button_closure: Some(italic_closure),
+        underline_button_closure: Some(underline_closure),
+        color_button_closure: Some(color_button_closure),
+        color_option_closures,
+    });
 
     // Add elements to document
     add_overlay_to_document(&document, &toolbar, &contenteditable, &color_picker)?;

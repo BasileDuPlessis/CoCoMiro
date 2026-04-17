@@ -5,7 +5,7 @@ This backlog contains tasks identified during the comprehensive code review of t
 
 **Review Date:** April 2026
 **Total Issues:** 19
-- 🔴 Critical: 2 issues (security & compatibility)
+- 🔴 Critical: 1 issues (security & compatibility)
 - 🟠 High: 4 issues (memory leaks, API design)
 - 🟡 Medium: 7 issues (performance, maintainability)
 - 🟢 Low: 6 issues (code quality, tests)
@@ -23,29 +23,29 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [x] Update input handler to sanitize content before storing in note.content
 - [x] Add tests for HTML sanitization edge cases
 
-### 2. Replace Deprecated document.execCommand()
+### 2. ✅ Replace Deprecated document.execCommand()
 **Severity:** Critical
 **Files:** `src/text_input.rs`
 **Issue:** Uses deprecated `execCommand` API which may be removed from browsers.
 
 **Subtasks:**
-- [ ] Replace `execCommand` with modern Selection/Range APIs for text formatting
-- [ ] Implement bold/italic/underline using `document.queryCommandState()` and `execCommand('bold')` alternatives
-- [ ] Handle `unwrap()` failures gracefully in JS reflection calls
-- [ ] Test formatting works across different browsers
+- [x] Replace `execCommand` with modern Selection/Range APIs for text formatting
+- [x] Implement bold/italic/underline using `document.queryCommandState()` and `execCommand('bold')` alternatives
+- [x] Handle `unwrap()` failures gracefully in JS reflection calls
+- [x] Test formatting works across different browsers
 
 ## High Priority Tasks
 
-### 3. Fix Memory Leaks in Event Listeners
+### 3. ✅ Fix Memory Leaks in Event Listeners
 **Severity:** High
 **Files:** `src/event_setup.rs`, `src/text_input.rs`, `src/mouse_events.rs`
 **Issue:** All event listeners use `closure.forget()` causing memory leaks, especially for text input overlays.
 
 **Subtasks:**
-- [ ] Store `Closure` references in overlay state instead of calling `forget()`
-- [ ] Implement proper cleanup when text input overlays are removed
-- [ ] Track and drop formatting button closures on overlay destruction
-- [ ] Add memory leak tests or monitoring
+- [x] Store `Closure` references in overlay state instead of calling `forget()`
+- [x] Implement proper cleanup when text input overlays are removed
+- [x] Track and drop formatting button closures on overlay destruction
+- [x] Add memory leak tests or monitoring
 
 ### 4. Remove Duplicate #[cfg] Attributes
 **Severity:** High
