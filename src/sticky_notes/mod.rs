@@ -440,18 +440,15 @@ mod tests {
 
         // Start resize from screen position (200, 200) - this is relative to start position
         // Screen delta of 50px should result in 50px world delta regardless of zoom
-        state.resize_to(
-            ResizeHandle::BottomRight,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            250.0, // current_mouse_x (50px delta)
-            230.0, // current_mouse_y (30px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::BottomRight,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 250.0,
+            current_mouse_y: 230.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Note should grow by (50, 30) in world space
         assert_eq!(state.notes[0].width, 250.0); // 200 + 50
@@ -466,18 +463,15 @@ mod tests {
 
         // Same screen delta (50px, 30px) should result in same world delta (50px, 30px)
         // Screen deltas are not divided by zoom for consistent feel
-        state.resize_to(
-            ResizeHandle::BottomRight,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            250.0, // current_mouse_x (50px delta)
-            230.0, // current_mouse_y (30px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::BottomRight,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 250.0,
+            current_mouse_y: 230.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Note should grow by (50, 30) in world space (same as zoom=1.0)
         assert_eq!(state.notes[0].width, 250.0); // 200 + 50
@@ -492,18 +486,15 @@ mod tests {
 
         // Same screen delta (50px, 30px) should result in same world delta (50px, 30px)
         // Screen deltas are not divided by zoom for consistent feel
-        state.resize_to(
-            ResizeHandle::BottomRight,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            250.0, // current_mouse_x (50px delta)
-            230.0, // current_mouse_y (30px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::BottomRight,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 250.0,
+            current_mouse_y: 230.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Note should grow by (50, 30) in world space (same as other zoom levels)
         assert_eq!(state.notes[0].width, 250.0); // 200 + 50
@@ -521,18 +512,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag left handle 50px to the left (delta_x = -50)
-        state.resize_to(
-            ResizeHandle::Left,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            150.0, // current_mouse_x (-50px delta)
-            200.0, // current_mouse_y (0px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::Left,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 150.0,
+            current_mouse_y: 200.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should increase by 50px (from 200 to 250)
         assert_eq!(state.notes[0].width, 250.0);
@@ -556,18 +544,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag top handle 30px up (delta_y = -30)
-        state.resize_to(
-            ResizeHandle::Top,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            200.0, // current_mouse_x (0px delta)
-            170.0, // current_mouse_y (-30px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::Top,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 200.0,
+            current_mouse_y: 170.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should stay the same
         assert_eq!(state.notes[0].width, 200.0);
@@ -591,18 +576,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag top-left handle 40px left and 25px up (delta_x = -40, delta_y = -25)
-        state.resize_to(
-            ResizeHandle::TopLeft,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            160.0, // current_mouse_x (-40px delta)
-            175.0, // current_mouse_y (-25px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::TopLeft,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 160.0,
+            current_mouse_y: 175.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should increase by 40px (from 200 to 240)
         assert_eq!(state.notes[0].width, 240.0);
@@ -635,18 +617,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag bottom-left handle 35px left and 20px down (delta_x = -35, delta_y = 20)
-        state.resize_to(
-            ResizeHandle::BottomLeft,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            165.0, // current_mouse_x (-35px delta)
-            220.0, // current_mouse_y (20px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::BottomLeft,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 165.0,
+            current_mouse_y: 220.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should increase by 35px (from 200 to 235)
         assert_eq!(state.notes[0].width, 235.0);
@@ -673,18 +652,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag top-right handle 45px right and 15px up (delta_x = 45, delta_y = -15)
-        state.resize_to(
-            ResizeHandle::TopRight,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            245.0, // current_mouse_x (45px delta)
-            185.0, // current_mouse_y (-15px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::TopRight,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 245.0,
+            current_mouse_y: 185.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should increase by 45px (from 200 to 245)
         assert_eq!(state.notes[0].width, 245.0);
@@ -711,18 +687,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag right handle 60px to the right (delta_x = 60)
-        state.resize_to(
-            ResizeHandle::Right,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            260.0, // current_mouse_x (60px delta)
-            200.0, // current_mouse_y (0px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::Right,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 260.0,
+            current_mouse_y: 200.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should increase by 60px (from 200 to 260)
         assert_eq!(state.notes[0].width, 260.0);
@@ -744,18 +717,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag bottom handle 40px down (delta_y = 40)
-        state.resize_to(
-            ResizeHandle::Bottom,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            200.0, // current_mouse_x (0px delta)
-            240.0, // current_mouse_y (40px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::Bottom,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 200.0,
+            current_mouse_y: 240.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Position should stay the same (resize from center)
         assert_eq!(state.notes[0].x, 100.0);
@@ -773,18 +743,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Drag bottom-right handle 55px right and 35px down (delta_x = 55, delta_y = 35)
-        state.resize_to(
-            ResizeHandle::BottomRight,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            255.0, // current_mouse_x (55px delta)
-            235.0, // current_mouse_y (35px delta)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::BottomRight,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 255.0,
+            current_mouse_y: 235.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should increase by 55px (from 200 to 255)
         assert_eq!(state.notes[0].width, 255.0);
@@ -807,18 +774,15 @@ mod tests {
         let viewport = ViewportState::default();
 
         // Try to resize below minimum size (width < 50, height < 40)
-        state.resize_to(
-            ResizeHandle::TopLeft,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            400.0, // current_mouse_x (large positive delta to shrink width)
-            400.0, // current_mouse_y (large positive delta to shrink height)
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::TopLeft,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 400.0,
+            current_mouse_y: 400.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Width should be clamped to minimum 50.0
         assert_eq!(state.notes[0].width, 50.0);
@@ -838,18 +802,15 @@ mod tests {
         let original_height = state.notes[0].height;
 
         // Try to resize with no selected note
-        state.resize_to(
-            ResizeHandle::BottomRight,
-            200.0, // start_mouse_x
-            200.0, // start_mouse_y
-            250.0, // current_mouse_x
-            230.0, // current_mouse_y
-            200.0, // original_width
-            150.0, // original_height
-            &viewport,
-            800.0,
-            600.0,
-        );
+        state.resize_to(ResizeParams {
+            handle: ResizeHandle::BottomRight,
+            start_mouse_x: 200.0,
+            start_mouse_y: 200.0,
+            current_mouse_x: 250.0,
+            current_mouse_y: 230.0,
+            original_width: 200.0,
+            original_height: 150.0,
+        });
 
         // Note should remain unchanged
         assert_eq!(state.notes[0].width, original_width);

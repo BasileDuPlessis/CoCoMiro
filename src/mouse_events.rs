@@ -248,18 +248,15 @@ pub fn handle_mouse_move(
             if let (Some(_note_id), Some(handle)) = (note_id, handle) {
                 // Extract viewport before mutable borrow
                 let viewport = state.borrow().viewport.clone();
-                state.borrow_mut().sticky_notes.resize_to(
+                state.borrow_mut().sticky_notes.resize_to(crate::sticky_notes::types::ResizeParams {
                     handle,
                     start_mouse_x,
                     start_mouse_y,
-                    mouse_x,
-                    mouse_y,
+                    current_mouse_x: mouse_x,
+                    current_mouse_y: mouse_y,
                     original_width,
                     original_height,
-                    &viewport,
-                    viewport_width,
-                    viewport_height,
-                );
+                });
                 true
             } else {
                 false

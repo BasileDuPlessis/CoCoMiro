@@ -88,5 +88,27 @@ pub struct ResizingState {
     pub original_height: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+/// Parameters for a resize operation on a sticky note.
+///
+/// This struct bundles all the necessary data for performing a resize operation,
+/// including the handle being used, mouse positions, and original dimensions.
+pub struct ResizeParams {
+    /// The resize handle being used
+    pub handle: ResizeHandle,
+    /// Mouse X position when resize started (screen coordinates)
+    pub start_mouse_x: f64,
+    /// Mouse Y position when resize started (screen coordinates)
+    pub start_mouse_y: f64,
+    /// Current mouse X position (screen coordinates)
+    pub current_mouse_x: f64,
+    /// Current mouse Y position (screen coordinates)
+    pub current_mouse_y: f64,
+    /// Original width of the note before resizing
+    pub original_width: f64,
+    /// Original height of the note before resizing
+    pub original_height: f64,
+}
+
 pub static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 pub use std::sync::atomic::Ordering;

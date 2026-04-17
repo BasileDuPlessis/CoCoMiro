@@ -66,15 +66,15 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [x] Remove `#[cfg(target_arch = "wasm32")]` gate from `AppResult` type alias
 - [x] Verify host compilation still works
 
-### 6. Refactor resize_to Function Signature
+### 6. ✅ Refactor resize_to Function Signature
 **Severity:** High
 **Files:** `src/sticky_notes/state.rs`
 **Issue:** `resize_to` function has 11 parameters (clippy limit is 7), with 3 unused parameters.
 
 **Subtasks:**
-- [ ] Remove unused `_viewport`, `_viewport_width`, `_viewport_height` parameters
-- [ ] Consider bundling remaining parameters into a struct if still too many
-- [ ] Update all call sites to match new signature
+- [x] Remove unused `_viewport`, `_viewport_width`, `_viewport_height` parameters
+- [x] Consider bundling remaining parameters into a struct if still too many
+- [x] Update all call sites to match new signature
 
 ## Medium Priority Tasks
 

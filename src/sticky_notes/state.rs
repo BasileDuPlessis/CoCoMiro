@@ -1,5 +1,5 @@
 use super::note::StickyNote;
-use super::types::ResizeHandle;
+use super::types::{ResizeHandle, ResizeParams};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 /// Manages the collection of sticky notes and their interaction state.
@@ -267,77 +267,56 @@ impl StickyNotesState {
     /// to ensure consistent behavior regardless of zoom level.
     ///
     /// # Arguments
-    /// * `handle` - The resize handle being used
-    /// * `start_mouse_x` - Mouse X position when resize started (screen coordinates)
-    /// * `start_mouse_y` - Mouse Y position when resize started (screen coordinates)
-    /// * `current_mouse_x` - Current mouse X position (screen coordinates)
-    /// * `current_mouse_y` - Current mouse Y position (screen coordinates)
-    /// * `original_width` - Original width of the note before resizing
-    /// * `original_height` - Original height of the note before resizing
-    /// * `viewport` - Current viewport state for zoom-based delta conversion
-    /// * `viewport_width` - Viewport width (unused, kept for API compatibility)
-    /// * `viewport_height` - Viewport height (unused, kept for API compatibility)
-    pub fn resize_to(
-        &mut self,
-        handle: ResizeHandle,
-        start_mouse_x: f64,
-        start_mouse_y: f64,
-        current_mouse_x: f64,
-        current_mouse_y: f64,
-        original_width: f64,
-        original_height: f64,
-        _viewport: &crate::viewport::ViewportState,
-        _viewport_width: f64,
-        _viewport_height: f64,
-    ) {
+    /// * `params` - The resize parameters including handle, mouse positions, and original dimensions
+    pub fn resize_to(&mut self, params: ResizeParams) {
         if let Some(note_id) = self.selected_note_id {
             if let Some(note) = self.get_note_mut(note_id) {
                 // Convert screen coordinate deltas to world coordinate deltas using viewport zoom
                 // This ensures resize speed feels consistent regardless of zoom level
-                let delta_x = current_mouse_x - start_mouse_x;
-                let delta_y = current_mouse_y - start_mouse_y;
+                let delta_x = params.current_mouse_x - params.start_mouse_x;
+                let delta_y = params.current_mouse_y - params.start_mouse_y;
 
                 // Calculate new dimensions based on handle type and original dimensions
-                match handle {
+                match params.handle {
                     ResizeHandle::TopLeft => Self::resize_top_left(
                         note,
                         delta_x,
                         delta_y,
-                        original_width,
-                        original_height,
+                        params.original_width,
+                        params.original_height,
                     ),
                     ResizeHandle::Top => {
-                        Self::resize_top(note, delta_x, delta_y, original_width, original_height)
+                        Self::resize_top(note, delta_x, delta_y, params.original_width, params.original_height)
                     }
                     ResizeHandle::TopRight => Self::resize_top_right(
                         note,
                         delta_x,
                         delta_y,
-                        original_width,
-                        original_height,
+                        params.original_width,
+                        params.original_height,
                     ),
                     ResizeHandle::Right => {
-                        Self::resize_right(note, delta_x, delta_y, original_width, original_height)
+                        Self::resize_right(note, delta_x, delta_y, params.original_width, params.original_height)
                     }
                     ResizeHandle::BottomRight => Self::resize_bottom_right(
                         note,
                         delta_x,
                         delta_y,
-                        original_width,
-                        original_height,
+                        params.original_width,
+                        params.original_height,
                     ),
                     ResizeHandle::Bottom => {
-                        Self::resize_bottom(note, delta_x, delta_y, original_width, original_height)
+                        Self::resize_bottom(note, delta_x, delta_y, params.original_width, params.original_height)
                     }
                     ResizeHandle::BottomLeft => Self::resize_bottom_left(
                         note,
                         delta_x,
                         delta_y,
-                        original_width,
-                        original_height,
+                        params.original_width,
+                        params.original_height,
                     ),
                     ResizeHandle::Left => {
-                        Self::resize_left(note, delta_x, delta_y, original_width, original_height)
+                        Self::resize_left(note, delta_x, delta_y, params.original_width, params.original_height)
                     }
                 }
             }
