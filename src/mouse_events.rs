@@ -496,8 +496,10 @@ pub fn handle_double_click(
 pub fn handle_toolbar_mouse_down(
     event: MouseEvent,
     canvas: &HtmlCanvasElement,
+    state: &Rc<RefCell<crate::AppState>>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     position_toolbar: &Rc<dyn Fn()>,
+    render: &Rc<dyn Fn()>,
 ) -> Result<(), crate::error::AppError> {
     if event.button() != 0 {
         return Ok(());
@@ -509,6 +511,11 @@ pub fn handle_toolbar_mouse_down(
     let Ok(target_element) = target.dyn_into::<HtmlElement>() else {
         return Ok(());
     };
+
+    // Clear sticky note selection when clicking anywhere on toolbar
+    state.borrow_mut().sticky_notes.clear_selection();
+    render();
+
     if target_element.id() != "floating-toolbar-handle" {
         return Ok(());
     }
@@ -521,6 +528,7 @@ pub fn handle_toolbar_mouse_down(
     toolbar_state
         .borrow_mut()
         .start_drag(event.client_x() as f64, event.client_y() as f64);
+    crate::logging::log_info("Toolbar drag started");
     position_toolbar();
     Ok(())
 }

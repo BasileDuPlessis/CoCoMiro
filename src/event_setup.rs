@@ -127,8 +127,10 @@ impl EventContext {
         crate::mouse_events::handle_toolbar_mouse_down(
             event,
             canvas,
+            &self.state,
             &self.toolbar_state,
             &self.position_toolbar,
+            &self.render,
         )
     }
 
