@@ -130,7 +130,6 @@ dependencies = [
  "headless_chrome",
  "image",
  "js-sys",
- "regex",
  "wasm-bindgen",
  "web-sys",
 ]

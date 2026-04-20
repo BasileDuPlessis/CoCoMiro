@@ -188,6 +188,127 @@ fn create_formatting_toolbar(
     Ok((toolbar, color_picker))
 }
 
+/// Applies text formatting using modern Selection/Range APIs instead of deprecated execCommand.
+///
+/// # Arguments
+/// * `contenteditable` - The contenteditable element to apply formatting to
+/// * `format_type` - The type of formatting ("bold", "italic", "underline")
+///
+/// # Returns
+/// Result indicating success or failure
+#[cfg(target_arch = "wasm32")]
+fn apply_formatting(
+    _contenteditable: &web_sys::HtmlElement,
+    format_type: &str,
+) -> Result<(), JsValue> {
+    // Get the window
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("No window available"))?;
+
+    // Get the current selection
+    let selection = window
+        .get_selection()
+        .map_err(|_| JsValue::from_str("Failed to get selection"))?
+        .ok_or_else(|| JsValue::from_str("No selection available"))?;
+
+    let range_count = selection.range_count();
+
+    if range_count == 0 {
+        // No selection, insert empty formatting tags
+        insert_empty_formatting_tags(&window, format_type)?;
+    } else {
+        // Apply formatting to each selected range
+        for i in 0..range_count {
+            let range = selection
+                .get_range_at(i)
+                .map_err(|_| JsValue::from_str("Failed to get range"))?;
+            apply_formatting_to_range(&window, &range, format_type)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Inserts empty formatting tags at the current cursor position when no text is selected.
+#[cfg(target_arch = "wasm32")]
+fn insert_empty_formatting_tags(
+    window: &web_sys::Window,
+    format_type: &str,
+) -> Result<(), JsValue> {
+    let document = window
+        .document()
+        .ok_or_else(|| JsValue::from_str("No document available"))?;
+    let selection = window
+        .get_selection()
+        .map_err(|_| JsValue::from_str("Failed to get selection"))?
+        .ok_or_else(|| JsValue::from_str("No selection available"))?;
+
+    if selection.range_count() == 0 {
+        return Ok(()); // No cursor position
+    }
+
+    let range = selection
+        .get_range_at(0)
+        .map_err(|_| JsValue::from_str("Failed to get range"))?;
+
+    // Create formatting element
+    let tag_name = match format_type {
+        "bold" => "b",
+        "italic" => "i",
+        "underline" => "u",
+        _ => return Err(JsValue::from_str("Unknown format type")),
+    };
+
+    let formatting_element = document.create_element(tag_name)?;
+
+    // Insert the element
+    range.insert_node(&formatting_element)?;
+
+    // Position cursor inside the element
+    let new_range = document.create_range()?;
+    new_range.select_node_contents(&formatting_element)?;
+    new_range.collapse(); // Collapse to start
+    selection.remove_all_ranges()?;
+    selection.add_range(&new_range)?;
+
+    Ok(())
+}
+
+/// Applies formatting to a selected range of text.
+#[cfg(target_arch = "wasm32")]
+fn apply_formatting_to_range(
+    window: &web_sys::Window,
+    range: &web_sys::Range,
+    format_type: &str,
+) -> Result<(), JsValue> {
+    let document = window
+        .document()
+        .ok_or_else(|| JsValue::from_str("No document available"))?;
+
+    // Check if the range is collapsed (no selection)
+    if range.collapsed() {
+        return insert_empty_formatting_tags(window, format_type);
+    }
+
+    // Extract the selected content
+    let selected_content = range.extract_contents()?;
+
+    // Create the formatting element
+    let tag_name = match format_type {
+        "bold" => "b",
+        "italic" => "i",
+        "underline" => "u",
+        _ => return Err(JsValue::from_str("Unknown format type")),
+    };
+
+    let formatting_element = document.create_element(tag_name)?;
+    formatting_element.append_child(&selected_content)?;
+
+    // Insert the formatted element back
+    range.insert_node(&formatting_element)?;
+
+    Ok(())
+}
+
 /// Adds a click handler to a formatting button.
 ///
 /// # Arguments
@@ -208,29 +329,17 @@ fn add_formatting_handler(
             event.prevent_default();
             event.stop_propagation();
 
-            // Get the document to execute formatting commands
-            let document = contenteditable.owner_document().unwrap();
-
-            // Apply formatting using document.execCommand()
-            let document_js = document.as_ref();
-            let command = wasm_bindgen::JsValue::from_str(format_type.as_str());
-            let exec_command_fn = js_sys::Function::from(
-                js_sys::Reflect::get(document_js, &wasm_bindgen::JsValue::from_str("execCommand"))
-                    .unwrap(),
-            );
-            let success = exec_command_fn
-                .call1(document_js, &command)
-                .ok()
-                .and_then(|val| val.as_bool())
-                .unwrap_or(false);
-
-            if success {
+            // Apply formatting using modern Selection/Range APIs
+            if let Err(e) = apply_formatting(&contenteditable, &format_type) {
+                crate::logging::log_warn(&format!(
+                    "Failed to apply {} formatting: {:?}",
+                    format_type, e
+                ));
+            } else {
                 crate::logging::log_info(&format!(
                     "Successfully applied {} formatting",
                     format_type
                 ));
-            } else {
-                crate::logging::log_warn(&format!("Failed to apply {} formatting", format_type));
             }
 
             // Focus the contenteditable to keep it active
@@ -264,7 +373,6 @@ fn create_color_picker_container(
     // Style the color picker
     color_picker.set_attribute("class", "color-picker")?;
     let style = color_picker.style();
-    style.set_property("position", "absolute")?;
     // Position directly below the color button (last button in toolbar)
     // Toolbar buttons: 24px each + 2px gap = 26px per button
     // Color button is at position: 3 buttons * 26px = 78px from toolbar left
@@ -272,9 +380,6 @@ fn create_color_picker_container(
     style.set_property("left", &format!("{}px", overlay_left + color_button_offset))?;
     style.set_property("top", &format!("{}px", overlay_top))?; // Directly below toolbar
     style.set_property("display", "none")?; // Hidden by default
-    style.set_property("flex-direction", "column")?;
-    style.set_property("gap", "2px")?;
-    style.set_property("z-index", "1002")?; // Higher than toolbar
 
     Ok(color_picker)
 }
@@ -310,13 +415,7 @@ fn create_color_option(
     color_option.set_attribute("aria-label", &format!("Set note color to {}", color_name))?;
 
     let option_style = color_option.style();
-    option_style.set_property("width", "24px")?;
-    option_style.set_property("height", "24px")?;
     option_style.set_property("background-color", color_hex)?;
-    option_style.set_property("border", "1px solid #d1d5db")?;
-    option_style.set_property("border-radius", "3px")?;
-    option_style.set_property("cursor", "pointer")?;
-    option_style.set_property("transition", "transform 0.1s")?;
 
     Ok(color_option)
 }
