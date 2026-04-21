@@ -45,12 +45,20 @@ impl EventContext {
     }
 
     /// Handles mouse down events using the shared context.
-    fn handle_mouse_down(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+    fn handle_mouse_down(
+        &self,
+        event: web_sys::MouseEvent,
+        canvas: &HtmlCanvasElement,
+    ) -> crate::error::AppResult<()> {
         crate::mouse_events::handle_mouse_down(event, canvas, &self.state, &self.render)
     }
 
     /// Handles mouse move events using the shared context.
-    fn handle_mouse_move(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+    fn handle_mouse_move(
+        &self,
+        event: web_sys::MouseEvent,
+        canvas: &HtmlCanvasElement,
+    ) -> crate::error::AppResult<()> {
         crate::mouse_events::handle_mouse_move(
             event,
             canvas,
@@ -84,27 +92,45 @@ impl EventContext {
     }
 
     /// Handles wheel events using the shared context.
-    fn handle_wheel(&self, event: web_sys::WheelEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+    fn handle_wheel(
+        &self,
+        event: web_sys::WheelEvent,
+        canvas: &HtmlCanvasElement,
+    ) -> crate::error::AppResult<()> {
         crate::mouse_events::handle_wheel(event, canvas, &self.state, &self.render)
     }
 
     /// Handles key down events using the shared context.
-    fn handle_key_down(&self, event: web_sys::KeyboardEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+    fn handle_key_down(
+        &self,
+        event: web_sys::KeyboardEvent,
+        canvas: &HtmlCanvasElement,
+    ) -> crate::error::AppResult<()> {
         crate::keyboard_events::handle_key_down(event, canvas, &self.state, &self.render)
     }
 
     /// Handles double click events using the shared context.
-    fn handle_double_click(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+    fn handle_double_click(
+        &self,
+        event: web_sys::MouseEvent,
+        canvas: &HtmlCanvasElement,
+    ) -> crate::error::AppResult<()> {
         crate::mouse_events::handle_double_click(event, canvas, &self.state, &self.render)
     }
 
     /// Handles toolbar mouse down events using the shared context.
-    fn handle_toolbar_mouse_down(&self, event: web_sys::MouseEvent, canvas: &HtmlCanvasElement) -> crate::error::AppResult<()> {
+    fn handle_toolbar_mouse_down(
+        &self,
+        event: web_sys::MouseEvent,
+        canvas: &HtmlCanvasElement,
+    ) -> crate::error::AppResult<()> {
         crate::mouse_events::handle_toolbar_mouse_down(
             event,
             canvas,
+            &self.state,
             &self.toolbar_state,
             &self.position_toolbar,
+            &self.render,
         )
     }
 
@@ -114,11 +140,15 @@ impl EventContext {
         let viewport_height = f64::from(canvas.client_height().max(1));
 
         let viewport = self.state.borrow().viewport.clone();
-        self.state.borrow_mut().sticky_notes.add_note_at_viewport_center(
-            viewport_width,
-            viewport_height,
-            &viewport,
-        );
+        {
+            let mut state = self.state.borrow_mut();
+            state.sticky_notes.clear_selection();
+            state.sticky_notes.add_note_at_viewport_center(
+                viewport_width,
+                viewport_height,
+                &viewport,
+            );
+        }
 
         (self.render)();
         crate::logging::log_info("Added new sticky note");

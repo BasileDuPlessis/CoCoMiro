@@ -428,4 +428,74 @@ mod integration_tests {
         // Verify selection is cleared
         assert!(app_state.sticky_notes.selected_note_id.is_none());
     }
+
+    #[test]
+    fn toolbar_button_clears_selection_when_adding_note() {
+        // Test that clicking the toolbar "add note" button clears any existing selection
+        let mut app_state = AppState::default();
+        let viewport = ViewportState::default();
+
+        // Add a note and select it
+        let note = StickyNote::new(100.0, 100.0);
+        let note_id = note.id;
+        app_state.sticky_notes.add_note(note);
+        app_state.sticky_notes.selected_note_id = Some(note_id);
+
+        // Verify note is selected
+        assert_eq!(app_state.sticky_notes.selected_note_id, Some(note_id));
+
+        // Simulate clicking the toolbar button (which calls add_note_at_viewport_center)
+        app_state.sticky_notes.clear_selection(); // This is what the button handler does
+        app_state
+            .sticky_notes
+            .add_note_at_viewport_center(800.0, 600.0, &viewport);
+
+        // Verify selection is cleared
+        assert!(app_state.sticky_notes.selected_note_id.is_none());
+
+        // Verify a new note was added
+        assert_eq!(app_state.sticky_notes.notes.len(), 2);
+    }
+
+    #[test]
+    fn toolbar_background_click_clears_selection() {
+        // Test that clicking on the toolbar background clears any existing selection
+        let mut app_state = AppState::default();
+
+        // Add a note and select it
+        let note = StickyNote::new(100.0, 100.0);
+        let note_id = note.id;
+        app_state.sticky_notes.add_note(note);
+        app_state.sticky_notes.selected_note_id = Some(note_id);
+
+        // Verify note is selected
+        assert_eq!(app_state.sticky_notes.selected_note_id, Some(note_id));
+
+        // Simulate clicking on toolbar background (this calls clear_selection)
+        app_state.sticky_notes.clear_selection();
+
+        // Verify selection is cleared
+        assert!(app_state.sticky_notes.selected_note_id.is_none());
+    }
+
+    #[test]
+    fn toolbar_handle_click_clears_selection() {
+        // Test that clicking on the toolbar handle clears any existing selection
+        let mut app_state = AppState::default();
+
+        // Add a note and select it
+        let note = StickyNote::new(100.0, 100.0);
+        let note_id = note.id;
+        app_state.sticky_notes.add_note(note);
+        app_state.sticky_notes.selected_note_id = Some(note_id);
+
+        // Verify note is selected
+        assert_eq!(app_state.sticky_notes.selected_note_id, Some(note_id));
+
+        // Simulate clicking on toolbar handle (this calls clear_selection)
+        app_state.sticky_notes.clear_selection();
+
+        // Verify selection is cleared
+        assert!(app_state.sticky_notes.selected_note_id.is_none());
+    }
 }

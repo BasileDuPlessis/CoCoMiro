@@ -390,7 +390,7 @@ fn get_available_colors() -> Vec<(&'static str, &'static str)> {
     vec![
         ("#ffff88", "Yellow"),
         ("#add8e6", "Light Blue"),
-        ("#ffb6c1", "Light Red"),
+        ("#ff4444", "Red"),
         ("#ffb6d9", "Light Pink"),
         ("#d3d3d3", "Light Grey"),
     ]

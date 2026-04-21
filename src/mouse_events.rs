@@ -496,8 +496,10 @@ pub fn handle_double_click(
 pub fn handle_toolbar_mouse_down(
     event: MouseEvent,
     canvas: &HtmlCanvasElement,
+    state: &Rc<RefCell<crate::AppState>>,
     toolbar_state: &Rc<RefCell<crate::toolbar::FloatingToolbarState>>,
     position_toolbar: &Rc<dyn Fn()>,
+    render: &Rc<dyn Fn()>,
 ) -> Result<(), crate::error::AppError> {
     if event.button() != 0 {
         return Ok(());
@@ -509,18 +511,33 @@ pub fn handle_toolbar_mouse_down(
     let Ok(target_element) = target.dyn_into::<HtmlElement>() else {
         return Ok(());
     };
-    if target_element.id() != "floating-toolbar-handle" {
-        return Ok(());
-    }
 
-    event.prevent_default();
-    event.stop_propagation();
-    if let Err(error) = canvas.focus() {
-        crate::logging::log_jsvalue_error("canvas focus failed", &error);
+    let target_id = target_element.id();
+    if target_id == "floating-toolbar-handle" {
+        // Handle toolbar drag - also clear selection
+        event.prevent_default();
+        event.stop_propagation();
+        if let Err(error) = canvas.focus() {
+            crate::logging::log_jsvalue_error("canvas focus failed", &error);
+        }
+        state.borrow_mut().sticky_notes.clear_selection();
+        crate::logging::log_info("Selection cleared by toolbar handle click");
+        render();
+        toolbar_state
+            .borrow_mut()
+            .start_drag(event.client_x() as f64, event.client_y() as f64);
+        position_toolbar();
+        Ok(())
+    } else if target_id == "floating-toolbar" {
+        // Handle toolbar background click - clear selection
+        event.prevent_default();
+        event.stop_propagation();
+        state.borrow_mut().sticky_notes.clear_selection();
+        crate::logging::log_info("Selection cleared by toolbar background click");
+        render();
+        Ok(())
+    } else {
+        // Click on toolbar button or other element - let it bubble
+        Ok(())
     }
-    toolbar_state
-        .borrow_mut()
-        .start_drag(event.client_x() as f64, event.client_y() as f64);
-    position_toolbar();
-    Ok(())
 }
