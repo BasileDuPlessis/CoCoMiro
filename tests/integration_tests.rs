@@ -409,6 +409,71 @@ mod integration_tests {
     }
 
     #[test]
+    fn html_to_text_and_formatting_conversion() {
+        // Test conversion between HTML and text+formatting spans
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::{parse_html_to_text_and_formatting, format_text_with_spans_to_html};
+
+            // Test basic conversion
+            let html = "Hello <b>world</b> and <i>universe</i>";
+            let (text, spans) = parse_html_to_text_and_formatting(html);
+
+            assert_eq!(text, "Hello world and universe");
+            assert_eq!(spans.len(), 2);
+
+            // First span: "world" (positions 6-11)
+            assert_eq!(spans[0].start, 6);
+            assert_eq!(spans[0].end, 11);
+            assert!(spans[0].bold);
+            assert!(!spans[0].italic);
+            assert!(!spans[0].underline);
+
+            // Second span: "universe" (positions 16-24)
+            assert_eq!(spans[1].start, 16);
+            assert_eq!(spans[1].end, 24);
+            assert!(!spans[1].bold);
+            assert!(spans[1].italic);
+            assert!(!spans[1].underline);
+
+            // Test round-trip conversion
+            let reconstructed_html = format_text_with_spans_to_html(&text, &spans);
+            assert_eq!(reconstructed_html, html);
+        }
+
+        // Test with nested formatting
+        #[cfg(target_arch = "wasm32")]
+        {
+            use canvas::{parse_html_to_text_and_formatting, format_text_with_spans_to_html};
+
+            let html = "Start <b>bold <i>bold-italic</i> still bold</b> end";
+            let (text, spans) = parse_html_to_text_and_formatting(html);
+
+            assert_eq!(text, "Start bold bold-italic still bold end");
+            assert_eq!(spans.len(), 2);
+
+            // First span: "bold " (positions 6-11)
+            assert_eq!(spans[0].start, 6);
+            assert_eq!(spans[0].end, 11);
+            assert!(spans[0].bold);
+            assert!(!spans[0].italic);
+
+            // Second span: "bold-italic still bold" (positions 11-32)
+            assert_eq!(spans[1].start, 11);
+            assert_eq!(spans[1].end, 32);
+            assert!(spans[1].bold);
+            assert!(spans[1].italic);
+
+            // Test round-trip
+            let reconstructed_html = format_text_with_spans_to_html(&text, &spans);
+            // The reconstructed HTML might be different due to span merging
+            let (text2, spans2) = parse_html_to_text_and_formatting(&reconstructed_html);
+            assert_eq!(text, text2);
+            assert_eq!(spans, spans2);
+        }
+    }
+
+    #[test]
     fn sticky_note_selection_clearing() {
         // Test that clicking on empty canvas clears note selection
         let mut app_state = AppState::default();

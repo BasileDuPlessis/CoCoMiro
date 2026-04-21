@@ -248,6 +248,133 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
     segments
 }
 
+/// Parses HTML content and returns plain text and TextFormat spans
+///
+/// # Arguments
+/// * `html` - The HTML content to parse
+///
+/// # Returns
+/// A tuple of (plain_text, formatting_spans)
+#[cfg(target_arch = "wasm32")]
+pub fn parse_html_to_text_and_formatting(html: &str) -> (String, Vec<super::sticky_notes::TextFormat>) {
+    use super::sticky_notes::TextFormat;
+
+    let segments = parse_formatted_text(html);
+    let mut plain_text = String::new();
+    let mut formatting_spans: Vec<super::sticky_notes::TextFormat> = Vec::new();
+    let mut current_pos = 0;
+
+    for segment in segments {
+        let start_pos = current_pos;
+        plain_text.push_str(&segment.text);
+        let end_pos = current_pos + segment.text.len();
+
+        // If this segment has formatting, add or merge with previous span
+        if segment.bold || segment.italic || segment.underline {
+            if let Some(last_span) = formatting_spans.last_mut() {
+                // Check if we can merge with the previous span
+                if last_span.end == start_pos
+                    && last_span.bold == segment.bold
+                    && last_span.italic == segment.italic
+                    && last_span.underline == segment.underline
+                {
+                    // Merge with previous span
+                    last_span.end = end_pos;
+                } else {
+                    // Add new span
+                    formatting_spans.push(TextFormat {
+                        start: start_pos,
+                        end: end_pos,
+                        bold: segment.bold,
+                        italic: segment.italic,
+                        underline: segment.underline,
+                    });
+                }
+            } else {
+                // First span
+                formatting_spans.push(TextFormat {
+                    start: start_pos,
+                    end: end_pos,
+                    bold: segment.bold,
+                    italic: segment.italic,
+                    underline: segment.underline,
+                });
+            }
+        }
+
+        current_pos = end_pos;
+    }
+
+    (plain_text, formatting_spans)
+}
+
+/// Converts plain text and TextFormat spans to HTML
+///
+/// # Arguments
+/// * `text` - The plain text content
+/// * `formatting` - The formatting spans
+///
+/// # Returns
+/// HTML representation of the formatted text
+#[cfg(target_arch = "wasm32")]
+pub fn format_text_with_spans_to_html(text: &str, formatting: &[super::sticky_notes::TextFormat]) -> String {
+    if formatting.is_empty() {
+        // No formatting, return plain text with line breaks converted to <br>
+        return text.replace("\n", "<br>");
+    }
+
+    let mut result = String::new();
+    let mut last_end = 0;
+
+    for span in formatting {
+        // Add text before this span
+        if span.start > last_end {
+            let before_text = &text[last_end..span.start];
+            result.push_str(&before_text.replace("\n", "<br>"));
+        }
+
+        // Add the formatted text
+        let span_text = &text[span.start..span.end];
+        let formatted_text = format_span_text(span_text, span);
+        result.push_str(&formatted_text);
+
+        last_end = span.end;
+    }
+
+    // Add remaining text after the last span
+    if last_end < text.len() {
+        let after_text = &text[last_end..];
+        result.push_str(&after_text.replace("\n", "<br>"));
+    }
+
+    result
+}
+
+/// Formats a text span with the given formatting
+///
+/// # Arguments
+/// * `text` - The text to format
+/// * `span` - The formatting information
+///
+/// # Returns
+/// HTML formatted text
+#[cfg(target_arch = "wasm32")]
+fn format_span_text(text: &str, span: &super::sticky_notes::TextFormat) -> String {
+    let mut result = text.replace("\n", "<br>");
+
+    if span.underline {
+        result = format!("<u>{}</u>", result);
+    }
+    if span.italic {
+        result = format!("<i>{}</i>", result);
+    }
+    if span.bold {
+        result = format!("<b>{}</b>", result);
+    }
+
+    result
+}
+
 /// Creates a CSS font string based on text formatting
 ///
 /// # Arguments
@@ -449,8 +576,16 @@ fn render_note_text_content(
     let text_y = screen_y + 8.0;
     let max_text_width = screen_width - 16.0; // Account for padding
 
-    // Parse the entire content for formatting
-    let formatted_segments = parse_formatted_text(&note.content);
+    // Generate HTML from plain text and formatting spans, then parse it
+    // Handle backward compatibility: if content contains HTML, use as-is; otherwise generate from spans
+    let html_content = if note.content.contains('<') && note.content.contains('>') {
+        // Legacy HTML content
+        note.content.clone()
+    } else {
+        // New format: generate HTML from plain text and formatting spans
+        format_text_with_spans_to_html(&note.content, &note.formatting)
+    };
+    let formatted_segments = parse_formatted_text(&html_content);
 
     // Process text with line breaks and wrapping while preserving formatting
     let mut all_lines = Vec::new();

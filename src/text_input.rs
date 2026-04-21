@@ -92,6 +92,8 @@ fn add_buttons_to_toolbar(
     toolbar: &web_sys::HtmlElement,
     contenteditable: &web_sys::HtmlElement,
     current_color: &str,
+    state: &Rc<RefCell<crate::AppState>>,
+    note_id: u32,
 ) -> Result<web_sys::Element, JsValue> {
     // Create buttons
     let bold_button = create_formatting_button(
@@ -127,9 +129,9 @@ fn add_buttons_to_toolbar(
     let _ = toolbar.append_child(&color_button);
 
     // Add click handlers for formatting buttons
-    add_formatting_handler(&bold_button, "bold", contenteditable)?;
-    add_formatting_handler(&italic_button, "italic", contenteditable)?;
-    add_formatting_handler(&underline_button, "underline", contenteditable)?;
+    add_formatting_handler(&bold_button, "bold", contenteditable, state, note_id)?;
+    add_formatting_handler(&italic_button, "italic", contenteditable, state, note_id)?;
+    add_formatting_handler(&underline_button, "underline", contenteditable, state, note_id)?;
 
     Ok(color_button)
 }
@@ -170,7 +172,7 @@ fn create_formatting_toolbar(
     let toolbar = create_toolbar_container(document, overlay_left, overlay_top, screen_width)?;
 
     // Add buttons to toolbar and get color button
-    let color_button = add_buttons_to_toolbar(document, &toolbar, contenteditable, current_color)?;
+    let color_button = add_buttons_to_toolbar(document, &toolbar, contenteditable, current_color, state, note_id)?;
 
     // Create and add color picker
     let color_picker = add_color_picker_handler(
@@ -315,14 +317,19 @@ fn apply_formatting_to_range(
 /// * `button` - The button element to add handler to
 /// * `format_type` - The type of formatting ("bold", "italic", "underline")
 /// * `contenteditable` - The contenteditable element to apply formatting to
+/// * `state` - The application state
+/// * `note_id` - The ID of the note being edited
 #[cfg(target_arch = "wasm32")]
 fn add_formatting_handler(
     button: &web_sys::Element,
     format_type: &str,
     contenteditable: &web_sys::HtmlElement,
+    state: &Rc<RefCell<crate::AppState>>,
+    note_id: u32,
 ) -> Result<(), JsValue> {
     let contenteditable = contenteditable.clone();
     let format_type = format_type.to_string();
+    let state = state.clone();
 
     let closure = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |event: web_sys::Event| {
@@ -340,6 +347,14 @@ fn add_formatting_handler(
                     "Successfully applied {} formatting",
                     format_type
                 ));
+
+                // Save the updated content after applying formatting
+                if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
+                    let html_content = contenteditable.inner_html();
+                    let (plain_text, formatting_spans) = crate::canvas::parse_html_to_text_and_formatting(&html_content);
+                    note.content = plain_text;
+                    note.formatting = formatting_spans;
+                }
             }
 
             // Focus the contenteditable to keep it active
@@ -720,13 +735,14 @@ fn create_contenteditable_element(
         &note.color,
     )?;
 
-    // Set initial content and focus - handle both HTML and plain text content
+    // Set initial content and focus - generate HTML from plain text and formatting spans
+    // Handle backward compatibility: if content contains HTML, parse it; otherwise use as plain text
     let initial_html = if note.content.contains('<') && note.content.contains('>') {
-        // Content appears to be HTML, use as-is
+        // Legacy HTML content, use as-is for now
         note.content.clone()
     } else {
-        // Content appears to be plain text, convert line breaks to HTML
-        note.content.replace("\n", "<br>")
+        // New format: generate HTML from plain text and formatting spans
+        crate::canvas::format_text_with_spans_to_html(&note.content, &note.formatting)
     };
     contenteditable.set_inner_html(&initial_html);
 
@@ -825,9 +841,11 @@ fn setup_input_event(
             // Update the note content with the current contenteditable content
             let zoom = state.borrow().viewport.zoom; // Get zoom before mutable borrow
             if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
-                // Store HTML content directly instead of converting to plain text
+                // Parse HTML content and extract plain text with formatting spans
                 let html_content = contenteditable.inner_html();
-                note.content = html_content;
+                let (plain_text, formatting_spans) = crate::canvas::parse_html_to_text_and_formatting(&html_content);
+                note.content = plain_text;
+                note.formatting = formatting_spans;
 
                 // Adjust contenteditable height to fit content
                 // For contenteditable, we need to measure the scroll height
