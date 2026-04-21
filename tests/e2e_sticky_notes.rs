@@ -632,6 +632,141 @@ fn assert_resize_handle_click_and_drag_works(tab: &Tab) -> TestResult {
     Ok(())
 }
 
+fn assert_text_formatting_works(tab: &Tab) -> TestResult {
+    let canvas = ready_canvas(tab)?;
+    let bounds = canvas.get_box_model()?.margin_viewport();
+    let center_x = bounds.x + bounds.width / 2.0;
+    let center_y = bounds.y + bounds.height / 2.0;
+
+    // Create a note
+    click_add_note_button(tab)?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Double-click the note to enter edit mode
+    let dblclick_script = format!(
+        r#"
+        (function() {{
+            const canvas = document.querySelector('#infinite-canvas');
+            if (canvas) {{
+                const event = new MouseEvent('dblclick', {{
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: {0},
+                    clientY: {1}
+                }});
+                canvas.dispatchEvent(event);
+            }}
+        }})()
+        "#,
+        center_x, center_y
+    );
+
+    tab.evaluate(&dblclick_script, false)?;
+    thread::sleep(Duration::from_millis(500));
+
+    // Type "Hello world" into the contenteditable
+    let type_script = r#"
+        (function() {
+            const editable = document.querySelector('div[contenteditable="true"]');
+            if (!editable) return 'NO_EDITABLE_FOUND';
+
+            editable.focus();
+            editable.innerHTML = 'Hello world';
+            return 'TYPED';
+        })()
+    "#;
+
+    let type_result = tab.evaluate(&type_script, false)?;
+    assert_eq!(type_result.value.as_ref().unwrap().as_str().unwrap(), "TYPED");
+
+    // Select "world" (positions 6-11)
+    let select_script = r#"
+        (function() {
+            const editable = document.querySelector('div[contenteditable="true"]');
+            if (!editable) return 'NO_EDITABLE_FOUND';
+
+            const range = document.createRange();
+            const textNode = editable.firstChild;
+            if (!textNode) return 'NO_TEXT_NODE';
+
+            range.setStart(textNode, 6); // Start at "w"
+            range.setEnd(textNode, 11);   // End after "d"
+
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            return 'SELECTED';
+        })()
+    "#;
+
+    let select_result = tab.evaluate(&select_script, false)?;
+    assert_eq!(select_result.value.as_ref().unwrap().as_str().unwrap(), "SELECTED");
+
+    // Click the bold button
+    let bold_button = tab.find_element(".formatting-button--bold")?;
+    bold_button.click()?;
+    thread::sleep(Duration::from_millis(200));
+
+    // Check that "world" is now wrapped in <b> tags
+    let check_bold_script = r#"
+        (function() {
+            const editable = document.querySelector('div[contenteditable="true"]');
+            if (!editable) return 'NO_EDITABLE_FOUND';
+
+            const html = editable.innerHTML;
+            return html;
+        })()
+    "#;
+
+    let check_result = tab.evaluate(&check_bold_script, false)?;
+    let html_content = check_result.value.as_ref().unwrap().as_str().unwrap();
+
+    assert!(
+        html_content.contains("<b>world</b>"),
+        "Expected '<b>world</b>' in HTML content, but got: {}",
+        html_content
+    );
+
+    // Confirm the edit by clicking outside the contenteditable
+    let click_outside_script = format!(
+        r#"
+        (function() {{
+            const canvas = document.querySelector('#infinite-canvas');
+            if (canvas) {{
+                const event = new MouseEvent('mousedown', {{
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: {0},
+                    clientY: {1}
+                }});
+                canvas.dispatchEvent(event);
+            }}
+        }})()
+        "#,
+        center_x + 100.0, center_y + 100.0 // Click away from the note
+    );
+
+    tab.evaluate(&click_outside_script, false)?;
+    thread::sleep(Duration::from_millis(500));
+
+    // Re-enter edit mode by double-clicking again
+    tab.evaluate(&dblclick_script, false)?;
+    thread::sleep(Duration::from_millis(500));
+
+    // Check that the formatting is still there
+    let recheck_result = tab.evaluate(&check_bold_script, false)?;
+    let recheck_html = recheck_result.value.as_ref().unwrap().as_str().unwrap();
+
+    assert!(
+        recheck_html.contains("<b>world</b>"),
+        "Formatting should persist after save and reload, but got: {}",
+        recheck_html
+    );
+
+    Ok(())
+}
+
 #[test]
 #[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_sticky_notes -- --ignored`"]
 fn sticky_note_creation_via_toolbar_button() -> TestResult {
@@ -712,6 +847,18 @@ fn resize_handle_click_and_drag_resizes_note() -> TestResult {
     assert_home_page_starts_clean(session.tab())?;
     assert_toolbar_is_visible(session.tab())?;
     assert_resize_handle_click_and_drag_works(session.tab())?;
+
+    Ok(())
+}
+
+#[test]
+#[ignore = "opt-in browser E2E; run with `cargo e2e` or `cargo test --test e2e_sticky_notes -- --ignored`"]
+fn text_formatting_buttons_save_to_sticky_note() -> TestResult {
+    let session = HomePageSession::launch()?;
+
+    assert_home_page_starts_clean(session.tab())?;
+    assert_toolbar_is_visible(session.tab())?;
+    assert_text_formatting_works(session.tab())?;
 
     Ok(())
 }
