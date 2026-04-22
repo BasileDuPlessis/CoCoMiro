@@ -138,21 +138,11 @@ pub mod components {
             .find_note_at(
                 state
                     .viewport
-                    .world_point_at(
-                        state.mouse_x,
-                        state.mouse_y,
-                        canvas_width,
-                        canvas_height,
-                    )
+                    .world_point_at(state.mouse_x, state.mouse_y, canvas_width, canvas_height)
                     .0,
                 state
                     .viewport
-                    .world_point_at(
-                        state.mouse_x,
-                        state.mouse_y,
-                        canvas_width,
-                        canvas_height,
-                    )
+                    .world_point_at(state.mouse_x, state.mouse_y, canvas_width, canvas_height)
                     .1,
             )
             .is_some()

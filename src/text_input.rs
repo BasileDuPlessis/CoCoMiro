@@ -798,7 +798,8 @@ fn setup_overlay_events(
 
     // Mousedown handlers are now set up in setup_blur_event
 
-    // Attach blur event listener for clicking outside
+    // Attach blur event listener for focus loss (tabbing away, etc.)
+    // Note: Clicking outside is now handled by document click listener in setup_blur_event
     let on_blur = setup_blur_event(contenteditable, toolbar, color_picker, document, note_id);
     contenteditable
         .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
@@ -970,80 +971,78 @@ fn setup_blur_event(
     let toolbar = toolbar.clone();
     let color_picker = color_picker.clone();
 
-    // Shared flag to track if any overlay element was clicked
-    let overlay_clicked = Rc::new(RefCell::new(false));
-
-    // Clone references for the document mousedown handler
+    // Clone references for the document click handler
     let contenteditable_clone = contenteditable.clone();
     let toolbar_clone = toolbar.clone();
     let color_picker_clone = color_picker.clone();
-    let overlay_clicked_clone = overlay_clicked.clone();
+    let document_clone = document.clone();
 
-    // Set up a single document mousedown listener to track clicks on overlay elements
-    let document_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
+    // Set up a document click listener to detect clicks outside overlay
+    let document_click = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
         Box::new(move |event: web_sys::Event| {
             if let Ok(target) = event
                 .target()
                 .ok_or_else(|| JsValue::from_str("No event target"))
                 .and_then(|t| Ok(t.dyn_into::<web_sys::Element>()?))
             {
-                // Check if the clicked element is part of our overlay
+                // Check if the clicked element is outside our overlay
                 let is_overlay_element = contenteditable_clone.contains(Some(&target))
                     || toolbar_clone.contains(Some(&target))
-                    || color_picker_clone.contains(Some(&target))
-                    || target == *contenteditable_clone.dyn_ref::<web_sys::Element>().unwrap()
-                    || target == *toolbar_clone.dyn_ref::<web_sys::Element>().unwrap()
-                    || target == *color_picker_clone.dyn_ref::<web_sys::Element>().unwrap();
+                    || color_picker_clone.contains(Some(&target));
 
-                if is_overlay_element {
-                    *overlay_clicked_clone.borrow_mut() = true;
+                if !is_overlay_element {
+                    // Click was outside overlay - close edit mode
+                    crate::logging::log_info(&format!(
+                        "Text editing cancelled (clicked outside) for note {}",
+                        note_id
+                    ));
+
+                    // Blur the contenteditable to lose focus
+                    let _ = contenteditable_clone.blur();
+
+                    // Remove the contenteditable overlay
+                    if let Some(body) = document_clone.body() {
+                        let _ = body.remove_child(&toolbar_clone);
+                        let _ = body.remove_child(&contenteditable_clone);
+                        let _ = body.remove_child(&color_picker_clone);
+                    }
+
+                    // Clear overlay closures to prevent memory leaks
+                    OVERLAY_CLOSURES.with(|closures| {
+                        let closures = closures.borrow();
+                        for closure in closures.iter() {
+                            document_clone
+                                .remove_event_listener_with_callback(
+                                    "mousedown",
+                                    closure.as_ref().unchecked_ref(),
+                                )
+                                .unwrap_or(());
+                        }
+                        drop(closures);
+                        OVERLAY_CLOSURES.with(|closures| closures.borrow_mut().clear());
+                    });
                 }
             }
         }),
     );
 
-    // Attach the document mousedown listener
+    // Attach the document click listener
     document
-        .add_event_listener_with_callback("mousedown", document_mousedown.as_ref().unchecked_ref())
+        .add_event_listener_with_callback("mousedown", document_click.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
             crate::logging::log_warn("Failed to attach document mousedown event listener");
         });
 
-    // Store the document mousedown closure in thread-local storage
+    // Store the document click closure in thread-local storage
     OVERLAY_CLOSURES.with(|closures| {
-        closures.borrow_mut().push(document_mousedown);
+        closures.borrow_mut().push(document_click);
     });
 
+    // Return a dummy closure for the blur event (no longer used)
     wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |_event: web_sys::Event| {
-            // Check if toolbar or color picker was clicked - if so, don't remove overlay
-            if *overlay_clicked.borrow() {
-                *overlay_clicked.borrow_mut() = false; // Reset flag
-                return; // Don't remove overlay
-            }
-
-            // Confirm changes when focus is lost (clicked outside)
-            crate::logging::log_info(&format!(
-                "Text editing confirmed (blur) for note {}",
-                note_id
-            ));
-
-            // Remove the contenteditable overlay
-            if let Some(body) = document.body() {
-                let _ = body.remove_child(&toolbar);
-                let _ = body.remove_child(&contenteditable);
-                let _ = body.remove_child(&color_picker);
-            }
-
-            // Clear overlay closures to prevent memory leaks
-            OVERLAY_CLOSURES.with(|closures| {
-                let closures = closures.borrow();
-                for closure in closures.iter() {
-                    document.remove_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref()).unwrap_or(());
-                }
-                drop(closures);
-                OVERLAY_CLOSURES.with(|closures| closures.borrow_mut().clear());
-            });
+            // Blur event is now handled by document click listener
+            // This closure is kept for API compatibility but does nothing
         },
     ))
 }
