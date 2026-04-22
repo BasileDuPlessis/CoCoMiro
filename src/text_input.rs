@@ -15,6 +15,13 @@ use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 
+// Thread-local storage for text input overlay closures to prevent memory leaks.
+// This stores the mousedown closures for toolbar and color picker elements.
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+    static OVERLAY_CLOSURES: RefCell<Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>> = RefCell::new(Vec::new());
+}
+
 /// Creates a formatting button with specified properties
 #[cfg(target_arch = "wasm32")]
 fn create_formatting_button(
@@ -994,8 +1001,11 @@ fn setup_blur_event(
             crate::logging::log_warn("Failed to attach color picker mousedown event listener");
         });
 
-    toolbar_mousedown.forget();
-    color_picker_mousedown.forget();
+    // Store closures in thread-local storage instead of forgetting them
+    OVERLAY_CLOSURES.with(|closures| {
+        closures.borrow_mut().push(toolbar_mousedown);
+        closures.borrow_mut().push(color_picker_mousedown);
+    });
 
     wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |_event: web_sys::Event| {
@@ -1017,6 +1027,11 @@ fn setup_blur_event(
                 let _ = body.remove_child(&contenteditable);
                 let _ = body.remove_child(&color_picker);
             }
+
+            // Clear overlay closures to prevent memory leaks
+            OVERLAY_CLOSURES.with(|closures| {
+                closures.borrow_mut().clear();
+            });
         },
     ))
 }

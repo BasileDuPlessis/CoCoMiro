@@ -7,7 +7,7 @@ This backlog contains tasks identified during the comprehensive code review of t
 **Total Issues:** 20
 **Completed:** 4 issues
 - 🔴 Critical: 2 issues ✅ (security & compatibility)
-- 🟠 High: 5 issues (memory leaks, API design)
+- 🟠 High: 6 issues (memory leaks, API design)
 - 🟡 Medium: 7 issues (2 ✅ performance, maintainability)
 - 🟢 Low: 6 issues (code quality, tests)
 
@@ -37,30 +37,29 @@ This backlog contains tasks identified during the comprehensive code review of t
 
 ## High Priority Tasks
 
-### 3. Fix Memory Leaks in Event Listeners
-**Severity:** High
-**Files:** `src/event_setup.rs`, `src/text_input.rs`, `src/mouse_events.rs`
-**Issue:** All event listeners use `closure.forget()` causing memory leaks, especially for text input overlays.
-
-**Subtasks:**
-- [ ] Store `Closure` references in overlay state instead of calling `forget()`
-- [ ] Implement proper cleanup when text input overlays are removed
-- [ ] Track and drop formatting button closures on overlay destruction
-- [ ] Add memory leak tests or monitoring
-
-### 4. Fix RefCell Double Borrow Panic in Text Input Overlay
+### 3. Fix Memory Leaks in Text Input Overlays
 **Severity:** High
 **Files:** `src/text_input.rs`
-**Issue:** `create_text_input_overlay` passes both `state` and `&mut state.borrow_mut().text_input_overlay` to helper functions, causing RefCell double borrow panics when functions borrow `state` again.
+**Issue:** Text input overlay event listeners use `closure.forget()` causing memory leaks when overlays are created and destroyed.
 
 **Subtasks:**
-- [x] Restructure `create_text_input_overlay` to borrow `state` once at the top level
-- [x] Change helper function signatures to accept borrowed references instead of `&Rc<RefCell<AppState>>`
-- [x] Update `create_contenteditable_element` to take `&AppState` and `&mut TextInputOverlayState` separately
-- [x] Update `create_formatting_toolbar` and all downstream functions to work with borrowed references
-- [x] Ensure no function borrows `state` while `overlay_state` is mutably borrowed
-- [x] Test that overlay creation works without panics in browser
-- [x] Verify E2E tests still pass after refactoring
+- [x] **3.1.1 Add Missing Closure Fields to TextInputOverlayState**: Add fields for toolbar and color picker mousedown closures
+- [ ] **3.1.2 Modify setup_blur_event Signature**: Change function to accept and store closures properly  
+- [ ] **3.1.3 Update setup_blur_event Call Site**: Pass state parameter to setup_blur_event
+- [ ] **3.1.4 Verify Overlay Creation Still Works**: Test that overlays can still be created and basic editing works
+- [ ] **3.1.5 Verify Memory Leak Fix**: Confirm closures are properly cleaned up
+- [ ] **3.2 Verify Overlay Cleanup**: Confirm that setting `text_input_overlay = None` properly drops all closures
+- [ ] **3.3 Add Memory Leak Detection**: Add runtime checks to detect if overlay closures aren't being cleaned up
+
+### 4. Optimize Main Canvas Event Listeners
+**Severity:** Medium
+**Files:** `src/event_setup.rs`
+**Issue:** Main canvas event listeners are set up once at app initialization and may benefit from proper storage for future cleanup.
+
+**Subtasks:**
+- [ ] **4.1 Analyze Main Canvas Listener Lifetime**: Document that main canvas listeners don't leak (set once, persist for app lifetime)
+- [ ] **4.2 Consider Event Listener Storage**: If needed for future cleanup, add `EventListenerState` to `AppState` and store main canvas closures
+
 
 ### 5. Remove Duplicate #[cfg] Attributes
 **Severity:** High
@@ -90,28 +89,6 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [ ] Remove unused `_viewport`, `_viewport_width`, `_viewport_height` parameters
 - [ ] Consider bundling remaining parameters into a struct if still too many
 - [ ] Update all call sites to match new signature
-**Severity:** High
-**Files:** `src/lib.rs`, `src/canvas.rs`
-**Issue:** Duplicate `#[cfg(target_arch = "wasm32")]` attributes on functions.
-
-**Subtasks:**
-- [ ] Remove duplicate `#[cfg(target_arch = "wasm32")]` from `start_impl()` in `src/lib.rs`
-- [ ] Remove duplicate `#[cfg(target_arch = "wasm32")]` from render functions in `src/canvas.rs`
-- [ ] Verify compilation still works for both targets
-
-### 5. Fix AppResult Type Availability
-**Severity:** High
-**Files:** `src/error.rs`
-**Issue:** `AppResult` type alias is only available on WASM target despite `AppError` being available everywhere.
-
-**Subtasks:**
-- [ ] Remove `#[cfg(target_arch = "wasm32")]` gate from `AppResult` type alias
-- [ ] Verify host compilation still works
-
-### 6. Refactor resize_to Function Signature
-**Severity:** High
-**Files:** `src/sticky_notes/state.rs`
-**Issue:** `resize_to` function has 11 parameters (clippy limit is 7), with 3 unused parameters.
 
 **Subtasks:**
 - [ ] Remove unused `_viewport`, `_viewport_width`, `_viewport_height` parameters
@@ -120,6 +97,19 @@ This backlog contains tasks identified during the comprehensive code review of t
 
 ## Medium Priority Tasks
 
+### 8. Fix Hardcoded Viewport Dimensions in Cursor Detection
+**Severity:** Medium
+**Files:** `src/styling.rs`
+**Issue:** `update_canvas_cursor` uses hardcoded 800x600 instead of actual canvas dimensions.
+
+**Subtasks:**
+- [ ] Pass actual canvas width/height to `update_canvas_cursor` function
+- [ ] Update function signature to accept viewport dimensions
+- [ ] Test cursor behavior with different canvas sizes
+
+### 9. Optimize Redundant world_point_at Calls
+**Severity:** Medium
+**Files:** `src/styling.rs`
 ### 8. Fix Hardcoded Viewport Dimensions in Cursor Detection
 **Severity:** Medium
 **Files:** `src/styling.rs`
@@ -188,12 +178,6 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [x] Remove inline style setting in `create_color_picker_container` that duplicates `.color-picker` CSS
 - [x] Remove inline style setting in `create_color_option` that duplicates `.color-picker-option` CSS
 - [x] Test that styling still works correctly
-**Severity:** Medium
-**Files:** `src/styling.rs`
-**Issue:** `update_canvas_cursor` uses hardcoded 800x600 instead of actual canvas dimensions.
-
-**Subtasks:**
-- [ ] Pass actual canvas width/height to `update_canvas_cursor` function
 - [ ] Update function signature to accept viewport dimensions
 - [ ] Test cursor behavior with different canvas sizes
 
@@ -318,45 +302,6 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [ ] Remove `#[cfg(target_arch = "wasm32")]` from event constants
 - [ ] Verify host compilation still works
 - [ ] Consider if tests need access to these constants
-**Severity:** Low
-**Files:** `src/styling.rs`
-**Issue:** `ElementStyling` trait not gated with `#[cfg(target_arch = "wasm32")]` despite using WASM types.
-
-**Subtasks:**
-- [ ] Add `#[cfg(target_arch = "wasm32")]` to `ElementStyling` trait and impl
-- [ ] Verify host compilation still works
-
-### 15. Make Test IDs Deterministic
-**Severity:** Low
-**Files:** `src/sticky_notes/types.rs`
-**Issue:** Global atomic ID counter makes test IDs non-deterministic.
-
-**Subtasks:**
-- [ ] Consider making ID generation deterministic for tests
-- [ ] Or document that ID assertions should avoid exact matching
-- [ ] Update test assertions if needed
-
-### 16. Fix Enter Key Behavior in Text Input
-**Severity:** Low
-**Files:** `src/text_input.rs`
-**Issue:** Enter key closes overlay instead of inserting newlines.
-
-**Subtasks:**
-- [ ] Change Enter key to insert newlines in contenteditable
-- [ ] Use Shift+Enter or other key combination to confirm edits
-- [ ] Update user documentation if needed
-
-### 17. Add DOM Element Cleanup Error Handling
-**Severity:** Low
-**Files:** `src/text_input.rs`
-**Issue:** Silent failure when removing DOM elements from overlays.
-
-**Subtasks:**
-- [ ] Handle `remove_child()` errors properly instead of ignoring with `let _ =`
-- [ ] Log cleanup failures or implement retry logic
-- [ ] Test overlay cleanup in error conditions
-
-### 18. Fix Clippy Warnings in Tests
 **Severity:** Low
 **Files:** `tests/e2e_home.rs`, `tests/integration_tests.rs`, `tests/visual_regression.rs`
 **Issue:** Various clippy warnings in test code.
