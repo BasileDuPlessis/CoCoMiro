@@ -1037,7 +1037,12 @@ fn setup_blur_event(
 
             // Clear overlay closures to prevent memory leaks
             OVERLAY_CLOSURES.with(|closures| {
-                closures.borrow_mut().clear();
+                let closures = closures.borrow();
+                for closure in closures.iter() {
+                    document.remove_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref()).unwrap_or(());
+                }
+                drop(closures);
+                OVERLAY_CLOSURES.with(|closures| closures.borrow_mut().clear());
             });
         },
     ))

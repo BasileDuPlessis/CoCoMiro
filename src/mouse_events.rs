@@ -219,8 +219,8 @@ pub fn handle_mouse_move(
 
     // Handle sticky note resizing
     let did_resize = {
-        let viewport_width = f64::from(canvas.client_width().max(1));
-        let viewport_height = f64::from(canvas.client_height().max(1));
+        let _viewport_width = f64::from(canvas.client_width().max(1));
+        let _viewport_height = f64::from(canvas.client_height().max(1));
 
         // Extract resizing state before mutable borrow
         let (
@@ -247,7 +247,7 @@ pub fn handle_mouse_move(
         if is_resizing {
             if let (Some(_note_id), Some(handle)) = (note_id, handle) {
                 // Extract viewport before mutable borrow
-                let viewport = state.borrow().viewport.clone();
+                let _viewport = state.borrow().viewport.clone();
                 let params = ResizeParams {
                     start_mouse_x,
                     start_mouse_y,
