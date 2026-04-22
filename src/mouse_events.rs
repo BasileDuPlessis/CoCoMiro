@@ -15,7 +15,7 @@ use web_sys::{HtmlCanvasElement, HtmlElement, MouseEvent, WheelEvent};
 #[cfg(target_arch = "wasm32")]
 use crate::event_setup::{end_drag_if_needed, end_toolbar_drag_if_needed};
 #[cfg(target_arch = "wasm32")]
-use crate::sticky_notes::{DEFAULT_NOTE_HEIGHT, DEFAULT_NOTE_WIDTH};
+use crate::sticky_notes::{DEFAULT_NOTE_HEIGHT, DEFAULT_NOTE_WIDTH, ResizeParams};
 #[cfg(target_arch = "wasm32")]
 use crate::text_input::create_text_input_overlay;
 
@@ -248,18 +248,15 @@ pub fn handle_mouse_move(
             if let (Some(_note_id), Some(handle)) = (note_id, handle) {
                 // Extract viewport before mutable borrow
                 let viewport = state.borrow().viewport.clone();
-                state.borrow_mut().sticky_notes.resize_to(
-                    handle,
+                let params = ResizeParams {
                     start_mouse_x,
                     start_mouse_y,
-                    mouse_x,
-                    mouse_y,
+                    current_mouse_x: mouse_x,
+                    current_mouse_y: mouse_y,
                     original_width,
                     original_height,
-                    &viewport,
-                    viewport_width,
-                    viewport_height,
-                );
+                };
+                state.borrow_mut().sticky_notes.resize_to(handle, params);
                 true
             } else {
                 false

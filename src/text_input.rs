@@ -982,7 +982,8 @@ fn setup_blur_event(
     // Set up a single document mousedown listener to track clicks on overlay elements
     let document_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
         Box::new(move |event: web_sys::Event| {
-            if let Ok(target) = event.target()
+            if let Ok(target) = event
+                .target()
                 .ok_or_else(|| JsValue::from_str("No event target"))
                 .and_then(|t| Ok(t.dyn_into::<web_sys::Element>()?))
             {
