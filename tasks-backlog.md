@@ -48,7 +48,7 @@ This backlog contains tasks to improve the CoCoMiro infinite canvas application.
 
 **Subtasks:**
 
-#### 1.8 Add Cursor Changes for Handles
+#### 1.8 ✅ Add Cursor Changes for Handles
 - Implement dynamic cursor changes when hovering over resize handles
 - Use appropriate cursors (nw-resize, n-resize, etc.) for each handle type
 - Update cursor in `update_canvas_attributes()`

@@ -293,6 +293,9 @@ pub fn handle_mouse_move(
         // state.borrow_mut().hovered_resize_handle = hovered_handle;
     }
 
+    // Always render to update cursor on mouse move
+    render();
+
     Ok(())
 }
 

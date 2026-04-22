@@ -122,28 +122,26 @@ pub mod components {
     /// Update canvas cursor based on interaction state
     #[cfg(target_arch = "wasm32")]
     pub fn update_canvas_cursor(canvas: &HtmlElement, state: &AppState) -> Result<(), JsValue> {
-        let cursor = if state
+        let canvas_width = canvas.client_width() as f64;
+        let canvas_height = canvas.client_height() as f64;
+        let world_point = state.viewport.world_point_at(
+            state.mouse_x,
+            state.mouse_y,
+            canvas_width,
+            canvas_height,
+        );
+
+        let cursor = if let Some((_note_id, handle)) = state.sticky_notes.find_resize_handle_at(
+            world_point.0,
+            world_point.1,
+            &state.viewport,
+            canvas_width,
+            canvas_height,
+        ) {
+            handle.cursor()
+        } else if state
             .sticky_notes
-            .find_note_at(
-                state
-                    .viewport
-                    .world_point_at(
-                        state.mouse_x,
-                        state.mouse_y,
-                        TEST_VIEWPORT_WIDTH,
-                        TEST_VIEWPORT_HEIGHT,
-                    )
-                    .0,
-                state
-                    .viewport
-                    .world_point_at(
-                        state.mouse_x,
-                        state.mouse_y,
-                        TEST_VIEWPORT_WIDTH,
-                        TEST_VIEWPORT_HEIGHT,
-                    )
-                    .1,
-            )
+            .find_note_at(world_point.0, world_point.1)
             .is_some()
         {
             "grab"

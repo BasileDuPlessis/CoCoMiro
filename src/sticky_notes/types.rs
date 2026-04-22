@@ -57,10 +57,14 @@ impl ResizeHandle {
     /// when dragging this handle (diagonal vs horizontal/vertical).
     pub fn cursor(&self) -> &'static str {
         match self {
-            ResizeHandle::TopLeft | ResizeHandle::BottomRight => "nw-resize",
-            ResizeHandle::Top | ResizeHandle::Bottom => "n-resize",
-            ResizeHandle::TopRight | ResizeHandle::BottomLeft => "ne-resize",
-            ResizeHandle::Left | ResizeHandle::Right => "e-resize",
+            ResizeHandle::TopLeft => "nw-resize",
+            ResizeHandle::Top => "n-resize",
+            ResizeHandle::TopRight => "ne-resize",
+            ResizeHandle::Right => "e-resize",
+            ResizeHandle::BottomRight => "se-resize",
+            ResizeHandle::Bottom => "s-resize",
+            ResizeHandle::BottomLeft => "sw-resize",
+            ResizeHandle::Left => "w-resize",
         }
     }
 }
