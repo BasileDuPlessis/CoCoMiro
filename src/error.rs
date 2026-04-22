@@ -59,6 +59,5 @@ impl From<AppError> for JsValue {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-/// Result type alias for WebAssembly operations that may fail.
+/// Result type alias for operations that may fail.
 pub type AppResult<T> = Result<T, AppError>;

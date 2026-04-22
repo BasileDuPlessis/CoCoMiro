@@ -481,7 +481,6 @@ fn render_grid_background(
 /// * `width` - Canvas width in CSS pixels
 /// * `height` - Canvas height in CSS pixels
 #[cfg(target_arch = "wasm32")]
-#[cfg(target_arch = "wasm32")]
 /// Renders the background and border for a single sticky note
 fn render_note_background_and_border(
     ctx: &CanvasRenderingContext2d,
