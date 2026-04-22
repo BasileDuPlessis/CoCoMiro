@@ -131,7 +131,13 @@ fn add_buttons_to_toolbar(
     // Add click handlers for formatting buttons
     add_formatting_handler(&bold_button, "bold", contenteditable, state, note_id)?;
     add_formatting_handler(&italic_button, "italic", contenteditable, state, note_id)?;
-    add_formatting_handler(&underline_button, "underline", contenteditable, state, note_id)?;
+    add_formatting_handler(
+        &underline_button,
+        "underline",
+        contenteditable,
+        state,
+        note_id,
+    )?;
 
     Ok(color_button)
 }
@@ -172,7 +178,14 @@ fn create_formatting_toolbar(
     let toolbar = create_toolbar_container(document, overlay_left, overlay_top, screen_width)?;
 
     // Add buttons to toolbar and get color button
-    let color_button = add_buttons_to_toolbar(document, &toolbar, contenteditable, current_color, state, note_id)?;
+    let color_button = add_buttons_to_toolbar(
+        document,
+        &toolbar,
+        contenteditable,
+        current_color,
+        state,
+        note_id,
+    )?;
 
     // Create and add color picker
     let color_picker = add_color_picker_handler(
@@ -351,7 +364,8 @@ fn add_formatting_handler(
                 // Save the updated content after applying formatting
                 if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
                     let html_content = contenteditable.inner_html();
-                    let (plain_text, formatting_spans) = crate::canvas::parse_html_to_text_and_formatting(&html_content);
+                    let (plain_text, formatting_spans) =
+                        crate::canvas::parse_html_to_text_and_formatting(&html_content);
                     note.content = plain_text;
                     note.formatting = formatting_spans;
                 }
@@ -634,13 +648,13 @@ fn sanitize_html_to_text(html: &str) -> String {
 fn calculate_overlay_position(
     canvas: &HtmlCanvasElement,
     note: &crate::sticky_notes::StickyNote,
-    state: &Rc<RefCell<crate::AppState>>,
+    state: &crate::AppState,
 ) -> Result<(f64, f64, f64, f64, f64, f64), JsValue> {
     let viewport_width = f64::from(canvas.client_width().max(1));
     let viewport_height = f64::from(canvas.client_height().max(1));
-    let zoom = state.borrow().viewport.zoom;
-    let pan_x = state.borrow().viewport.pan_x;
-    let pan_y = state.borrow().viewport.pan_y;
+    let zoom = state.viewport.zoom;
+    let pan_x = state.viewport.pan_x;
+    let pan_y = state.viewport.pan_y;
 
     let screen_x = note.x * zoom + viewport_width / 2.0 + pan_x;
     let screen_y = note.y * zoom + viewport_height / 2.0 + pan_y;
@@ -689,17 +703,7 @@ fn create_contenteditable_element(
     screen_width: f64,
     screen_height: f64,
     note: &crate::sticky_notes::StickyNote,
-    state: &Rc<RefCell<crate::AppState>>,
-    note_id: u32,
-    render: &Rc<dyn Fn()>,
-) -> Result<
-    (
-        web_sys::HtmlElement,
-        web_sys::HtmlElement,
-        web_sys::HtmlElement,
-    ),
-    JsValue,
-> {
+) -> Result<web_sys::HtmlElement, JsValue> {
     // Create contenteditable div element for seamless text editing
     let contenteditable = document
         .create_element("div")
@@ -711,19 +715,6 @@ fn create_contenteditable_element(
 
     // Set contenteditable attribute
     contenteditable.set_attribute("contenteditable", "true")?;
-
-    // Create formatting toolbar
-    let (toolbar, color_picker) = create_formatting_toolbar(
-        document,
-        &contenteditable,
-        overlay_left,
-        overlay_top,
-        screen_width,
-        state,
-        note_id,
-        render,
-        &note.color,
-    )?;
 
     // Style the contenteditable div with centralized styling function
     crate::styling::components::style_contenteditable_overlay(
@@ -755,7 +746,7 @@ fn create_contenteditable_element(
 
     contenteditable.focus()?;
 
-    Ok((contenteditable, toolbar, color_picker))
+    Ok(contenteditable)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -843,7 +834,8 @@ fn setup_input_event(
             if let Some(note) = state.borrow_mut().sticky_notes.get_note_mut(note_id) {
                 // Parse HTML content and extract plain text with formatting spans
                 let html_content = contenteditable.inner_html();
-                let (plain_text, formatting_spans) = crate::canvas::parse_html_to_text_and_formatting(&html_content);
+                let (plain_text, formatting_spans) =
+                    crate::canvas::parse_html_to_text_and_formatting(&html_content);
                 note.content = plain_text;
                 note.formatting = formatting_spans;
 
@@ -1160,9 +1152,11 @@ pub fn create_text_input_overlay(
         }
     };
 
+    // Borrow state once at the top level
+    let state_ref = state.borrow();
+
     // Get note details
-    let note = match state
-        .borrow()
+    let note = match state_ref
         .sticky_notes
         .notes
         .iter()
@@ -1180,19 +1174,32 @@ pub fn create_text_input_overlay(
 
     // Calculate overlay position
     let (overlay_left, overlay_top, screen_width, screen_height, _viewport_width, _viewport_height) =
-        calculate_overlay_position(canvas, &note, state)?;
+        calculate_overlay_position(canvas, &note, &*state_ref)?;
+
+    // Drop the borrow before creating elements that need to capture state in closures
+    drop(state_ref);
 
     // Create contenteditable element
-    let (contenteditable, toolbar, color_picker) = create_contenteditable_element(
+    let contenteditable = create_contenteditable_element(
         &document,
         overlay_left,
         overlay_top,
         screen_width,
         screen_height,
         &note,
+    )?;
+
+    // Create formatting toolbar
+    let (toolbar, color_picker) = create_formatting_toolbar(
+        &document,
+        &contenteditable,
+        overlay_left,
+        overlay_top,
+        screen_width,
         state,
         note_id,
         render,
+        &note.color,
     )?;
 
     // Store original content for potential cancellation

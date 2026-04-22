@@ -256,7 +256,9 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
 /// # Returns
 /// A tuple of (plain_text, formatting_spans)
 #[cfg(target_arch = "wasm32")]
-pub fn parse_html_to_text_and_formatting(html: &str) -> (String, Vec<super::sticky_notes::TextFormat>) {
+pub fn parse_html_to_text_and_formatting(
+    html: &str,
+) -> (String, Vec<super::sticky_notes::TextFormat>) {
     use super::sticky_notes::TextFormat;
 
     let segments = parse_formatted_text(html);
@@ -317,7 +319,10 @@ pub fn parse_html_to_text_and_formatting(html: &str) -> (String, Vec<super::stic
 /// # Returns
 /// HTML representation of the formatted text
 #[cfg(target_arch = "wasm32")]
-pub fn format_text_with_spans_to_html(text: &str, formatting: &[super::sticky_notes::TextFormat]) -> String {
+pub fn format_text_with_spans_to_html(
+    text: &str,
+    formatting: &[super::sticky_notes::TextFormat],
+) -> String {
     if formatting.is_empty() {
         // No formatting, return plain text with line breaks converted to <br>
         return text.replace("\n", "<br>");

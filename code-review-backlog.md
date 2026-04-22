@@ -4,10 +4,10 @@
 This backlog contains tasks identified during the comprehensive code review of the CoCoMiro infinite canvas application. Tasks are organized by severity level with actionable fixes.
 
 **Review Date:** April 2026
-**Total Issues:** 19
+**Total Issues:** 20
 **Completed:** 4 issues
 - 🔴 Critical: 2 issues ✅ (security & compatibility)
-- 🟠 High: 4 issues (memory leaks, API design)
+- 🟠 High: 5 issues (memory leaks, API design)
 - 🟡 Medium: 7 issues (2 ✅ performance, maintainability)
 - 🟢 Low: 6 issues (code quality, tests)
 
@@ -48,7 +48,48 @@ This backlog contains tasks identified during the comprehensive code review of t
 - [ ] Track and drop formatting button closures on overlay destruction
 - [ ] Add memory leak tests or monitoring
 
-### 4. Remove Duplicate #[cfg] Attributes
+### 4. Fix RefCell Double Borrow Panic in Text Input Overlay
+**Severity:** High
+**Files:** `src/text_input.rs`
+**Issue:** `create_text_input_overlay` passes both `state` and `&mut state.borrow_mut().text_input_overlay` to helper functions, causing RefCell double borrow panics when functions borrow `state` again.
+
+**Subtasks:**
+- [x] Restructure `create_text_input_overlay` to borrow `state` once at the top level
+- [x] Change helper function signatures to accept borrowed references instead of `&Rc<RefCell<AppState>>`
+- [x] Update `create_contenteditable_element` to take `&AppState` and `&mut TextInputOverlayState` separately
+- [x] Update `create_formatting_toolbar` and all downstream functions to work with borrowed references
+- [x] Ensure no function borrows `state` while `overlay_state` is mutably borrowed
+- [x] Test that overlay creation works without panics in browser
+- [x] Verify E2E tests still pass after refactoring
+
+### 5. Remove Duplicate #[cfg] Attributes
+**Severity:** High
+**Files:** `src/lib.rs`, `src/canvas.rs`
+**Issue:** Duplicate `#[cfg(target_arch = "wasm32")]` attributes on functions.
+
+**Subtasks:**
+- [ ] Remove duplicate `#[cfg(target_arch = "wasm32")]` from `start_impl()` in `src/lib.rs`
+- [ ] Remove duplicate `#[cfg(target_arch = "wasm32")]` from render functions in `src/canvas.rs`
+- [ ] Verify compilation still works for both targets
+
+### 6. Fix AppResult Type Availability
+**Severity:** High
+**Files:** `src/error.rs`
+**Issue:** `AppResult` type alias is only available on WASM target despite `AppError` being available everywhere.
+
+**Subtasks:**
+- [ ] Remove `#[cfg(target_arch = "wasm32")]` gate from `AppResult` type alias
+- [ ] Verify host compilation still works
+
+### 7. Refactor resize_to Function Signature
+**Severity:** High
+**Files:** `src/sticky_notes/state.rs`
+**Issue:** `resize_to` function has 11 parameters (clippy limit is 7), with 3 unused parameters.
+
+**Subtasks:**
+- [ ] Remove unused `_viewport`, `_viewport_width`, `_viewport_height` parameters
+- [ ] Consider bundling remaining parameters into a struct if still too many
+- [ ] Update all call sites to match new signature
 **Severity:** High
 **Files:** `src/lib.rs`, `src/canvas.rs`
 **Issue:** Duplicate `#[cfg(target_arch = "wasm32")]` attributes on functions.
@@ -79,7 +120,74 @@ This backlog contains tasks identified during the comprehensive code review of t
 
 ## Medium Priority Tasks
 
-### 7. Fix Hardcoded Viewport Dimensions in Cursor Detection
+### 8. Fix Hardcoded Viewport Dimensions in Cursor Detection
+**Severity:** Medium
+**Files:** `src/styling.rs`
+**Issue:** `update_canvas_cursor` uses hardcoded 800x600 instead of actual canvas dimensions.
+
+**Subtasks:**
+- [ ] Pass actual canvas width/height to `update_canvas_cursor` function
+- [ ] Update function signature to accept viewport dimensions
+- [ ] Test cursor behavior with different canvas sizes
+
+### 9. Optimize Redundant world_point_at Calls
+**Severity:** Medium
+**Files:** `src/styling.rs`
+**Issue:** Same `world_point_at` call made twice to get `.0` and `.1` coordinates.
+
+**Subtasks:**
+- [ ] Destructure the tuple once and reuse the values
+- [ ] Verify cursor detection still works correctly
+
+### 10. Remove Commented-Out Code
+**Severity:** Medium
+**Files:** `src/lib.rs`, `src/canvas.rs`
+**Issue:** Multiple instances of commented-out code adding noise to codebase.
+
+**Subtasks:**
+- [ ] Remove commented-out `hovered_resize_handle` field and related code
+- [ ] Remove commented-out handle color logic in canvas rendering
+- [ ] Ensure no functionality is lost
+
+### 11. Add Recursion Depth Limit to HTML Parser
+**Severity:** Medium
+**Files:** `src/canvas.rs`
+**Issue:** `parse_formatted_text` can recurse infinitely with deeply nested HTML.
+
+**Subtasks:**
+- [ ] Add max recursion depth parameter (e.g., 10 levels)
+- [ ] Return error or flatten content when depth exceeded
+- [ ] Add tests for deeply nested HTML parsing
+
+### 12. Implement Actual Delay in Render Retry Loop
+**Severity:** Medium
+**Files:** `src/lib.rs`
+**Issue:** Render retry loop has no actual delay between attempts.
+
+**Subtasks:**
+- [ ] Implement proper delay using `setTimeout` in WASM context
+- [ ] Consider exponential backoff for retries
+- [ ] Test retry behavior with artificial failures
+
+### 13. ✅ Remove Unused regex Dependency
+**Severity:** Medium
+**Files:** `Cargo.toml`
+**Issue:** `regex` crate is listed but never used in codebase.
+
+**Subtasks:**
+- [x] Search codebase for any regex usage (including comments)
+- [x] Remove `regex` dependency from `Cargo.toml` if truly unused
+- [x] Verify compilation and WASM build still work
+
+### 14. ✅ Remove Inline Style Duplication in Color Picker
+**Severity:** Medium
+**Files:** `src/text_input.rs`, `styles.css`
+**Issue:** Color picker functions set inline styles that duplicate CSS classes.
+
+**Subtasks:**
+- [x] Remove inline style setting in `create_color_picker_container` that duplicates `.color-picker` CSS
+- [x] Remove inline style setting in `create_color_option` that duplicates `.color-picker-option` CSS
+- [x] Test that styling still works correctly
 **Severity:** Medium
 **Files:** `src/styling.rs`
 **Issue:** `update_canvas_cursor` uses hardcoded 800x600 instead of actual canvas dimensions.
@@ -150,7 +258,66 @@ This backlog contains tasks identified during the comprehensive code review of t
 
 ## Low Priority Tasks
 
-### 14. Fix ElementStyling Trait Gating
+### 15. Fix ElementStyling Trait Gating
+**Severity:** Low
+**Files:** `src/styling.rs`
+**Issue:** `ElementStyling` trait not gated with `#[cfg(target_arch = "wasm32")]` despite using WASM types.
+
+**Subtasks:**
+- [ ] Add `#[cfg(target_arch = "wasm32")]` to `ElementStyling` trait and impl
+- [ ] Verify host compilation still works
+
+### 16. Make Test IDs Deterministic
+**Severity:** Low
+**Files:** `src/sticky_notes/types.rs`
+**Issue:** Global atomic ID counter makes test IDs non-deterministic.
+
+**Subtasks:**
+- [ ] Consider making ID generation deterministic for tests
+- [ ] Or document that ID assertions should avoid exact matching
+- [ ] Update test assertions if needed
+
+### 17. Fix Enter Key Behavior in Text Input
+**Severity:** Low
+**Files:** `src/text_input.rs`
+**Issue:** Enter key closes overlay instead of inserting newlines.
+
+**Subtasks:**
+- [ ] Change Enter key to insert newlines in contenteditable
+- [ ] Use Shift+Enter or other key combination to confirm edits
+- [ ] Update user documentation if needed
+
+### 18. Add DOM Element Cleanup Error Handling
+**Severity:** Low
+**Files:** `src/text_input.rs`
+**Issue:** Silent failure when removing DOM elements from overlays.
+
+**Subtasks:**
+- [ ] Handle `remove_child()` errors properly instead of ignoring with `let _ =`
+- [ ] Log cleanup failures or implement retry logic
+- [ ] Test overlay cleanup in error conditions
+
+### 19. Fix Clippy Warnings in Tests
+**Severity:** Low
+**Files:** `tests/e2e_home.rs`, `tests/integration_tests.rs`, `tests/visual_regression.rs`
+**Issue:** Various clippy warnings in test code.
+
+**Subtasks:**
+- [ ] Remove redundant `base64` import in visual regression tests
+- [ ] Replace `map_or(false, ...)` with `is_some_and(...)`
+- [ ] Fix needless borrows on string references
+- [ ] Remove or implement unused method `assert_sticky_note_color_picker_behavior`
+- [ ] Fix field assignments outside Default::default() initializers
+
+### 20. Make Event Constants Available on All Targets
+**Severity:** Low
+**Files:** `src/event_constants.rs`
+**Issue:** Constants only available on WASM target.
+
+**Subtasks:**
+- [ ] Remove `#[cfg(target_arch = "wasm32")]` from event constants
+- [ ] Verify host compilation still works
+- [ ] Consider if tests need access to these constants
 **Severity:** Low
 **Files:** `src/styling.rs`
 **Issue:** `ElementStyling` trait not gated with `#[cfg(target_arch = "wasm32")]` despite using WASM types.

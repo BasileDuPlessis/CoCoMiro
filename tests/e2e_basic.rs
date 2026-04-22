@@ -1,7 +1,10 @@
 #[path = "common/mod.rs"]
 mod common;
 use common::*;
-use headless_chrome::{Tab, browser::tab::{element::Element, point::Point}};
+use headless_chrome::{
+    Tab,
+    browser::tab::{element::Element, point::Point},
+};
 
 const MIN_EXPECTED_PAN_Y_DELTA: f64 = 50.0;
 const MIN_EXPECTED_TOOLBAR_X_DELTA: f64 = 40.0;

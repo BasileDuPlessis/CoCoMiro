@@ -413,7 +413,7 @@ mod integration_tests {
         // Test conversion between HTML and text+formatting spans
         #[cfg(target_arch = "wasm32")]
         {
-            use canvas::{parse_html_to_text_and_formatting, format_text_with_spans_to_html};
+            use canvas::{format_text_with_spans_to_html, parse_html_to_text_and_formatting};
 
             // Test basic conversion
             let html = "Hello <b>world</b> and <i>universe</i>";
@@ -444,7 +444,7 @@ mod integration_tests {
         // Test with nested formatting
         #[cfg(target_arch = "wasm32")]
         {
-            use canvas::{parse_html_to_text_and_formatting, format_text_with_spans_to_html};
+            use canvas::{format_text_with_spans_to_html, parse_html_to_text_and_formatting};
 
             let html = "Start <b>bold <i>bold-italic</i> still bold</b> end";
             let (text, spans) = parse_html_to_text_and_formatting(html);

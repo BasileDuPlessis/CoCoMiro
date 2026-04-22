@@ -1,7 +1,11 @@
 #[path = "common/mod.rs"]
 mod common;
 use common::*;
-use headless_chrome::{Tab, browser::tab::{element::Element, point::Point}, protocol::cdp::Input};
+use headless_chrome::{
+    Tab,
+    browser::tab::{element::Element, point::Point},
+    protocol::cdp::Input,
+};
 use std::{thread, time::Duration};
 
 fn assert_home_page_starts_clean(tab: &Tab) -> TestResult {
@@ -677,7 +681,10 @@ fn assert_text_formatting_works(tab: &Tab) -> TestResult {
     "#;
 
     let type_result = tab.evaluate(&type_script, false)?;
-    assert_eq!(type_result.value.as_ref().unwrap().as_str().unwrap(), "TYPED");
+    assert_eq!(
+        type_result.value.as_ref().unwrap().as_str().unwrap(),
+        "TYPED"
+    );
 
     // Select "world" (positions 6-11)
     let select_script = r#"
@@ -701,7 +708,10 @@ fn assert_text_formatting_works(tab: &Tab) -> TestResult {
     "#;
 
     let select_result = tab.evaluate(&select_script, false)?;
-    assert_eq!(select_result.value.as_ref().unwrap().as_str().unwrap(), "SELECTED");
+    assert_eq!(
+        select_result.value.as_ref().unwrap().as_str().unwrap(),
+        "SELECTED"
+    );
 
     // Click the bold button
     let bold_button = tab.find_element(".formatting-button--bold")?;
@@ -744,7 +754,8 @@ fn assert_text_formatting_works(tab: &Tab) -> TestResult {
             }}
         }})()
         "#,
-        center_x + 100.0, center_y + 100.0 // Click away from the note
+        center_x + 100.0,
+        center_y + 100.0 // Click away from the note
     );
 
     tab.evaluate(&click_outside_script, false)?;
