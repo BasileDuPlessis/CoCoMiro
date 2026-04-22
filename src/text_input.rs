@@ -15,8 +15,8 @@ use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
 
-// Thread-local storage for text input overlay closures to prevent memory leaks.
-// This stores the mousedown closures for toolbar and color picker elements.
+// Thread-local storage for overlay closures to prevent memory leaks.
+// This stores the document mousedown closures for overlays.
 #[cfg(target_arch = "wasm32")]
 thread_local! {
     static OVERLAY_CLOSURES: RefCell<Vec<wasm_bindgen::closure::Closure<dyn FnMut(web_sys::Event)>>> = RefCell::new(Vec::new());
@@ -970,41 +970,47 @@ fn setup_blur_event(
     let toolbar = toolbar.clone();
     let color_picker = color_picker.clone();
 
-    // Shared flag to track if toolbar/color picker was clicked
+    // Shared flag to track if any overlay element was clicked
     let overlay_clicked = Rc::new(RefCell::new(false));
 
-    // Set up mousedown handlers to track clicks on overlay elements
+    // Clone references for the document mousedown handler
+    let contenteditable_clone = contenteditable.clone();
+    let toolbar_clone = toolbar.clone();
+    let color_picker_clone = color_picker.clone();
     let overlay_clicked_clone = overlay_clicked.clone();
-    let toolbar_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
-        Box::new(move |_event: web_sys::Event| {
-            *overlay_clicked_clone.borrow_mut() = true;
+
+    // Set up a single document mousedown listener to track clicks on overlay elements
+    let document_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
+        Box::new(move |event: web_sys::Event| {
+            if let Ok(target) = event.target()
+                .ok_or_else(|| JsValue::from_str("No event target"))
+                .and_then(|t| Ok(t.dyn_into::<web_sys::Element>()?))
+            {
+                // Check if the clicked element is part of our overlay
+                let is_overlay_element = contenteditable_clone.contains(Some(&target))
+                    || toolbar_clone.contains(Some(&target))
+                    || color_picker_clone.contains(Some(&target))
+                    || target == *contenteditable_clone.dyn_ref::<web_sys::Element>().unwrap()
+                    || target == *toolbar_clone.dyn_ref::<web_sys::Element>().unwrap()
+                    || target == *color_picker_clone.dyn_ref::<web_sys::Element>().unwrap();
+
+                if is_overlay_element {
+                    *overlay_clicked_clone.borrow_mut() = true;
+                }
+            }
         }),
     );
-    toolbar
-        .add_event_listener_with_callback("mousedown", toolbar_mousedown.as_ref().unchecked_ref())
+
+    // Attach the document mousedown listener
+    document
+        .add_event_listener_with_callback("mousedown", document_mousedown.as_ref().unchecked_ref())
         .unwrap_or_else(|_| {
-            crate::logging::log_warn("Failed to attach toolbar mousedown event listener");
+            crate::logging::log_warn("Failed to attach document mousedown event listener");
         });
 
-    let overlay_clicked_clone2 = overlay_clicked.clone();
-    let color_picker_mousedown = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(
-        Box::new(move |_event: web_sys::Event| {
-            *overlay_clicked_clone2.borrow_mut() = true;
-        }),
-    );
-    color_picker
-        .add_event_listener_with_callback(
-            "mousedown",
-            color_picker_mousedown.as_ref().unchecked_ref(),
-        )
-        .unwrap_or_else(|_| {
-            crate::logging::log_warn("Failed to attach color picker mousedown event listener");
-        });
-
-    // Store closures in thread-local storage instead of forgetting them
+    // Store the document mousedown closure in thread-local storage
     OVERLAY_CLOSURES.with(|closures| {
-        closures.borrow_mut().push(toolbar_mousedown);
-        closures.borrow_mut().push(color_picker_mousedown);
+        closures.borrow_mut().push(document_mousedown);
     });
 
     wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(

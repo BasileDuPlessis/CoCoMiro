@@ -44,7 +44,7 @@ This backlog contains tasks identified during the comprehensive code review of t
 
 **Subtasks:**
 - [x] **3.1.1 Add Missing Closure Fields to TextInputOverlayState**: Add fields for toolbar and color picker mousedown closures
-- [ ] **3.1.2 Modify setup_blur_event Signature**: Change function to accept and store closures properly  
+- [x] **3.1.2 Modify setup_blur_event Signature**: Alternative implemented - replaced individual mousedown handlers with single document-level listener for better memory management  
 - [ ] **3.1.3 Update setup_blur_event Call Site**: Pass state parameter to setup_blur_event
 - [ ] **3.1.4 Verify Overlay Creation Still Works**: Test that overlays can still be created and basic editing works
 - [ ] **3.1.5 Verify Memory Leak Fix**: Confirm closures are properly cleaned up
