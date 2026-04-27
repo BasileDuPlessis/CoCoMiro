@@ -1049,7 +1049,14 @@ fn setup_blur_event(
 
 #[cfg(target_arch = "wasm32")]
 fn insert_sanitized_text(document: &web_sys::Document, text: &str) -> Result<(), JsValue> {
-    // Use document.execCommand to insert text
+    // Convert newlines to HTML <br> tags and escape HTML characters
+    let html_text = text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br>");
+
+    // Use document.execCommand to insert HTML
     let exec_command_fn = js_sys::Function::from(
         js_sys::Reflect::get(
             document.as_ref(),
@@ -1058,12 +1065,12 @@ fn insert_sanitized_text(document: &web_sys::Document, text: &str) -> Result<(),
         .unwrap(),
     );
 
-    // Call execCommand("insertText", false, text)
+    // Call execCommand("insertHTML", false, html_text)
     let _ = exec_command_fn.call3(
         document.as_ref(),
-        &wasm_bindgen::JsValue::from_str("insertText"),
+        &wasm_bindgen::JsValue::from_str("insertHTML"),
         &wasm_bindgen::JsValue::from_bool(false),
-        &wasm_bindgen::JsValue::from_str(text),
+        &wasm_bindgen::JsValue::from_str(&html_text),
     );
 
     crate::logging::log_info("Pasted content sanitized and inserted");
