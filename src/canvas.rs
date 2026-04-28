@@ -613,16 +613,43 @@ fn render_note_text_content(
     let text_y = screen_y + 8.0;
     let max_text_width = screen_width - 16.0; // Account for padding
 
-    // If there is no formatting, split plain text on '\n' and render each line directly
+    // If there is no formatting, split plain text on '\n', then wrap each line to fit within the note
     if note.formatting.is_empty() && !(note.content.contains('<') && note.content.contains('>')) {
         let lines: Vec<&str> = note.content.split('\n').collect();
         let mut y_offset = 0.0;
+        ctx.set_font("14px sans-serif");
         for line in lines {
-            let text = line;
-            ctx.set_font("14px sans-serif");
-            ctx.set_fill_style_str("#000000");
-            ctx.fill_text(text, text_x, text_y + y_offset)?;
-            y_offset += 18.0; // Line height
+            let mut current_line = String::new();
+            let mut current_width = 0.0;
+            for word in line.split_whitespace() {
+                let test_line = if current_line.is_empty() {
+                    word.to_string()
+                } else {
+                    format!("{} {}", current_line, word)
+                };
+                let test_width = ctx.measure_text(&test_line)?.width();
+                if test_width <= max_text_width {
+                    current_line = test_line;
+                    current_width = test_width;
+                } else {
+                    // Draw the current line and start a new one
+                    ctx.set_fill_style_str("#000000");
+                    ctx.fill_text(&current_line, text_x, text_y + y_offset)?;
+                    y_offset += 18.0;
+                    current_line = word.to_string();
+                    current_width = ctx.measure_text(&current_line)?.width();
+                }
+            }
+            // Draw any remaining text in the line
+            if !current_line.is_empty() {
+                ctx.set_fill_style_str("#000000");
+                ctx.fill_text(&current_line, text_x, text_y + y_offset)?;
+                y_offset += 18.0;
+            }
+            // If the line was empty, still advance y_offset for blank lines
+            if line.trim().is_empty() {
+                y_offset += 18.0;
+            }
         }
         return Ok(());
     }
