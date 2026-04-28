@@ -139,10 +139,10 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
             ("<u>", "underline", "</u>"),
             ("<u ", "underline", "</u>"),
             ("<span ", "span", "</span>"),
-            ("<br>", "br", "</br>"),
-            ("<br ", "br", "</br>"),
         ];
 
+        // Special handling for <br>, <br/>, <br /> (self-closing)
+        let br_pos = remaining.find("<br");
         let mut earliest_pos = None;
         let mut tag_info = None;
 
@@ -152,6 +152,49 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                     earliest_pos = Some(pos);
                     tag_info = Some((pos, *tag_type, *closing));
                 }
+            }
+        }
+
+        // Check if <br>, <br/>, or <br /> is the earliest tag
+        if let Some(pos) = br_pos {
+            // Only treat as <br> if it's the earliest tag
+            if earliest_pos.is_none() || pos < earliest_pos.unwrap() {
+                // Add text before the <br> as plain text
+                if pos > 0 {
+                    segments.push(TextSegment {
+                        text: remaining[..pos].to_string(),
+                        bold: false,
+                        italic: false,
+                        underline: false,
+                    });
+                }
+                // Find the end of the <br> tag (handle <br>, <br/>, <br />)
+                let after = &remaining[pos..];
+                let br_end = if after.starts_with("<br>") {
+                    pos + 4
+                } else if after.starts_with("<br/>") {
+                    pos + 5
+                } else if after.starts_with("<br />") {
+                    pos + 6
+                } else {
+                    // Not a recognized <br> tag, treat as plain text
+                    segments.push(TextSegment {
+                        text: remaining[pos..].to_string(),
+                        bold: false,
+                        italic: false,
+                        underline: false,
+                    });
+                    break;
+                };
+                // Insert a line break
+                segments.push(TextSegment {
+                    text: "\n".to_string(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                });
+                remaining = &remaining[br_end..];
+                continue;
             }
         }
 
@@ -190,16 +233,6 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 let has_underline =
                     tag_content.contains("text-decoration:") && tag_content.contains("underline");
                 (has_bold, has_italic, has_underline)
-            } else if tag_type == "br" {
-                // <br> tags represent line breaks
-                segments.push(TextSegment {
-                    text: "\n".to_string(),
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                });
-                remaining = &remaining[tag_end..];
-                continue;
             } else {
                 (
                     tag_type == "bold",
@@ -580,47 +613,49 @@ fn render_note_text_content(
     let text_y = screen_y + 8.0;
     let max_text_width = screen_width - 16.0; // Account for padding
 
-    // Generate HTML from plain text and formatting spans, then parse it
-    // Handle backward compatibility: if content contains HTML, use as-is; otherwise generate from spans
+    // If there is no formatting, split plain text on '\n' and render each line directly
+    if note.formatting.is_empty() && !(note.content.contains('<') && note.content.contains('>')) {
+        let lines: Vec<&str> = note.content.split('\n').collect();
+        let mut y_offset = 0.0;
+        for line in lines {
+            let text = line;
+            ctx.set_font("14px sans-serif");
+            ctx.set_fill_style_str("#000000");
+            ctx.fill_text(text, text_x, text_y + y_offset)?;
+            y_offset += 18.0; // Line height
+        }
+        return Ok(());
+    }
+
+    // Otherwise, use the existing rich text/HTML logic
     let html_content = if note.content.contains('<') && note.content.contains('>') {
-        // Legacy HTML content
         note.content.clone()
     } else {
-        // New format: generate HTML from plain text and formatting spans
         format_text_with_spans_to_html(&note.content, &note.formatting)
     };
     let formatted_segments = parse_formatted_text(&html_content);
 
-    // Process text with line breaks and wrapping while preserving formatting
     let mut all_lines = Vec::new();
     let mut current_line_segments = Vec::new();
     let mut current_line_width = 0.0;
 
     for segment in formatted_segments {
-        // Handle line breaks in the segment
         let lines_in_segment: Vec<&str> = segment.text.lines().collect();
-
         for (i, line_part) in lines_in_segment.iter().enumerate() {
             if i > 0 {
-                // This is a new line due to \n, finalize current line and start new one
                 if !current_line_segments.is_empty() {
                     all_lines.push(current_line_segments);
                     current_line_segments = Vec::new();
                     current_line_width = 0.0;
                 }
             }
-
             if line_part.is_empty() {
                 continue;
             }
-
-            // Process the line part character by character to preserve spaces
             let chars: Vec<char> = line_part.chars().collect();
             let mut current_word = String::new();
-
             for (_char_idx, &ch) in chars.iter().enumerate() {
                 if ch.is_whitespace() {
-                    // Finish current word if any
                     if !current_word.is_empty() {
                         let word_segment = TextSegment {
                             text: current_word.clone(),
@@ -628,20 +663,15 @@ fn render_note_text_content(
                             italic: segment.italic,
                             underline: segment.underline,
                         };
-
-                        // Calculate word width
                         let font = format_font(&word_segment, 14.0);
                         ctx.set_font(&font);
                         let word_width = ctx.measure_text(&word_segment.text)?.width();
-
-                        // Check if adding this word would exceed line width
                         if current_line_width + word_width <= max_text_width
                             || current_line_segments.is_empty()
                         {
                             current_line_segments.push(word_segment);
                             current_line_width += word_width;
                         } else {
-                            // Start new line
                             if !current_line_segments.is_empty() {
                                 all_lines.push(current_line_segments);
                             }
@@ -650,25 +680,20 @@ fn render_note_text_content(
                         }
                         current_word.clear();
                     }
-
-                    // Add space
                     let space_segment = TextSegment {
                         text: ch.to_string(),
                         bold: segment.bold,
                         italic: segment.italic,
                         underline: segment.underline,
                     };
-
                     ctx.set_font(&format_font(&space_segment, 14.0));
                     let space_width = ctx.measure_text(&space_segment.text)?.width();
-
                     if current_line_width + space_width <= max_text_width
                         || current_line_segments.is_empty()
                     {
                         current_line_segments.push(space_segment);
                         current_line_width += space_width;
                     } else {
-                        // Start new line with space
                         if !current_line_segments.is_empty() {
                             all_lines.push(current_line_segments);
                         }
@@ -679,8 +704,6 @@ fn render_note_text_content(
                     current_word.push(ch);
                 }
             }
-
-            // Add the last word if any
             if !current_word.is_empty() {
                 let word_segment = TextSegment {
                     text: current_word,
@@ -688,20 +711,15 @@ fn render_note_text_content(
                     italic: segment.italic,
                     underline: segment.underline,
                 };
-
-                // Calculate word width
                 let font = format_font(&word_segment, 14.0);
                 ctx.set_font(&font);
                 let word_width = ctx.measure_text(&word_segment.text)?.width();
-
-                // Check if adding this word would exceed line width
                 if current_line_width + word_width <= max_text_width
                     || current_line_segments.is_empty()
                 {
                     current_line_segments.push(word_segment);
                     current_line_width += word_width;
                 } else {
-                    // Start new line
                     if !current_line_segments.is_empty() {
                         all_lines.push(current_line_segments);
                     }
@@ -711,8 +729,6 @@ fn render_note_text_content(
             }
         }
     }
-
-    // Add the last line if not empty
     if !current_line_segments.is_empty() {
         all_lines.push(current_line_segments);
     }
