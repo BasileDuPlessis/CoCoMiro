@@ -141,6 +141,13 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
             ("<span ", "span", "</span>"),
         ];
 
+        // Helper to decode HTML entities in text
+        fn decode_html_entities(s: &str) -> String {
+            s.replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&")
+        }
+
         // Special handling for <br>, <br/>, <br /> (self-closing)
         let br_pos = remaining.find("<br");
         let mut earliest_pos = None;
@@ -162,7 +169,7 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 // Add text before the <br> as plain text
                 if pos > 0 {
                     segments.push(TextSegment {
-                        text: remaining[..pos].to_string(),
+                        text: decode_html_entities(&remaining[..pos]),
                         bold: false,
                         italic: false,
                         underline: false,
@@ -179,7 +186,7 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 } else {
                     // Not a recognized <br> tag, treat as plain text
                     segments.push(TextSegment {
-                        text: remaining[pos..].to_string(),
+                        text: decode_html_entities(&remaining[pos..]),
                         bold: false,
                         italic: false,
                         underline: false,
@@ -202,7 +209,7 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
             // Add text before the tag as plain text
             if pos > 0 {
                 segments.push(TextSegment {
-                    text: remaining[..pos].to_string(),
+                    text: decode_html_entities(&remaining[..pos]),
                     bold: false,
                     italic: false,
                     underline: false,
@@ -215,7 +222,7 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
             } else {
                 // Malformed tag, treat as plain text
                 segments.push(TextSegment {
-                    text: remaining[pos..].to_string(),
+                    text: decode_html_entities(&remaining[pos..]),
                     bold: false,
                     italic: false,
                     underline: false,
@@ -267,9 +274,9 @@ fn parse_formatted_text(text: &str) -> Vec<TextSegment> {
                 break;
             }
         } else {
-            // No more tags found, add remaining text as plain text
+            // No more tags found, add remaining text as plain text (decode HTML entities)
             segments.push(TextSegment {
-                text: remaining.to_string(),
+                text: decode_html_entities(remaining),
                 bold: false,
                 italic: false,
                 underline: false,
