@@ -620,7 +620,6 @@ fn render_note_text_content(
         ctx.set_font("14px sans-serif");
         for line in lines {
             let mut current_line = String::new();
-            let mut current_width = 0.0;
             for word in line.split_whitespace() {
                 let test_line = if current_line.is_empty() {
                     word.to_string()
@@ -630,14 +629,12 @@ fn render_note_text_content(
                 let test_width = ctx.measure_text(&test_line)?.width();
                 if test_width <= max_text_width {
                     current_line = test_line;
-                    current_width = test_width;
                 } else {
                     // Draw the current line and start a new one
                     ctx.set_fill_style_str("#000000");
                     ctx.fill_text(&current_line, text_x, text_y + y_offset)?;
                     y_offset += 18.0;
                     current_line = word.to_string();
-                    current_width = ctx.measure_text(&current_line)?.width();
                 }
             }
             // Draw any remaining text in the line
