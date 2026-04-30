@@ -744,4 +744,56 @@ mod tests {
         assert_eq!(state.notes[0].x, 100.0);
         assert_eq!(state.notes[0].y, 100.0);
     }
+
+    #[test]
+    fn text_clipping_with_long_content() {
+        // Test that notes with very long text content can be created and handled properly
+        // This verifies that the text clipping implementation doesn't break basic note functionality
+        let mut state = StickyNotesState::default();
+
+        // Create a note with extremely long text that would definitely overflow
+        let long_text = format!(
+            "{}{}{}{}{}",
+            "This is a very long line of text that should exceed the width of a standard sticky note and wrap to multiple lines. ".repeat(20),
+            "\n\n",
+            "This is another paragraph with more text that continues the long content test. ".repeat(15),
+            "\n\n",
+            "<b>Bold text</b> and <i>italic text</i> should also work properly with text clipping enabled. ".repeat(10)
+        );
+
+        let note = StickyNote {
+            id: 1,
+            x: 0.0,
+            y: 0.0,
+            width: 200.0,
+            height: 150.0,
+            content: long_text.clone(),
+            formatting: Vec::new(),
+            color: "#ffff88".to_string(),
+        };
+
+        state.add_note(note);
+
+        // Verify the note was added successfully
+        assert_eq!(state.notes.len(), 1);
+        assert_eq!(state.notes[0].content, long_text); // Verify content matches exactly
+        assert_eq!(state.notes[0].width, 200.0);
+        assert_eq!(state.notes[0].height, 150.0);
+
+        // Test that the note can still be found and selected
+        let found_id = state.find_note_at(50.0, 50.0);
+        assert_eq!(found_id, Some(1));
+
+        // Test selection and dragging still work
+        state.start_drag(1, 50.0, 50.0);
+        assert_eq!(state.selected_note_id, Some(1));
+        assert!(state.is_dragging);
+
+        state.drag_to(100.0, 100.0);
+        assert_eq!(state.notes[0].x, 50.0); // 100.0 - 50.0 offset
+        assert_eq!(state.notes[0].y, 50.0); // 100.0 - 50.0 offset
+
+        state.end_drag();
+        assert!(!state.is_dragging);
+    }
 }

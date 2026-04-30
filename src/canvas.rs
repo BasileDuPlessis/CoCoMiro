@@ -607,7 +607,7 @@ fn render_note_text_content(
     screen_x: f64,
     screen_y: f64,
     screen_width: f64,
-    _screen_height: f64,
+    screen_height: f64,
 ) -> crate::error::AppResult<()> {
     if note.content.is_empty() {
         return Ok(());
@@ -619,6 +619,13 @@ fn render_note_text_content(
     let text_x = screen_x + 8.0;
     let text_y = screen_y + 8.0;
     let max_text_width = screen_width - 16.0; // Account for padding
+    let max_text_height = screen_height - 16.0; // Account for padding
+
+    // Save canvas state and set clipping region to prevent text overflow
+    ctx.save();
+    ctx.begin_path();
+    ctx.rect(screen_x + 8.0, screen_y + 8.0, max_text_width, max_text_height);
+    ctx.clip();
 
     // If there is no formatting, split plain text on '\n', then wrap each line to fit within the note
     if note.formatting.is_empty() && !(note.content.contains('<') && note.content.contains('>')) {
@@ -655,6 +662,9 @@ fn render_note_text_content(
                 y_offset += 18.0;
             }
         }
+
+        // Restore canvas state to remove clipping
+        ctx.restore();
         return Ok(());
     }
 
@@ -671,6 +681,16 @@ fn render_note_text_content(
     let mut current_line_width = 0.0;
 
     for segment in formatted_segments {
+        // Special handling for line break segments created by <br> tags
+        if segment.text == "\n" {
+            // Always start a new line for line breaks, even if current line is empty
+            // This ensures consecutive line breaks create multiple blank lines
+            all_lines.push(current_line_segments);
+            current_line_segments = Vec::new();
+            current_line_width = 0.0;
+            continue;
+        }
+
         let lines_in_segment: Vec<&str> = segment.text.lines().collect();
         for (i, line_part) in lines_in_segment.iter().enumerate() {
             if i > 0 {
@@ -794,6 +814,9 @@ fn render_note_text_content(
         }
         y_offset += 18.0; // Line height
     }
+
+    // Restore canvas state to remove clipping
+    ctx.restore();
 
     Ok(())
 }

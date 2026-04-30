@@ -915,13 +915,15 @@ fn setup_keydown_event(
 
             match key {
                 "Enter" => {
-                    // Confirm changes on Enter (for test compatibility) or Ctrl/Shift+Enter
-                    // Confirm changes - content already updated via input handler
+                    if event.shift_key() {
+                        // Allow Shift+Enter to insert a line break (default behavior)
+                        return;
+                    }
+                    // Confirm changes on Enter (without Shift)
                     crate::logging::log_info(&format!(
                         "Text editing confirmed for note {}",
                         note_id
                     ));
-
                     // Remove the contenteditable overlay
                     if let Some(body) = document.body() {
                         let _ = body.remove_child(&toolbar);
@@ -938,14 +940,12 @@ fn setup_keydown_event(
                         "Text editing cancelled for note {}",
                         note_id
                     ));
-
                     // Remove the contenteditable overlay
                     if let Some(body) = document.body() {
                         let _ = body.remove_child(&toolbar);
                         let _ = body.remove_child(&contenteditable);
                         let _ = body.remove_child(&color_picker);
                     }
-
                     // Re-render to show restored content
                     render();
                 }

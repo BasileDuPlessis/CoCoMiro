@@ -1,0 +1,95 @@
+# Cline Rules for CoCoMiro
+
+## Core Principles
+
+1. **Don't assume. Don't hide confusion. Surface tradeoffs.**
+   - Ask clarifying questions when requirements are ambiguous
+   - Explicitly state assumptions and alternatives considered
+   - Document trade-offs in code comments when making design decisions
+
+2. **Minimum code that solves the problem. Nothing speculative.**
+   - Write only what's needed to solve the immediate problem
+   - No premature optimization or "future-proofing"
+   - Avoid adding features or abstractions that aren't required
+
+3. **Touch only what you must. Clean up only your own mess.**
+   - Make surgical changes to existing code
+   - Don't refactor unrelated code unless explicitly asked
+   - Only fix issues directly related to the current task
+
+4. **Define success criteria. Loop until verified.**
+   - Establish clear, testable success criteria before starting
+   - Verify changes work as expected (compile, test, run)
+   - Iterate until all criteria are met
+
+## Rust Best Practices
+
+### Code Quality
+- Follow Rust idioms and conventions from the Rust API Guidelines
+- Use `clippy` recommendations and fix all warnings
+- Run `cargo fmt` to ensure consistent formatting
+- Prefer `Result<T, E>` over panicking for error handling
+- Use `Option<T>` appropriately for nullable values
+- Avoid `unwrap()` and `expect()` in production code; handle errors explicitly
+
+### Ownership & Borrowing
+- Prefer borrowing (`&T`, `&mut T`) over taking ownership when possible
+- Use `Clone` judiciously; prefer references to avoid unnecessary copies
+- Leverage lifetime annotations when needed, but keep them simple
+- Use smart pointers (`Box`, `Rc`, `Arc`) only when necessary
+
+### Type Safety
+- Use strong types over primitives (newtype pattern) for domain concepts
+- Leverage the type system to prevent invalid states
+- Prefer enums with pattern matching over boolean flags
+- Use `#[non_exhaustive]` for public enums that may grow
+
+### Performance
+- Profile before optimizing
+- Use iterators and iterator adapters for collection operations
+- Prefer stack allocation over heap when possible
+- Use `&str` over `String` for function parameters when ownership isn't needed
+
+### Error Handling
+- Define custom error types using `thiserror` or similar
+- Provide context with errors using `anyhow` or custom error types
+- Use `?` operator for error propagation
+- Document error conditions in function documentation
+
+### Testing
+- Write unit tests for individual functions and modules
+- Use integration tests for end-to-end scenarios
+- Test error paths, not just happy paths
+- Use `#[cfg(test)]` for test-only code
+
+### Documentation
+- Document public APIs with `///` doc comments
+- Include examples in documentation when helpful
+- Explain "why" in comments, not "what" (code shows what)
+- Keep comments up-to-date with code changes
+
+### Dependencies
+- Minimize external dependencies
+- Prefer well-maintained, widely-used crates
+- Review dependency licenses for compatibility
+- Keep dependencies up-to-date for security
+
+### WebAssembly Specific (for this project)
+- Be mindful of binary size; avoid bloated dependencies
+- Use `wasm-bindgen` idiomatically for JS interop
+- Handle JS exceptions gracefully
+- Test in actual browser environments, not just unit tests
+
+### Project Structure
+- Keep modules focused and cohesive
+- Use `mod.rs` or single-file modules appropriately
+- Organize code by feature/domain, not by technical layer
+- Keep public API surface minimal
+
+## Workflow
+1. Understand the requirement and define success criteria
+2. Identify the minimal set of files to modify
+3. Make changes following Rust best practices
+4. Run `cargo check`, `cargo clippy`, and `cargo test`
+5. Verify the change solves the problem
+6. Document any non-obvious decisions
