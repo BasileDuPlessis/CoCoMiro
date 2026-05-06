@@ -39,6 +39,7 @@ use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, window};
 
 pub mod app;
+pub mod auth;
 pub mod canvas;
 pub mod error;
 pub mod event_constants;
@@ -56,8 +57,8 @@ pub mod viewport;
 /// Application state containing all data for the infinite canvas.
 ///
 /// This struct holds the complete state of the CoCoMiro application,
-/// including viewport settings and sticky note data. It's used for
-/// both testing and WebAssembly execution.
+/// including viewport settings, sticky note data, and authentication state.
+/// It's used for both testing and WebAssembly execution.
 #[derive(Debug, Clone)]
 pub struct AppState {
     /// Current viewport state (pan, zoom, drag status)
@@ -70,6 +71,8 @@ pub struct AppState {
     pub mouse_y: f64,
     // /// Current resizing operation state
     pub resizing: sticky_notes::ResizingState,
+    /// Authentication state and user management
+    pub auth: auth::AuthManager,
     // /// Currently hovered resize handle (note_id, handle)
     // pub hovered_resize_handle: Option<(u32, sticky_notes::ResizeHandle)>,
 }
@@ -82,6 +85,7 @@ impl Default for AppState {
             mouse_x: 0.0,
             mouse_y: 0.0,
             resizing: sticky_notes::ResizingState::default(),
+            auth: auth::AuthManager::default(),
             // hovered_resize_handle: None,
         }
     }
