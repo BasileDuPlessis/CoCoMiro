@@ -93,3 +93,37 @@
 4. Run `cargo check`, `cargo clippy`, and `cargo test`
 5. Verify the change solves the problem
 6. Document any non-obvious decisions
+
+## Cline-Specific Rules
+
+### Documentation Workflow
+For every task:
+- First read `PRODUCT_SPECIFICATION.md` and `ARCHITECTURE_DECISION_RECORD.md`
+- Do not assume architecture; follow ADRs explicitly
+- Before editing code, write a short implementation plan
+- After editing code, check whether `PRODUCT_SPECIFICATION.md` or `ARCHITECTURE_DECISION_RECORD.md` must be updated
+- Never update `ARCHITECTURE_DECISION_RECORD.md` for minor implementation details
+- Update `ARCHITECTURE_DECISION_RECORD.md` only for decisions that affect future development
+
+### Task Workflow Template
+
+## Task workflow
+
+1. Read:
+   - PRODUCT_SPECIFICATION.md
+   - ARCHITECTURE_DECISION_RECORD.md
+
+2. Identify:
+   - relevant spec section
+   - relevant ADR constraints
+
+3. Implement.
+
+4. Validate:
+   - tests pass
+   - app still matches specs
+   - ADRs were respected
+
+5. Documentation update:
+   - update PRODUCT_SPECIFICATION.md if behavior changed
+   - update ARCHITECTURE_DECISION_RECORD.md if architecture changed
