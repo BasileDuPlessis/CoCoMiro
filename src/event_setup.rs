@@ -50,6 +50,10 @@ impl EventContext {
         event: web_sys::MouseEvent,
         canvas: &HtmlCanvasElement,
     ) -> crate::error::AppResult<()> {
+        // Block canvas interactions if user is not authenticated
+        if !self.state.borrow().auth.state().is_authenticated() {
+            return Ok(()); // Silently ignore interactions when unauthenticated
+        }
         crate::mouse_events::handle_mouse_down(event, canvas, &self.state, &self.render)
     }
 
@@ -97,6 +101,10 @@ impl EventContext {
         event: web_sys::WheelEvent,
         canvas: &HtmlCanvasElement,
     ) -> crate::error::AppResult<()> {
+        // Block canvas interactions if user is not authenticated
+        if !self.state.borrow().auth.state().is_authenticated() {
+            return Ok(()); // Silently ignore interactions when unauthenticated
+        }
         crate::mouse_events::handle_wheel(event, canvas, &self.state, &self.render)
     }
 
@@ -106,6 +114,10 @@ impl EventContext {
         event: web_sys::KeyboardEvent,
         canvas: &HtmlCanvasElement,
     ) -> crate::error::AppResult<()> {
+        // Block canvas interactions if user is not authenticated
+        if !self.state.borrow().auth.state().is_authenticated() {
+            return Ok(()); // Silently ignore interactions when unauthenticated
+        }
         crate::keyboard_events::handle_key_down(event, canvas, &self.state, &self.render)
     }
 
@@ -115,6 +127,10 @@ impl EventContext {
         event: web_sys::MouseEvent,
         canvas: &HtmlCanvasElement,
     ) -> crate::error::AppResult<()> {
+        // Block canvas interactions if user is not authenticated
+        if !self.state.borrow().auth.state().is_authenticated() {
+            return Ok(()); // Silently ignore interactions when unauthenticated
+        }
         crate::mouse_events::handle_double_click(event, canvas, &self.state, &self.render)
     }
 
@@ -136,6 +152,11 @@ impl EventContext {
 
     /// Handles add note button clicks using the shared context.
     fn handle_add_note_click(&self, canvas: &HtmlCanvasElement) {
+        // Block toolbar interactions if user is not authenticated
+        if !self.state.borrow().auth.state().is_authenticated() {
+            return; // Silently ignore interactions when unauthenticated
+        }
+
         let viewport_width = f64::from(canvas.client_width().max(1));
         let viewport_height = f64::from(canvas.client_height().max(1));
 
@@ -362,6 +383,58 @@ fn setup_button_event_listeners(
             js_error_to_app_error(e, "failed to attach click listener to add note button")
         })?;
     on_add_note_click.forget();
+
+    // Click on login button
+    let on_login_click = Closure::<dyn FnMut()>::wrap(Box::new({
+        let context = context.clone();
+        move || {
+            // Trigger login through JavaScript
+            if let Err(error) = context.state.borrow().auth.login() {
+                crate::logging::log_error(&format!("Failed to trigger login: {:?}", error));
+            }
+        }
+    }));
+    let login_button = document
+        .get_element_by_id("login-button")
+        .ok_or_else(|| {
+            crate::error::AppError::Dom("login button element not found".to_string())
+        })?
+        .dyn_into::<web_sys::HtmlElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom("login button is not an HTML element".to_string())
+        })?;
+    login_button
+        .add_event_listener_with_callback("click", on_login_click.as_ref().unchecked_ref())
+        .map_err(|e| {
+            js_error_to_app_error(e, "failed to attach click listener to login button")
+        })?;
+    on_login_click.forget();
+
+    // Click on logout button
+    let on_logout_click = Closure::<dyn FnMut()>::wrap(Box::new({
+        let context = context.clone();
+        move || {
+            // Trigger logout through JavaScript
+            if let Err(error) = context.state.borrow().auth.logout() {
+                crate::logging::log_error(&format!("Failed to trigger logout: {:?}", error));
+            }
+        }
+    }));
+    let logout_button = document
+        .get_element_by_id("logout-button")
+        .ok_or_else(|| {
+            crate::error::AppError::Dom("logout button element not found".to_string())
+        })?
+        .dyn_into::<web_sys::HtmlElement>()
+        .map_err(|_| {
+            crate::error::AppError::Dom("logout button is not an HTML element".to_string())
+        })?;
+    logout_button
+        .add_event_listener_with_callback("click", on_logout_click.as_ref().unchecked_ref())
+        .map_err(|e| {
+            js_error_to_app_error(e, "failed to attach click listener to logout button")
+        })?;
+    on_logout_click.forget();
 
     Ok(())
 }

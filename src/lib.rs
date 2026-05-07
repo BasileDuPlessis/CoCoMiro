@@ -366,6 +366,204 @@ fn setup_window_resize_handler(
 }
 
 #[cfg(target_arch = "wasm32")]
+/// Sets up JavaScript callbacks for authentication events.
+///
+/// This function creates global JavaScript functions that the auth.js module
+/// can call when authentication state changes.
+///
+/// # Arguments
+/// * `state` - Reference to the application state containing auth manager
+/// * `render` - Function to trigger canvas re-rendering when auth state changes
+///
+/// # Returns
+/// * `Ok(())` - Callbacks set up successfully
+/// * `Err(AppError)` - Failed to set up callbacks
+fn setup_auth_callbacks(
+    state: &Rc<RefCell<AppState>>,
+    render: &Rc<dyn Fn()>,
+) -> crate::error::AppResult<()> {
+    let window = web_sys::window()
+        .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
+
+    // Callback for successful authentication
+    let state_clone = state.clone();
+    let render_clone = render.clone();
+    let notify_auth_success = Closure::<dyn FnMut(JsValue)>::wrap(Box::new(move |user_data: JsValue| {
+        let user = match state_clone.borrow().auth.parse_user_from_js(user_data) {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                logging::log_error("notifyAuthSuccess called with null/undefined user data");
+                return;
+            }
+            Err(err) => {
+                logging::log_error(&format!("Failed to parse user data in notifyAuthSuccess: {:?}", err));
+                return;
+            }
+        };
+
+        {
+            let mut app_state = state_clone.borrow_mut();
+            app_state.auth.handle_auth_success(user);
+        }
+
+        // Update login overlay visibility
+        update_login_overlay_visibility(&state_clone);
+
+        // Trigger re-render to show authenticated state
+        render_clone();
+    }));
+    window.set("notifyAuthSuccess", notify_auth_success.as_ref().unchecked_ref::<JsValue>());
+    notify_auth_success.forget();
+
+    // Callback for authentication errors
+    let state_clone = state.clone();
+    let notify_auth_error = Closure::<dyn FnMut(JsValue)>::wrap(Box::new(move |error: JsValue| {
+        let error_msg = error
+            .as_string()
+            .unwrap_or_else(|| "Unknown authentication error".to_string());
+
+        {
+            let mut app_state = state_clone.borrow_mut();
+            app_state.auth.handle_auth_error(error_msg);
+        }
+
+        // Update login overlay visibility
+        update_login_overlay_visibility(&state_clone);
+    }));
+    window.set("notifyAuthError", notify_auth_error.as_ref().unchecked_ref::<JsValue>());
+    notify_auth_error.forget();
+
+    // Callback for restored authentication state
+    let state_clone = state.clone();
+    let render_clone = render.clone();
+    let notify_auth_restored = Closure::<dyn FnMut(JsValue)>::wrap(Box::new(move |user_data: JsValue| {
+        let user = match state_clone.borrow().auth.parse_user_from_js(user_data) {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                logging::log_error("notifyAuthRestored called with null/undefined user data");
+                return;
+            }
+            Err(err) => {
+                logging::log_error(&format!("Failed to parse user data in notifyAuthRestored: {:?}", err));
+                return;
+            }
+        };
+
+        {
+            let mut app_state = state_clone.borrow_mut();
+            app_state.auth.handle_auth_success(user);
+        }
+
+        // Update login overlay visibility
+        update_login_overlay_visibility(&state_clone);
+
+        // Trigger re-render to show authenticated state
+        render_clone();
+    }));
+    window.set("notifyAuthRestored", notify_auth_restored.as_ref().unchecked_ref::<JsValue>());
+    notify_auth_restored.forget();
+
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Updates the visibility of the login overlay based on authentication state.
+///
+/// # Arguments
+/// * `state` - Reference to the application state
+fn update_login_overlay_visibility(state: &Rc<RefCell<AppState>>) {
+    let window = match web_sys::window() {
+        Some(window) => window,
+        None => {
+            logging::log_error("Window not available when updating login overlay");
+            return;
+        }
+    };
+
+    let document = match window.document() {
+        Some(document) => document,
+        None => {
+            logging::log_error("Document not available when updating login overlay");
+            return;
+        }
+    };
+
+    let overlay = match document.get_element_by_id("login-overlay") {
+        Some(overlay) => overlay,
+        None => {
+            logging::log_error("Login overlay element not found");
+            return;
+        }
+    };
+
+    let is_authenticated = state.borrow().auth.state().is_authenticated();
+
+    if is_authenticated {
+        // Hide overlay for authenticated users
+        let _ = overlay.set_attribute("aria-hidden", "true");
+        let _ = overlay.set_attribute("style", "display: none;");
+    } else {
+        // Show overlay for unauthenticated users
+        let _ = overlay.remove_attribute("aria-hidden");
+        let _ = overlay.set_attribute("style", "display: block;");
+    }
+
+    // Also update toolbar button visibility
+    update_toolbar_button_visibility(state);
+}
+
+/// Updates the visibility of toolbar buttons based on authentication state.
+///
+/// # Arguments
+/// * `state` - Reference to the application state
+#[cfg(target_arch = "wasm32")]
+fn update_toolbar_button_visibility(state: &Rc<RefCell<AppState>>) {
+    let window = match web_sys::window() {
+        Some(window) => window,
+        None => {
+            logging::log_error("Window not available when updating toolbar buttons");
+            return;
+        }
+    };
+
+    let document = match window.document() {
+        Some(document) => document,
+        None => {
+            logging::log_error("Document not available when updating toolbar buttons");
+            return;
+        }
+    };
+
+    let login_button = match document.get_element_by_id("login-button") {
+        Some(button) => button,
+        None => {
+            logging::log_error("Login button element not found");
+            return;
+        }
+    };
+
+    let logout_button = match document.get_element_by_id("logout-button") {
+        Some(button) => button,
+        None => {
+            logging::log_error("Logout button element not found");
+            return;
+        }
+    };
+
+    let is_authenticated = state.borrow().auth.state().is_authenticated();
+
+    if is_authenticated {
+        // Show logout button, hide login button for authenticated users
+        let _ = login_button.set_attribute("style", "display: none;");
+        let _ = logout_button.set_attribute("style", "display: block;");
+    } else {
+        // Show login button, hide logout button for unauthenticated users
+        let _ = login_button.set_attribute("style", "display: block;");
+        let _ = logout_button.set_attribute("style", "display: none;");
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 fn start_impl() -> crate::error::AppResult<()> {
     let browser_window = window()
         .ok_or_else(|| crate::error::AppError::BrowserEnv("window is unavailable".to_string()))?;
@@ -381,6 +579,14 @@ fn start_impl() -> crate::error::AppResult<()> {
     let toolbar_state = Rc::new(RefCell::new(toolbar::FloatingToolbarState::default()));
     let is_rendering = Rc::new(Cell::new(false));
 
+    // Initialize authentication state from stored tokens
+    {
+        let mut app_state = state.borrow_mut();
+        if let Err(error) = app_state.auth.initialize_from_storage() {
+            logging::log_warn(&format!("Failed to initialize auth from storage: {:?}", error));
+        }
+    }
+
     let (render, position_toolbar) = create_render_and_position_functions(
         &canvas,
         &context,
@@ -394,6 +600,9 @@ fn start_impl() -> crate::error::AppResult<()> {
 
     render();
     position_toolbar();
+
+    // Set up JavaScript authentication callbacks
+    setup_auth_callbacks(&state, &render)?;
 
     setup_event_system(
         &canvas,

@@ -89,7 +89,7 @@ CoCoMiro is a WebAssembly-based infinite canvas application built with Rust, pro
 - **AppState**: Central state container with viewport, notes, mouse position, and auth data
 - **ViewportState**: Pan coordinates, zoom level, drag status
 - **StickyNotesState**: Collection of notes with selection management
-- **AuthManager**: User authentication state (placeholder for future features)
+- **AuthManager**: User authentication state and Google OAuth management
 
 #### Persistence
 - **In-memory State**: Current implementation maintains state in memory
@@ -123,7 +123,7 @@ CoCoMiro is a WebAssembly-based infinite canvas application built with Rust, pro
 - **Sticky Notes**: Note creation, editing, and interaction
 - **Toolbar**: Floating UI element management
 - **Text Input**: Rich text editing functionality
-- **Auth**: User authentication (placeholder)
+- **Auth**: User authentication with Google OAuth
 
 ### Performance Characteristics
 - **Smooth Rendering**: 60fps target with frame skipping for slow operations
@@ -176,7 +176,6 @@ CoCoMiro is a WebAssembly-based infinite canvas application built with Rust, pro
 ## Future Extensibility
 
 ### Planned Features
-- **User Authentication**: Login/logout functionality
 - **Data Persistence**: Save/load canvas state
 - **Collaboration**: Real-time multi-user editing
 - **Export**: Canvas export to various formats
@@ -197,6 +196,7 @@ CoCoMiro is a WebAssembly-based infinite canvas application built with Rust, pro
 - ✅ Floating toolbar with all required actions
 - ✅ Proper coordinate system transformations
 - ✅ Cross-browser compatibility
+- ✅ User authentication with Google OAuth
 
 ### Quality Requirements
 - ✅ Comprehensive test coverage (unit, integration, E2E)

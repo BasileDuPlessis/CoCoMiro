@@ -1063,18 +1063,32 @@ pub fn render_canvas(
 
     let (width, height) = canvas_css_size(canvas)?;
 
-    // Render grid background
-    render_grid_background(
-        ctx,
-        width,
-        height,
-        state.viewport.zoom,
-        state.viewport.pan_x,
-        state.viewport.pan_y,
-    )?;
+    // Only render canvas content if user is authenticated
+    if state.auth.state().is_authenticated() {
+        // Render grid background
+        render_grid_background(
+            ctx,
+            width,
+            height,
+            state.viewport.zoom,
+            state.viewport.pan_x,
+            state.viewport.pan_y,
+        )?;
 
-    // Render sticky notes
-    render_sticky_notes(ctx, state, width, height)?;
+        // Render sticky notes
+        render_sticky_notes(ctx, state, width, height)?;
+    } else {
+        // Render a dimmed background for unauthenticated users
+        ctx.set_fill_style_str("#f8fafc");
+        ctx.fill_rect(0.0, 0.0, width, height);
+
+        // Optional: Add a subtle message or pattern
+        ctx.set_fill_style_str("#e2e8f0");
+        ctx.set_font("16px Inter, sans-serif");
+        ctx.set_text_align("center");
+        ctx.set_text_baseline("middle");
+        ctx.fill_text("Sign in to access your canvas", width / 2.0, height / 2.0)?;
+    }
 
     // Update canvas attributes and cursor
     update_canvas_attributes(canvas, state, width, height)?;
